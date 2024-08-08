@@ -587,6 +587,9 @@ require('lazy').setup({
         -- java
         jdtls = {},
 
+        -- bash
+        bashls = {},
+
         lua_ls = {
           -- cmd = {...},
           -- filetypes = { ...},
