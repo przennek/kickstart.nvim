@@ -10,11 +10,13 @@ return {
     'MunifTanjim/nui.nvim',
   },
   cmd = 'Neotree',
+  lazy = false,
   keys = {
     { '<A-1>', ':Neotree reveal<CR>', desc = 'NeoTree reveal' },
   },
   opts = {
     filesystem = {
+      hijack_netrw_behavior = 'open_current',
       window = {
         mappings = {
           ['<A-1>'] = 'close_window',
