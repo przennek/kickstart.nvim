@@ -6,13 +6,13 @@ return {
     local harpoon = require 'harpoon'
     harpoon:setup()
 
-    vim.keymap.set('n', '<leader>ha', function()
+    vim.keymap.set('n', '<leader>pa', function()
       harpoon:list():add()
-    end, { desc = '[H]arpoon [A]dd bookmark' })
+    end, { desc = 'Har[p]oon [A]dd bookmark' })
 
-    vim.keymap.set('n', '<leader>hr', function()
+    vim.keymap.set('n', '<leader>pr', function()
       harpoon:list():remove()
-    end, { desc = '[H]arpoon [R]emove bookmark' })
+    end, { desc = 'Har[p]oon [R]emove bookmark' })
 
     -- vim.keymap.set("n", "<C-h>", function() harpoon:list():select(1) end)
     -- vim.keymap.set("n", "<C-t>", function() harpoon:list():select(2) end)
