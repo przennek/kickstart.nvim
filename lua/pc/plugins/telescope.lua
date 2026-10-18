@@ -115,17 +115,64 @@ return {
         end
       end
     end
-    local function goto_class()
+    -- Go to Class: project classes only, like IDEA. Alt+N again inside the picker toggles
+    -- "include non-project items" (JDK, libraries, .venv…), keeping what you typed.
+    local class_kinds = { Class = true, Interface = true, Enum = true, Struct = true, Module = true }
+    local function in_project(filename, root)
+      return vim.startswith(filename, root .. '/')
+        and not filename:match '/%.venv/'
+        and not filename:match '/site%-packages/'
+        and not filename:match '/node_modules/'
+        and not filename:match '/target/'
+        and not filename:match '/build/'
+    end
+    local function goto_class(opts)
+      opts = opts or {}
       local bufnr = workspace_symbol_buf()
       if not bufnr then
         vim.notify('No language server running yet: open a source file first', vim.log.levels.WARN)
         return
       end
-      builtin.lsp_dynamic_workspace_symbols {
-        bufnr = bufnr,
-        prompt_title = 'Go to Class',
-        symbols = { 'class', 'interface', 'enum', 'struct', 'module' },
-      }
+      local root = vim.fn.getcwd()
+      local channel = require('plenary.async.control').channel
+      local cancel = function() end
+      local function request(prompt)
+        local tx, rx = channel.oneshot()
+        cancel()
+        cancel = vim.lsp.buf_request_all(bufnr, 'workspace/symbol', { query = prompt }, tx)
+        local items = {}
+        for client_id, response in pairs(rx()) do
+          local client = vim.lsp.get_client_by_id(client_id)
+          if response.result and client then
+            for _, item in ipairs(vim.lsp.util.symbols_to_items(response.result, bufnr, client.offset_encoding)) do
+              if class_kinds[item.kind] and (opts.include_all or in_project(item.filename, root)) then
+                table.insert(items, item)
+              end
+            end
+          end
+        end
+        return items
+      end
+
+      require('telescope.pickers')
+        .new({ bufnr = bufnr, default_text = opts.default_text }, {
+          prompt_title = opts.include_all and 'Go to Class (all places)' or 'Go to Class (project) · Alt+N: all places',
+          finder = require('telescope.finders').new_dynamic {
+            fn = request,
+            entry_maker = require('telescope.make_entry').gen_from_lsp_symbols { bufnr = bufnr },
+          },
+          previewer = require('telescope.config').values.qflist_previewer {},
+          sorter = require('telescope.config').values.generic_sorter {},
+          attach_mappings = function(prompt_bufnr, map)
+            map({ 'i', 'n' }, '<M-n>', function()
+              local text = require('telescope.actions.state').get_current_line()
+              require('telescope.actions').close(prompt_bufnr)
+              goto_class { include_all = not opts.include_all, default_text = text }
+            end)
+            return true
+          end,
+        })
+        :find()
     end
     vim.keymap.set('n', '<leader>sc', goto_class, { desc = '[S]earch [C]lass' })
     vim.keymap.set('n', '<leader>sn', goto_class, { desc = '[S]earch class by [N]ame' })
