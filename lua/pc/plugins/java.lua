@@ -39,6 +39,29 @@ local function start_jdtls()
     end
   end
 
+  local settings = {
+    java = {
+      configuration = { runtimes = jdk_runtimes() },
+      eclipse = { downloadSources = true },
+      maven = { downloadSources = true },
+      references = { includeDecompiledSources = true },
+      implementationsCodeLens = { enabled = true },
+      referencesCodeLens = { enabled = true },
+      inlayHints = { parameterNames = { enabled = 'all' } },
+      signatureHelp = { enabled = true },
+      contentProvider = { preferred = 'fernflower' }, -- decompiler, like IDEA
+      sources = { organizeImports = { starThreshold = 5, staticStarThreshold = 3 } },
+      completion = {
+        favoriteStaticMembers = {
+          'org.junit.jupiter.api.Assertions.*',
+          'org.junit.Assert.*',
+          'org.mockito.Mockito.*',
+          'org.assertj.core.api.Assertions.*',
+        },
+      },
+    },
+  }
+
   local java_home = jdk_home()
   jdtls.start_or_attach {
     name = 'jdtls',
@@ -51,29 +74,9 @@ local function start_jdtls()
     cmd_env = java_home and { JAVA_HOME = java_home, PATH = java_home .. '/bin:' .. vim.env.PATH } or nil,
     root_dir = root_dir,
     capabilities = require('cmp_nvim_lsp').default_capabilities(),
-    init_options = { bundles = bundles },
-    settings = {
-      java = {
-        configuration = { runtimes = jdk_runtimes() },
-        eclipse = { downloadSources = true },
-        maven = { downloadSources = true },
-        references = { includeDecompiledSources = true },
-        implementationsCodeLens = { enabled = true },
-        referencesCodeLens = { enabled = true },
-        inlayHints = { parameterNames = { enabled = 'all' } },
-        signatureHelp = { enabled = true },
-        contentProvider = { preferred = 'fernflower' }, -- decompiler, like IDEA
-        sources = { organizeImports = { starThreshold = 5, staticStarThreshold = 3 } },
-        completion = {
-          favoriteStaticMembers = {
-            'org.junit.jupiter.api.Assertions.*',
-            'org.junit.Assert.*',
-            'org.mockito.Mockito.*',
-            'org.assertj.core.api.Assertions.*',
-          },
-        },
-      },
-    },
+    -- settings go in init_options too: jdtls reads some of them only during initialize
+    init_options = { bundles = bundles, settings = settings },
+    settings = settings,
     on_attach = function(_, bufnr)
       -- Hot code replace on every change, same as RunHotswapAlways in your IDEA debugger settings
       jdtls.setup_dap { hotcodereplace = 'auto' }
