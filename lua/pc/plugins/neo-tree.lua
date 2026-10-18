@@ -1,6 +1,28 @@
 -- Neo-tree is a Neovim plugin to browse the file system
 -- https://github.com/nvim-neo-tree/neo-tree.nvim
 
+-- Alt+1 (Project tool window): reveal the current file without ever asking to change the cwd.
+--  * diff buffers (diffview://…/.git/<rev>/path) reveal the same path in the repo
+--  * files outside the cwd open the tree rooted at their project / directory
+--    (the tree is not bound to the cwd, so Neovim's cwd stays where it is)
+--  * buffers that aren't files (decompiled jdt:// classes, terminals…) just open the project tree
+local function project_tree()
+  local name = vim.api.nvim_buf_get_name(0)
+  local repo, rel = name:match '^diffview://(.-)/%.git/[^/]+/(.+)$'
+  local file = repo and (repo .. '/' .. rel) or name
+  local command = require 'neo-tree.command'
+  local cwd = vim.fn.getcwd()
+
+  if vim.bo.buftype ~= '' and not repo or not vim.uv.fs_stat(file) then
+    return command.execute { action = 'focus', source = 'filesystem', dir = cwd }
+  end
+  local dir = cwd
+  if not vim.startswith(file, cwd .. '/') then
+    dir = vim.fs.root(file, { '.git', 'pom.xml', 'build.gradle', 'pyproject.toml', 'Makefile' }) or vim.fs.dirname(file)
+  end
+  command.execute { action = 'focus', source = 'filesystem', dir = dir, reveal_file = file }
+end
+
 return {
   'nvim-neo-tree/neo-tree.nvim',
   version = '*',
@@ -12,11 +34,13 @@ return {
   cmd = 'Neotree',
   lazy = false,
   keys = {
-    { '<A-1>', ':Neotree reveal<CR>', desc = 'NeoTree reveal' },
+    { '<A-1>', project_tree, desc = 'Project (reveal current file)' },
   },
   opts = {
     filesystem = {
       hijack_netrw_behavior = 'open_current',
+      -- Opening the tree somewhere else must not change Neovim's cwd
+      bind_to_cwd = false,
       window = {
         mappings = {
           ['<A-1>'] = 'close_window',

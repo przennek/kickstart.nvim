@@ -44,6 +44,10 @@ vim.opt.smartcase = true
 -- :s replaces all matches in a line by default (same as `set gdefault` in .ideavimrc)
 vim.opt.gdefault = true
 
+-- Back / Forward (Ctrl+O / Ctrl+I, Alt+H / Alt+L, Cmd+Shift+P / N) behave like IDEA's
+-- navigation history: jumping somewhere new after going back drops the "forward" part
+vim.opt.jumpoptions = 'stack,view'
+
 -- Keep signcolumn on by default
 vim.opt.signcolumn = 'yes'
 

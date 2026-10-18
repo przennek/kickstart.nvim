@@ -66,6 +66,49 @@ return {
       require('dap').set_breakpoint(vim.fn.input 'Breakpoint condition: ')
     end
 
+    -- F7 / Shift+F7 in a diff window jump to the next / previous change (and past the last
+    -- one to the next / previous file in Diffview), like IDEA's diff viewer.
+    -- Outside of a diff F7 is Step Into.
+    local function diff_change(dir, fallback)
+      return function()
+        local in_diffview = package.loaded['diffview'] and require('diffview.lib').get_current_view()
+        if not vim.wo.diff and in_diffview then
+          -- e.g. focus is in the file panel: move to the working-tree (right) side of the diff
+          local wins = vim.tbl_filter(function(win)
+            return vim.wo[win].diff
+          end, vim.api.nvim_tabpage_list_wins(0))
+          if wins[#wins] then
+            vim.api.nvim_set_current_win(wins[#wins])
+          end
+        end
+        if not vim.wo.diff then
+          return fallback and fallback()
+        end
+        local before = vim.api.nvim_win_get_cursor(0)
+        vim.cmd.normal { dir == 'next' and ']c' or '[c', bang = true }
+        local stuck = vim.deep_equal(before, vim.api.nvim_win_get_cursor(0))
+        if stuck and in_diffview then
+          require('diffview.actions')[dir == 'next' and 'select_next_entry' or 'select_prev_entry']()
+          -- Land on the first change of the next file (or the last one of the previous file)
+          -- once Diffview has loaded it
+          vim.defer_fn(function()
+            local wins = vim.tbl_filter(function(win)
+              return vim.wo[win].diff
+            end, vim.api.nvim_tabpage_list_wins(0))
+            if not wins[#wins] then
+              return
+            end
+            vim.api.nvim_set_current_win(wins[#wins])
+            local edge = dir == 'next' and 1 or vim.fn.line '$'
+            vim.api.nvim_win_set_cursor(0, { edge, 0 })
+            if vim.fn.diff_hlID(edge, 1) == 0 then
+              vim.cmd.normal { dir == 'next' and ']c' or '[c', bang = true }
+            end
+          end, 150)
+        end
+      end
+    end
+
     -- IntelliJ IDEA (Default for XWin) debugger keys. Inside tmux modified F-keys arrive
     -- as F13+ (Shift +12, Ctrl +24, Ctrl+Shift +36, Alt +48), so both forms are mapped.
     return {
@@ -74,7 +117,9 @@ return {
       { '<F21>', dap 'continue', desc = 'Debug: Start/Continue' },
       { '<F9>', dap 'continue', desc = 'Debug: Resume' },
       { '<F8>', dap 'step_over', desc = 'Debug: Step Over' },
-      { '<F7>', dap 'step_into', desc = 'Debug: Step Into' },
+      { '<F7>', diff_change('next', dap 'step_into'), desc = 'Next change (diff) / Step Into' },
+      { '<S-F7>', diff_change 'prev', desc = 'Previous change (diff)' },
+      { '<F19>', diff_change 'prev', desc = 'Previous change (diff)' },
       { '<S-F8>', dap 'step_out', desc = 'Debug: Step Out' },
       { '<F20>', dap 'step_out', desc = 'Debug: Step Out' },
       { '<M-F9>', dap 'run_to_cursor', desc = 'Debug: Run to Cursor' },

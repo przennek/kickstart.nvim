@@ -1,5 +1,30 @@
 -- Git, IDEA style. Everything VCS lives under <leader>v (the VCS menu),
 -- plus the tool windows: Alt+0 = Commit, Alt+9 = Git log.
+
+-- Compare with Branch: pick a local or remote branch, then diff the current file
+-- (or the whole working tree) against it in Diffview
+local function compare_with_branch(file_only)
+  return function()
+    local file = vim.fn.expand '%:p'
+    require('telescope.builtin').git_branches {
+      prompt_title = file_only and ('Compare ' .. vim.fn.expand '%:t' .. ' with branch') or 'Compare project with branch',
+      attach_mappings = function(prompt_bufnr)
+        local actions = require 'telescope.actions'
+        actions.select_default:replace(function()
+          local entry = require('telescope.actions.state').get_selected_entry()
+          actions.close(prompt_bufnr)
+          local cmd = 'DiffviewOpen ' .. entry.value
+          if file_only then
+            cmd = cmd .. ' -- ' .. vim.fn.fnameescape(file)
+          end
+          vim.cmd(cmd)
+        end)
+        return true
+      end,
+    }
+  end
+end
+
 return {
   -- The git fugitive (Annotate = :Git blame)
   {
@@ -37,6 +62,8 @@ return {
       { '<leader>vh', '<cmd>DiffviewFileHistory %<CR>', desc = 'VCS: File [h]istory' },
       { '<leader>vh', ":'<,'>DiffviewFileHistory<CR>", mode = 'v', desc = 'VCS: Selection history' },
       { '<leader>vd', '<cmd>DiffviewOpen<CR>', desc = 'VCS: [D]iff working tree' },
+      { '<leader>vw', compare_with_branch(true), desc = 'VCS: Compare file [w]ith branch' },
+      { '<leader>vW', compare_with_branch(false), desc = 'VCS: Compare project [W]ith branch' },
     },
     opts = function()
       -- q closes a diff / history tab, like Esc on an IDEA dialog

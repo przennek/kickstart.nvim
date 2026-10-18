@@ -94,8 +94,35 @@ return {
 
     -- [[ IDEA-like navigation ]]
     -- GotoClass: workspace symbols narrowed to types
+    -- Works from any buffer (file tree, diff, Markdown…): asks a buffer whose language
+    -- server can search the workspace, preferring the current one.
+    local function workspace_symbol_buf()
+      local method = 'workspace/symbol'
+      local function capable(buf)
+        for _, client in ipairs(vim.lsp.get_clients { bufnr = buf }) do
+          if client:supports_method(method, buf) then
+            return true
+          end
+        end
+      end
+      if capable(0) then
+        return vim.api.nvim_get_current_buf()
+      end
+      for _, client in ipairs(vim.lsp.get_clients { method = method }) do
+        local buf = next(client.attached_buffers)
+        if buf then
+          return buf
+        end
+      end
+    end
     local function goto_class()
+      local bufnr = workspace_symbol_buf()
+      if not bufnr then
+        vim.notify('No language server running yet: open a source file first', vim.log.levels.WARN)
+        return
+      end
       builtin.lsp_dynamic_workspace_symbols {
+        bufnr = bufnr,
         prompt_title = 'Go to Class',
         symbols = { 'class', 'interface', 'enum', 'struct', 'module' },
       }
@@ -103,7 +130,9 @@ return {
     vim.keymap.set('n', '<leader>sc', goto_class, { desc = '[S]earch [C]lass' })
     vim.keymap.set('n', '<leader>sn', goto_class, { desc = '[S]earch class by [N]ame' })
     vim.keymap.set('n', '<M-n>', goto_class, { desc = 'Go to Class' })
-    vim.keymap.set('n', '<leader>sS', builtin.lsp_dynamic_workspace_symbols, { desc = '[S]earch [S]ymbol' })
+    vim.keymap.set('n', '<leader>sS', function()
+      builtin.lsp_dynamic_workspace_symbols { bufnr = workspace_symbol_buf() }
+    end, { desc = '[S]earch [S]ymbol' })
     vim.keymap.set('n', '<M-N>', builtin.find_files, { desc = 'Go to File' })
     -- Switcher: open files, most recently used first
     vim.keymap.set('n', '<leader>q', function()
