@@ -47,6 +47,16 @@ return {
         require('dapui')[fn](unpack(args))
       end
     end
+    -- Alt+5: hide whatever part of the debug UI is open, or open all of it
+    local function toggle_ui()
+      for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+        local ft = vim.bo[vim.api.nvim_win_get_buf(win)].filetype
+        if ft:match '^dapui_' or ft == 'dap-repl' then
+          return require('dapui').close()
+        end
+      end
+      require('dapui').open()
+    end
     local function tdap(picker)
       return function()
         require('telescope').extensions.dap[picker]()
@@ -80,13 +90,13 @@ return {
       { '<C-F5>', dap 'restart', desc = 'Debug: Rerun' },
       { '<F29>', dap 'restart', desc = 'Debug: Rerun' },
       -- Debug tool window (Alt+5)
-      { '<M-5>', dapui 'toggle', desc = 'Debug: Toggle UI' },
+      { '<M-5>', toggle_ui, desc = 'Debug: Toggle UI' },
 
       { '<leader>b', dap 'toggle_breakpoint', desc = 'Debug: Toggle Breakpoint' },
       { '<leader>B', conditional_breakpoint, desc = 'Debug: Conditional Breakpoint' },
 
       -- <leader>x: Run / Debug (<leader>d closes the file, like CloseContent in .ideavimrc)
-      { '<leader>xu', dapui 'toggle', desc = 'Debug: Toggle UI' },
+      { '<leader>xu', toggle_ui, desc = 'Debug: Toggle UI' },
       { '<leader>xe', dapui 'eval', mode = { 'n', 'v' }, desc = 'Debug: Evaluate Expression' },
       { '<leader>xc', dap 'clear_breakpoints', desc = 'Debug: Clear All Breakpoints' },
       { '<leader>xC', dap 'run_to_cursor', desc = 'Debug: Run to Cursor' },
@@ -192,9 +202,24 @@ return {
       },
     }
 
-    dap.listeners.after.event_initialized['dapui_config'] = dapui.open
-    dap.listeners.before.event_terminated['dapui_config'] = dapui.close
-    dap.listeners.before.event_exited['dapui_config'] = dapui.close
+    -- Like IDEA's Run / Debug tool windows: a Run (noDebug) session only opens the console
+    -- at the bottom (layout 2); a Debug session opens everything. When the program ends the
+    -- console stays with its output and only the debug panels (layout 1) close. Alt+5 hides it.
+    -- Hooked on the launch / attach response: in noDebug mode the Java adapter sends no `initialized` event
+    local function on_start(session)
+      if session.config.noDebug then
+        dapui.open { layout = 2 }
+      else
+        dapui.open()
+      end
+    end
+    dap.listeners.after.launch['dapui_config'] = on_start
+    dap.listeners.after.attach['dapui_config'] = on_start
+    local function on_end()
+      dapui.close { layout = 1 }
+    end
+    dap.listeners.before.event_terminated['dapui_config'] = on_end
+    dap.listeners.before.event_exited['dapui_config'] = on_end
 
     -- Virtual text for debugging (shows variable values inline)
     require('nvim-dap-virtual-text').setup {
