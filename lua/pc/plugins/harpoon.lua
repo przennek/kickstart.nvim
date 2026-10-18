@@ -6,13 +6,14 @@ return {
     local harpoon = require 'harpoon'
     harpoon:setup()
 
-    vim.keymap.set('n', '<leader>pa', function()
+    -- <leader>pa / pr / sb are line bookmarks now (bookmarks.lua), Harpoon pins whole files
+    vim.keymap.set('n', '<leader>pf', function()
       harpoon:list():add()
-    end, { desc = 'Har[p]oon [A]dd bookmark' })
+    end, { desc = 'Har[p]oon pin [f]ile' })
 
-    vim.keymap.set('n', '<leader>pr', function()
+    vim.keymap.set('n', '<leader>pF', function()
       harpoon:list():remove()
-    end, { desc = 'Har[p]oon [R]emove bookmark' })
+    end, { desc = 'Har[p]oon unpin [F]ile' })
 
     -- vim.keymap.set("n", "<C-h>", function() harpoon:list():select(1) end)
     -- vim.keymap.set("n", "<C-t>", function() harpoon:list():select(2) end)
@@ -43,8 +44,8 @@ return {
         :find()
     end
 
-    vim.keymap.set('n', '<leader>sb', function()
+    vim.keymap.set('n', '<leader>pl', function()
       toggle_telescope(harpoon:list())
-    end, { desc = '[S]earch harpoon [B]ookmarks window' })
+    end, { desc = 'Har[p]oon pinned files [l]ist' })
   end,
 }

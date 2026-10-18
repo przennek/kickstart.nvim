@@ -1,40 +1,52 @@
-return { -- Highlight, edit, and navigate code
+-- Highlight, edit, and navigate code
+-- nvim-treesitter `main` branch (the old `master` one breaks on Neovim 0.12, e.g. in Markdown).
+-- It only installs parsers and queries; highlighting/indent are started per filetype below.
+-- Needs tree-sitter-cli, which Mason installs (see lsp.lua).
+local parsers = { 'bash', 'c', 'cpp', 'diff', 'html', 'java', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'python', 'query', 'vim', 'vimdoc', 'xml', 'yaml', 'json' }
+
+return {
   'nvim-treesitter/nvim-treesitter',
+  branch = 'main',
+  lazy = false,
   build = ':TSUpdate',
-  opts = {
-    ensure_installed = { 'bash', 'c', 'cpp', 'diff', 'html', 'java', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'python', 'query', 'vim', 'vimdoc' },
-    -- Autoinstall languages that are not installed
-    auto_install = true,
-    highlight = {
-      enable = true,
-      -- Some languages depend on vim's regex highlighting system (such as Ruby) for indent rules.
-      --  If you are experiencing weird indenting issues, add the language to
-      --  the list of additional_vim_regex_highlighting and disabled languages for indent.
-      additional_vim_regex_highlighting = { 'ruby' },
-    },
-    indent = { enable = true, disable = { 'ruby' } },
-    -- Extend Selection / Shrink Selection (Alt+W in IDEA)
-    incremental_selection = {
-      enable = true,
-      keymaps = {
-        init_selection = '<M-w>',
-        node_incremental = '<M-w>',
-        node_decremental = '<M-W>',
-        scope_incremental = false,
-      },
-    },
-  },
-  config = function(_, opts)
-    -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
+  config = function()
+    local ts = require 'nvim-treesitter'
+    ts.install(parsers)
 
-    ---@diagnostic disable-next-line: missing-fields
-    require('nvim-treesitter.configs').setup(opts)
+    vim.api.nvim_create_autocmd('FileType', {
+      group = vim.api.nvim_create_augroup('pc-treesitter', { clear = true }),
+      callback = function(event)
+        local lang = vim.treesitter.language.get_lang(event.match)
+        if not lang then
+          return
+        end
+        local function start()
+          if vim.api.nvim_buf_is_valid(event.buf) and pcall(vim.treesitter.start, event.buf, lang) then
+            vim.bo[event.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+          end
+        end
+        -- Autoinstall languages that are not installed yet
+        if not vim.tbl_contains(ts.get_installed(), lang) and vim.tbl_contains(ts.get_available(), lang) then
+          ts.install(lang):await(vim.schedule_wrap(start))
+        else
+          start()
+        end
+      end,
+    })
 
-    -- There are additional nvim-treesitter modules that you can use to interact
-    -- with nvim-treesitter. You should go explore a few and see what interests you:
-    --
-    --    - Incremental selection: Included, see `:help nvim-treesitter-incremental-selection-mod`
-    --    - Show your current context: https://github.com/nvim-treesitter/nvim-treesitter-context
-    --    - Treesitter + textobjects: https://github.com/nvim-treesitter/nvim-treesitter-textobjects
+    -- Extend Selection / Shrink Selection (Alt+W / Alt+Shift+W in IDEA), built on Neovim's
+    -- node selection (:help v_an, v_in). Called directly because mini.ai takes over `an` / `in`.
+    local function select_node(parent)
+      return function()
+        if vim.treesitter.get_parser(nil, nil, { error = false }) then
+          require('vim.treesitter._select')[parent and 'select_parent' or 'select_child'](vim.v.count1)
+        else
+          vim.lsp.buf.selection_range(parent and vim.v.count1 or -vim.v.count1)
+        end
+      end
+    end
+    vim.keymap.set('x', '<M-w>', select_node(true), { desc = 'Extend selection' })
+    vim.keymap.set('x', '<M-W>', select_node(false), { desc = 'Shrink selection' })
+    vim.keymap.set('n', '<M-w>', 'v<M-w>', { remap = true, desc = 'Extend selection' })
   end,
 }

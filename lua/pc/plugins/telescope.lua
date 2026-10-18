@@ -44,7 +44,19 @@ return {
 
     -- [[ Configure Telescope ]]
     -- See `:help telescope` and `:help telescope.setup()`
+    -- Ctrl+T in any picker moves all its results to the Find window at the bottom (Alt+3)
+    local function open_in_find_window(prompt_bufnr)
+      require('telescope.actions').send_to_qflist(prompt_bufnr)
+      require('trouble').open 'quickfix'
+    end
+
     require('telescope').setup {
+      defaults = {
+        mappings = {
+          i = { ['<C-t>'] = open_in_find_window },
+          n = { ['<C-t>'] = open_in_find_window },
+        },
+      },
       -- You can put your default mappings / updates / etc. in here
       --  All the info you're looking for is in `:help telescope.setup()`
       --

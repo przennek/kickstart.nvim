@@ -47,7 +47,8 @@ return {
       vim.api.nvim_create_autocmd({ 'BufEnter', 'BufWritePost', 'InsertLeave' }, {
         group = lint_augroup,
         callback = function()
-          lint.try_lint()
+          -- linters that aren't installed (e.g. markdownlint) are skipped silently
+          lint.try_lint(nil, { ignore_errors = true })
         end,
       })
     end,

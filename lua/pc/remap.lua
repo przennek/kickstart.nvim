@@ -65,8 +65,8 @@ end, { desc = 'Close file (keep window)' })
 map('n', '<M-h>', '<C-o>', { desc = 'Back' })
 map('n', '<M-l>', '<C-i>', { desc = 'Forward' })
 
--- Problems: F2 / Shift+F2 = next / previous, Alt+F1 = error description, Alt+6 = list
--- (F14 / F49 are what Shift+F2 / Alt+F1 arrive as inside tmux)
+-- Problems: F2 / Shift+F2 = next / previous, Alt+F1 = error description
+-- (F14 / F49 are what Shift+F2 / Alt+F1 arrive as inside tmux); Alt+6 window is in ide-ui.lua
 local function jump_diag(count)
   return function()
     vim.diagnostic.jump { count = count, float = true }
@@ -77,6 +77,3 @@ map('n', '<S-F2>', jump_diag(-1), { desc = 'Previous problem' })
 map('n', '<F14>', jump_diag(-1), { desc = 'Previous problem' })
 map('n', '<M-F1>', vim.diagnostic.open_float, { desc = 'Show error description' })
 map('n', '<F49>', vim.diagnostic.open_float, { desc = 'Show error description' })
-map('n', '<M-6>', function()
-  require('telescope.builtin').diagnostics()
-end, { desc = 'Problems' })

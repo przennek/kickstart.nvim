@@ -1,5 +1,50 @@
--- IDEA-like tool windows: Structure, navigation bar, terminal.
+-- IDEA-like tool windows: Find, Structure, navigation bar, terminal.
+
+-- The Find tool window (Alt+3) shows the quickfix list: search results are sent there
+-- (Ctrl+T in a picker, Alt+F7 usages), so they stay put while you walk through them,
+-- and older searches are kept (:colder / :cnewer, like the tabs in IDEA's Find window).
+local function find_toggle()
+  local trouble = require 'trouble'
+  if trouble.is_open 'quickfix' then
+    trouble.close 'quickfix'
+  else
+    trouble.open 'quickfix'
+  end
+end
+
+local function find_history(cmd)
+  return function()
+    if pcall(vim.cmd, cmd) then
+      require('trouble').open 'quickfix'
+    end
+  end
+end
+
 return {
+  -- Find / Problems tool windows at the bottom
+  {
+    'folke/trouble.nvim',
+    cmd = 'Trouble',
+    keys = {
+      { '<M-3>', find_toggle, desc = 'Find window (toggle)' },
+      { '<leader>s[', find_history 'colder', desc = 'Previous search results' },
+      { '<leader>s]', find_history 'cnewer', desc = 'Next search results' },
+      {
+        '<M-6>',
+        function()
+          require('trouble').toggle 'diagnostics'
+        end,
+        desc = 'Problems window (toggle)',
+      },
+      -- ]q / [q (Neovim defaults: :cnext / :cprev) walk the results without opening the window
+    },
+    opts = {
+      focus = true, -- jump into the window, like IDEA's tool windows
+      auto_preview = true,
+      follow = false, -- don't move the selection along with the editor cursor
+      win = { size = 12 },
+    },
+  },
   -- Structure (Alt+7) and File Structure popup (<leader>k)
   {
     'stevearc/aerial.nvim',

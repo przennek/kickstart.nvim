@@ -63,7 +63,6 @@ return {
       { '<S-F9>', dap 'continue', desc = 'Debug: Start/Continue' },
       { '<F21>', dap 'continue', desc = 'Debug: Start/Continue' },
       { '<F9>', dap 'continue', desc = 'Debug: Resume' },
-      { '<F10>', dap('continue', { new = true }), desc = 'Debug: Choose configuration' },
       { '<F8>', dap 'step_over', desc = 'Debug: Step Over' },
       { '<F7>', dap 'step_into', desc = 'Debug: Step Into' },
       { '<S-F8>', dap 'step_out', desc = 'Debug: Step Out' },

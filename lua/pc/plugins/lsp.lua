@@ -53,9 +53,18 @@ return {
           map('gD', vim.lsp.buf.declaration, '[G]oto [D]eclaration')
           map('<leader>D', builtin.lsp_type_definitions, 'Type [D]efinition')
           map('<leader>ws', builtin.lsp_dynamic_workspace_symbols, '[W]orkspace [S]ymbols')
-          -- Find Usages (Alt+F7; F55 is how it arrives inside tmux)
-          map('<M-F7>', builtin.lsp_references, 'Find Usages')
-          map('<F55>', builtin.lsp_references, 'Find Usages')
+          -- Find Usages into the Find window at the bottom (Alt+F7; F55 inside tmux).
+          -- `gr` is the popup version, like Ctrl+Alt+F7 / Show Usages.
+          local function find_usages()
+            vim.lsp.buf.references(nil, {
+              on_list = function(list)
+                vim.fn.setqflist({}, ' ', list)
+                require('trouble').open 'quickfix'
+              end,
+            })
+          end
+          map('<M-F7>', find_usages, 'Find Usages')
+          map('<F55>', find_usages, 'Find Usages')
           -- Call hierarchy (Ctrl+Alt+H in IDEA)
           map('<leader>ci', builtin.lsp_incoming_calls, '[C]all hierarchy: [i]ncoming')
           map('<leader>co', builtin.lsp_outgoing_calls, '[C]all hierarchy: [o]utgoing')
@@ -178,6 +187,7 @@ return {
       end, vim.tbl_keys(servers))
       vim.list_extend(ensure_installed, {
         'stylua', -- Used to format Lua code
+        'tree-sitter-cli', -- Builds parsers for nvim-treesitter (main branch)
         'jdtls', -- Java, started by nvim-jdtls
         'java-debug-adapter',
         'java-test',
