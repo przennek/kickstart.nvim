@@ -1,0 +1,124 @@
+-- Java via nvim-jdtls: LSP, Lombok, debugging, running tests, refactorings.
+-- JDKs come from SDKMAN (~/.sdkman/candidates/java), so this works even when
+-- Neovim is started without the SDKMAN shell init (e.g. from the GNOME launcher).
+
+local function jdk_home()
+  local sdkman = vim.fs.joinpath(vim.env.HOME, '.sdkman', 'candidates', 'java', 'current')
+  if vim.uv.fs_stat(sdkman) then
+    return vim.uv.fs_realpath(sdkman)
+  end
+  return vim.env.JAVA_HOME
+end
+
+-- Every SDKMAN JDK is offered to jdtls, like IDEA's SDK table
+local function jdk_runtimes()
+  local runtimes = {}
+  local dir = vim.fs.joinpath(vim.env.HOME, '.sdkman', 'candidates', 'java')
+  for name, type in vim.fs.dir(dir) do
+    local major = name:match '^(%d+)'
+    if type == 'directory' and major then
+      local version = tonumber(major) <= 8 and ('JavaSE-1.' .. major) or ('JavaSE-' .. major)
+      table.insert(runtimes, { name = version, path = vim.fs.joinpath(dir, name), default = vim.fs.joinpath(dir, name) == jdk_home() })
+    end
+  end
+  return runtimes
+end
+
+local function start_jdtls()
+  local jdtls = require 'jdtls'
+  local mason = vim.fn.stdpath 'data' .. '/mason'
+  local root_dir = vim.fs.root(0, { 'mvnw', 'gradlew', 'pom.xml', 'build.gradle', 'build.gradle.kts', 'settings.gradle', '.git' })
+    or vim.fn.getcwd()
+  local workspace = vim.fn.stdpath 'cache' .. '/jdtls/' .. root_dir:gsub('/', '_')
+
+  -- Debugger + test runner extensions
+  local bundles = vim.fn.glob(mason .. '/packages/java-debug-adapter/extension/server/com.microsoft.java.debug.plugin-*.jar', true, true)
+  for _, jar in ipairs(vim.fn.glob(mason .. '/packages/java-test/extension/server/*.jar', true, true)) do
+    if not jar:match 'com.microsoft.java.test.runner%-jar%-with%-dependencies' and not jar:match 'jacocoagent' then
+      table.insert(bundles, jar)
+    end
+  end
+
+  local java_home = jdk_home()
+  jdtls.start_or_attach {
+    name = 'jdtls',
+    cmd = {
+      mason .. '/bin/jdtls',
+      '--jvm-arg=-javaagent:' .. mason .. '/packages/jdtls/lombok.jar',
+      '-data',
+      workspace,
+    },
+    cmd_env = java_home and { JAVA_HOME = java_home, PATH = java_home .. '/bin:' .. vim.env.PATH } or nil,
+    root_dir = root_dir,
+    capabilities = require('cmp_nvim_lsp').default_capabilities(),
+    init_options = { bundles = bundles },
+    settings = {
+      java = {
+        configuration = { runtimes = jdk_runtimes() },
+        eclipse = { downloadSources = true },
+        maven = { downloadSources = true },
+        references = { includeDecompiledSources = true },
+        implementationsCodeLens = { enabled = true },
+        referencesCodeLens = { enabled = true },
+        inlayHints = { parameterNames = { enabled = 'all' } },
+        signatureHelp = { enabled = true },
+        contentProvider = { preferred = 'fernflower' }, -- decompiler, like IDEA
+        sources = { organizeImports = { starThreshold = 5, staticStarThreshold = 3 } },
+        completion = {
+          favoriteStaticMembers = {
+            'org.junit.jupiter.api.Assertions.*',
+            'org.junit.Assert.*',
+            'org.mockito.Mockito.*',
+            'org.assertj.core.api.Assertions.*',
+          },
+        },
+      },
+    },
+    on_attach = function(_, bufnr)
+      -- Hot code replace on every change, same as RunHotswapAlways in your IDEA debugger settings
+      jdtls.setup_dap { hotcodereplace = 'auto' }
+      require('jdtls.dap').setup_dap_main_class_configs()
+
+      local map = function(mode, keys, func, desc)
+        vim.keymap.set(mode, keys, func, { buffer = bufnr, desc = 'Java: ' .. desc })
+      end
+      -- Tests (run in the debugger, so breakpoints work)
+      map('n', '<leader>xt', jdtls.test_nearest_method, 'Debug nearest test')
+      map('n', '<leader>xT', jdtls.test_class, 'Debug test class')
+      map('n', '<leader>xp', jdtls.pick_test, 'Pick test')
+      -- Refactor > Extract (Ctrl+Alt+V/M/C in IDEA, those are taken by Rectangle here)
+      map({ 'n', 'x' }, '<leader>cv', function()
+        jdtls.extract_variable(vim.fn.mode() ~= 'n')
+      end, 'Extract variable')
+      map({ 'n', 'x' }, '<leader>cc', function()
+        jdtls.extract_constant(vim.fn.mode() ~= 'n')
+      end, 'Extract constant')
+      map('x', '<leader>cm', function()
+        jdtls.extract_method(true)
+      end, 'Extract method')
+      map('n', '<M-O>', jdtls.organize_imports, 'Optimize Imports')
+      -- Go to Test / Super method
+      map('n', '<leader>ct', function()
+        require('jdtls.tests').goto_subjects()
+      end, 'Go to test / subject')
+      map('n', 'gs', jdtls.super_implementation, 'Go to super method')
+    end,
+  }
+end
+
+return {
+  'mfussenegger/nvim-jdtls',
+  ft = 'java',
+  dependencies = { 'mfussenegger/nvim-dap', 'hrsh7th/cmp-nvim-lsp' },
+  config = function()
+    vim.api.nvim_create_autocmd('FileType', {
+      pattern = 'java',
+      group = vim.api.nvim_create_augroup('pc-jdtls', { clear = true }),
+      callback = start_jdtls,
+    })
+    -- The FileType event that triggered loading this plugin already fired
+    if vim.bo.filetype == 'java' then
+      start_jdtls()
+    end
+  end,
+}

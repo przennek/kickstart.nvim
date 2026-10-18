@@ -2,7 +2,6 @@
 return {
   'nvim-telescope/telescope.nvim',
   event = 'VimEnter',
-  branch = '0.1.x',
   dependencies = {
     'nvim-lua/plenary.nvim',
     { -- If encountering errors, see telescope-fzf-native README for installation instructions
@@ -79,7 +78,27 @@ return {
     vim.keymap.set('n', '<leader>s.', builtin.oldfiles, { desc = '[S]earch Recent Files ("." for repeat)' })
     vim.keymap.set('n', '<leader><leader>', builtin.buffers, { desc = '[ ] Find existing buffers' })
     vim.keymap.set('n', '<leader>sp', builtin.git_files, { desc = '[S]earch [P]roject (git files)' })
-    vim.keymap.set('n', '<leader>sc', '<cmd>Telescope command_history<CR>', { desc = '[S]earch [C]ommand history' })
+    vim.keymap.set('n', '<leader>s:', '<cmd>Telescope command_history<CR>', { desc = '[S]earch command history' })
+
+    -- [[ IDEA-like navigation ]]
+    -- GotoClass: workspace symbols narrowed to types
+    local function goto_class()
+      builtin.lsp_dynamic_workspace_symbols {
+        prompt_title = 'Go to Class',
+        symbols = { 'class', 'interface', 'enum', 'struct', 'module' },
+      }
+    end
+    vim.keymap.set('n', '<leader>sc', goto_class, { desc = '[S]earch [C]lass' })
+    vim.keymap.set('n', '<leader>sn', goto_class, { desc = '[S]earch class by [N]ame' })
+    vim.keymap.set('n', '<M-n>', goto_class, { desc = 'Go to Class' })
+    vim.keymap.set('n', '<leader>sS', builtin.lsp_dynamic_workspace_symbols, { desc = '[S]earch [S]ymbol' })
+    vim.keymap.set('n', '<M-N>', builtin.find_files, { desc = 'Go to File' })
+    -- Switcher: open files, most recently used first
+    vim.keymap.set('n', '<leader>q', function()
+      builtin.buffers { sort_mru = true, ignore_current_buffer = true }
+    end, { desc = 'Switcher' })
+    -- Find Action
+    vim.keymap.set('n', '<M-A>', builtin.commands, { desc = 'Find Action' })
 
     -- Slightly advanced example of overriding default behavior and theme
     vim.keymap.set('n', '<leader>/', function()
@@ -100,7 +119,7 @@ return {
     end, { desc = '[S]earch [/] in Open Files' })
 
     -- Shortcut for searching your Neovim configuration files
-    vim.keymap.set('n', '<leader>sn', function()
+    vim.keymap.set('n', '<leader>sN', function()
       builtin.find_files { cwd = vim.fn.stdpath 'config' }
     end, { desc = '[S]earch [N]eovim files' })
   end,

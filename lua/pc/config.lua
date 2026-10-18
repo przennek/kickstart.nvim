@@ -41,6 +41,9 @@ vim.opt.undofile = true
 vim.opt.ignorecase = true
 vim.opt.smartcase = true
 
+-- :s replaces all matches in a line by default (same as `set gdefault` in .ideavimrc)
+vim.opt.gdefault = true
+
 -- Keep signcolumn on by default
 vim.opt.signcolumn = 'yes'
 

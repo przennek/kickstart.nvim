@@ -1,15 +1,53 @@
+-- Git, IDEA style. Everything VCS lives under <leader>v (the VCS menu),
+-- plus the tool windows: Alt+0 = Commit, Alt+9 = Git log.
 return {
-  -- The git fugitive
+  -- The git fugitive (Annotate = :Git blame)
   {
     'tpope/vim-fugitive',
+    keys = {
+      { '<leader>va', '<cmd>Git blame<CR>', desc = 'VCS: [A]nnotate (blame)' },
+    },
   },
-  -- Better diff
+  -- Commit window, branches, push / pull
+  {
+    'NeogitOrg/neogit',
+    dependencies = { 'nvim-lua/plenary.nvim', 'sindrets/diffview.nvim', 'nvim-telescope/telescope.nvim' },
+    cmd = 'Neogit',
+    keys = {
+      { '<M-0>', '<cmd>Neogit<CR>', desc = 'VCS: Commit window' },
+      { '<leader>vv', '<cmd>Neogit<CR>', desc = 'VCS: Status / commit window' },
+      { '<leader>vc', '<cmd>Neogit commit<CR>', desc = 'VCS: [C]ommit' },
+      { '<leader>vp', '<cmd>Neogit pull<CR>', desc = 'VCS: [p]ull' },
+      { '<leader>vP', '<cmd>Neogit push<CR>', desc = 'VCS: [P]ush' },
+      { '<leader>vB', '<cmd>Telescope git_branches<CR>', desc = 'VCS: [B]ranches' },
+      { '<leader>vf', '<cmd>Telescope git_status<CR>', desc = 'VCS: Changed [f]iles' },
+    },
+    opts = {
+      integrations = { diffview = true, telescope = true },
+      graph_style = 'unicode',
+    },
+  },
+  -- Diffs and history
   {
     'sindrets/diffview.nvim',
-    config = function()
-      vim.keymap.set('n', '<leader>dv', function()
-        vim.cmd 'DiffviewOpen'
-      end, { desc = 'git [d]iff[v]iew' })
+    cmd = { 'DiffviewOpen', 'DiffviewFileHistory' },
+    keys = {
+      { '<M-9>', '<cmd>DiffviewFileHistory<CR>', desc = 'VCS: Git log' },
+      { '<leader>vl', '<cmd>DiffviewFileHistory<CR>', desc = 'VCS: [L]og' },
+      { '<leader>vh', '<cmd>DiffviewFileHistory %<CR>', desc = 'VCS: File [h]istory' },
+      { '<leader>vh', ":'<,'>DiffviewFileHistory<CR>", mode = 'v', desc = 'VCS: Selection history' },
+      { '<leader>vd', '<cmd>DiffviewOpen<CR>', desc = 'VCS: [D]iff working tree' },
+    },
+    opts = function()
+      -- q closes a diff / history tab, like Esc on an IDEA dialog
+      local close = { 'n', 'q', '<cmd>DiffviewClose<CR>', { desc = 'Close Diffview' } }
+      return {
+        keymaps = {
+          view = { close },
+          file_panel = { close },
+          file_history_panel = { close },
+        },
+      }
     end,
   },
   -- Adds git related signs to the gutter, as well as utilities for managing changes
@@ -51,24 +89,23 @@ return {
 
         -- Actions
         -- visual mode
-        map('v', '<leader>hs', function()
+        map('v', '<leader>vs', function()
           gitsigns.stage_hunk { vim.fn.line '.', vim.fn.line 'v' }
-        end, { desc = 'stage git hunk' })
-        map('v', '<leader>hr', function()
+        end, { desc = 'VCS: stage hunk' })
+        map('v', '<leader>vr', function()
           gitsigns.reset_hunk { vim.fn.line '.', vim.fn.line 'v' }
-        end, { desc = 'reset git hunk' })
+        end, { desc = 'VCS: rollback hunk' })
         -- normal mode
-        map('n', '<leader>hs', gitsigns.stage_hunk, { desc = 'git [s]tage hunk' })
-        map('n', '<leader>hr', gitsigns.reset_hunk, { desc = 'git [r]eset hunk' })
-        map('n', '<leader>hS', gitsigns.stage_buffer, { desc = 'git [S]tage buffer' })
-        map('n', '<leader>hu', gitsigns.undo_stage_hunk, { desc = 'git [u]ndo stage hunk' })
-        map('n', '<leader>hR', gitsigns.reset_buffer, { desc = 'git [R]eset buffer' })
-        map('n', '<leader>hp', gitsigns.preview_hunk, { desc = 'git [p]review hunk' })
-        map('n', '<leader>hb', gitsigns.blame_line, { desc = 'git [b]lame line' })
-        map('n', '<leader>hd', gitsigns.diffthis, { desc = 'git [d]iff against index' })
-        map('n', '<leader>hD', function()
+        map('n', '<leader>vs', gitsigns.stage_hunk, { desc = 'VCS: [s]tage hunk' })
+        map('n', '<leader>vr', gitsigns.reset_hunk, { desc = 'VCS: [r]ollback hunk' })
+        map('n', '<leader>vS', gitsigns.stage_buffer, { desc = 'VCS: [S]tage file' })
+        map('n', '<leader>vu', gitsigns.undo_stage_hunk, { desc = 'VCS: [u]ndo stage hunk' })
+        map('n', '<leader>vR', gitsigns.reset_buffer, { desc = 'VCS: [R]ollback file' })
+        map('n', '<leader>vi', gitsigns.preview_hunk, { desc = 'VCS: [i]nspect hunk' })
+        map('n', '<leader>vb', gitsigns.blame_line, { desc = 'VCS: [b]lame line' })
+        map('n', '<leader>vD', function()
           gitsigns.diffthis '@'
-        end, { desc = 'git [D]iff against last commit' })
+        end, { desc = 'VCS: [D]iff file against last commit' })
         -- Toggles
         map('n', '<leader>tb', gitsigns.toggle_current_line_blame, { desc = '[T]oggle git show [b]lame line' })
         map('n', '<leader>tD', gitsigns.toggle_deleted, { desc = '[T]oggle git show [D]eleted' })

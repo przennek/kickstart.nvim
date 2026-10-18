@@ -2,7 +2,7 @@ return { -- Highlight, edit, and navigate code
   'nvim-treesitter/nvim-treesitter',
   build = ':TSUpdate',
   opts = {
-    ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' },
+    ensure_installed = { 'bash', 'c', 'cpp', 'diff', 'html', 'java', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'python', 'query', 'vim', 'vimdoc' },
     -- Autoinstall languages that are not installed
     auto_install = true,
     highlight = {
@@ -13,6 +13,16 @@ return { -- Highlight, edit, and navigate code
       additional_vim_regex_highlighting = { 'ruby' },
     },
     indent = { enable = true, disable = { 'ruby' } },
+    -- Extend Selection / Shrink Selection (Alt+W in IDEA)
+    incremental_selection = {
+      enable = true,
+      keymaps = {
+        init_selection = '<M-w>',
+        node_incremental = '<M-w>',
+        node_decremental = '<M-W>',
+        scope_incremental = false,
+      },
+    },
   },
   config = function(_, opts)
     -- [[ Configure Treesitter ]] See `:help nvim-treesitter`

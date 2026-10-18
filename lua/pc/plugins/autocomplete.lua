@@ -77,6 +77,8 @@ return { -- Autocompletion
         --  Generally you don't need this, because nvim-cmp will display
         --  completions whenever it has completion options available.
         ['<C-Space>'] = cmp.mapping.complete {},
+        -- <C-Space> is the tmux prefix, so also Alt+Space (CodeCompletion in your IDEA keymap)
+        ['<M-Space>'] = cmp.mapping.complete {},
 
         -- Think of <c-l> as moving to the right of your snippet expansion.
         --  So if you have a snippet that's like:
@@ -86,14 +88,19 @@ return { -- Autocompletion
         --
         -- <c-l> will move you to the right of each of the expansion locations.
         -- <c-h> is similar, except moving you backwards.
-        ['<C-l>'] = cmp.mapping(function()
+        -- Outside of a snippet they fall back to the insert-mode arrows from remap.lua
+        ['<C-l>'] = cmp.mapping(function(fallback)
           if luasnip.expand_or_locally_jumpable() then
             luasnip.expand_or_jump()
+          else
+            fallback()
           end
         end, { 'i', 's' }),
-        ['<C-h>'] = cmp.mapping(function()
+        ['<C-h>'] = cmp.mapping(function(fallback)
           if luasnip.locally_jumpable(-1) then
             luasnip.jump(-1)
+          else
+            fallback()
           end
         end, { 'i', 's' }),
 
