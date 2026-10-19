@@ -34,6 +34,16 @@ return { -- Collection of various small independent plugins/modules
       return '%2l:%-2v'
     end
 
+    -- Active AWS profile / region (<leader>A) in front of the file info, like the AWS Toolkit
+    -- widget in IDEA's status bar
+    local section_fileinfo = statusline.section_fileinfo
+    ---@diagnostic disable-next-line: duplicate-set-field
+    statusline.section_fileinfo = function(args)
+      local aws = package.loaded['pc.aws'] and require('pc.aws').status() or ''
+      local info = section_fileinfo(args)
+      return aws ~= '' and (aws .. '  ' .. info) or info
+    end
+
     -- ... and there is more!
     --  Check out: https://github.com/echasnovski/mini.nvim
   end,
