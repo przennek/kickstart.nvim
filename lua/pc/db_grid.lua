@@ -7,6 +7,10 @@
 --   R                 record view: every column of the current row
 --   yc / yr / yC      copy cell / row (tab-separated) / whole column
 --   s / S             sort by the current column (again: descending) / original order
+--   E                 export: CSV / TSV / JSON / SQL INSERT / Markdown, to the clipboard or a file
+--   i                 edit the cell: runs UPDATE … WHERE <primary key> after confirming
+--                     (NULL = null; a table without a primary key matches on the whole row)
+--   dd                delete the row (DELETE, after confirming)
 -- dadbod-ui's own keys keep working (yic, yh, Ctrl+] foreign key, <leader>R layout).
 
 local M = {}
@@ -351,6 +355,370 @@ local function sort(buf, reset)
 end
 
 ---------------------------------------------------------------------------
+-- Export
+---------------------------------------------------------------------------
+
+local function all_rows(buf, g)
+  local rows = {}
+  for lnum = g.first, g.last do
+    table.insert(rows, row_values(buf, g, lnum))
+  end
+  return rows
+end
+
+-- a column is numeric when every non-empty value is a number
+local function numeric_columns(g, rows)
+  local numeric = {}
+  for i in ipairs(g.cols) do
+    numeric[i] = true
+    for _, r in ipairs(rows) do
+      if r[i] ~= '' and not tonumber(r[i]) then
+        numeric[i] = false
+        break
+      end
+    end
+  end
+  return numeric
+end
+
+-- The query that produced the result and the connection it ran on (dadbod's b:db)
+local function source(buf)
+  local q = vim.b[buf].db
+  if type(q) ~= 'table' or not q.db_url then
+    return nil
+  end
+  local ok, lines = pcall(vim.fn.readfile, q.input or '')
+  return { url = q.db_url, query = ok and table.concat(lines, '\n') or '' }
+end
+
+-- "select … from orders where …" → orders; nil for joins and anything ambiguous
+local function source_table(query)
+  local q = query:lower():gsub('%-%-[^\n]*', ''):gsub('%s+', ' ')
+  if q:find ' join ' or select(2, q:gsub(' from ', '')) ~= 1 then
+    return nil
+  end
+  return query:match '[Ff][Rr][Oo][Mm]%s+([%w_."`]+)'
+end
+
+local function quote_sql(v)
+  return "'" .. v:gsub("'", "''") .. "'"
+end
+
+local function csv_field(v, sep)
+  if v:find('[' .. sep .. '"\n]') then
+    return '"' .. v:gsub('"', '""') .. '"'
+  end
+  return v
+end
+
+local EXPORTS = {
+  {
+    name = 'CSV',
+    ext = 'csv',
+    render = function(g, rows)
+      local out = { table.concat(
+        vim.tbl_map(function(c)
+          return csv_field(c.name, ',')
+        end, g.cols),
+        ','
+      ) }
+      for _, r in ipairs(rows) do
+        table.insert(
+          out,
+          table.concat(
+            vim.tbl_map(function(v)
+              return csv_field(v, ',')
+            end, r),
+            ','
+          )
+        )
+      end
+      return out
+    end,
+  },
+  {
+    name = 'TSV',
+    ext = 'tsv',
+    render = function(g, rows)
+      local out = { table.concat(
+        vim.tbl_map(function(c)
+          return c.name
+        end, g.cols),
+        '\t'
+      ) }
+      for _, r in ipairs(rows) do
+        table.insert(out, table.concat(r, '\t'))
+      end
+      return out
+    end,
+  },
+  {
+    name = 'JSON',
+    ext = 'json',
+    render = function(g, rows)
+      local numeric = numeric_columns(g, rows)
+      local out = { '[' }
+      for n, r in ipairs(rows) do
+        local fields = {}
+        for i, c in ipairs(g.cols) do
+          local v = r[i]
+          local json
+          if numeric[i] then
+            json = v == '' and 'null' or v
+          elseif (v:match '^[%[{]' and pcall(vim.json.decode, v)) or v == 'true' or v == 'false' then
+            json = v
+          else
+            json = vim.json.encode(v)
+          end
+          table.insert(fields, vim.json.encode(c.name) .. ': ' .. json)
+        end
+        table.insert(out, '  {' .. table.concat(fields, ', ') .. '}' .. (n < #rows and ',' or ''))
+      end
+      table.insert(out, ']')
+      return out
+    end,
+  },
+  {
+    name = 'SQL INSERT',
+    ext = 'sql',
+    render = function(g, rows, tbl)
+      local numeric = numeric_columns(g, rows)
+      local names = table.concat(
+        vim.tbl_map(function(c)
+          return c.name
+        end, g.cols),
+        ', '
+      )
+      local out = {}
+      for _, r in ipairs(rows) do
+        local values = {}
+        for i, v in ipairs(r) do
+          values[i] = (numeric[i] and (v == '' and 'NULL' or v)) or quote_sql(v)
+        end
+        table.insert(out, ('INSERT INTO %s (%s) VALUES (%s);'):format(tbl, names, table.concat(values, ', ')))
+      end
+      return out
+    end,
+  },
+  {
+    name = 'Markdown',
+    ext = 'md',
+    render = function(g, rows)
+      local function line(values)
+        return '| '
+          .. table.concat(
+            vim.tbl_map(function(v)
+              return (v:gsub('|', '\\|'))
+            end, values),
+            ' | '
+          )
+          .. ' |'
+      end
+      local out = {
+        line(vim.tbl_map(function(c)
+          return c.name
+        end, g.cols)),
+        '|' .. string.rep(' --- |', #g.cols),
+      }
+      for _, r in ipairs(rows) do
+        table.insert(out, line(r))
+      end
+      return out
+    end,
+  },
+}
+
+local function export(buf)
+  local g = grids[buf]
+  if not g then
+    return
+  end
+  local rows = all_rows(buf, g)
+  local src = source(buf)
+  local tbl = src and source_table(src.query) or 'result'
+  vim.ui.select(EXPORTS, {
+    prompt = ('Export %d rows'):format(#rows),
+    format_item = function(e)
+      return e.name
+    end,
+  }, function(e)
+    if not e then
+      return
+    end
+    local text = table.concat(e.render(g, rows, tbl), '\n') .. '\n'
+    vim.ui.select({ 'Clipboard', 'File…' }, { prompt = 'Export ' .. e.name .. ' to' }, function(where)
+      if where == 'Clipboard' then
+        copy(text, ('%d rows as %s'):format(#rows, e.name))
+      elseif where then
+        vim.ui.input({ prompt = 'File: ', default = vim.fn.getcwd() .. '/' .. tbl:gsub('.*%.', '') .. '.' .. e.ext, completion = 'file' }, function(path)
+          if path and path ~= '' then
+            path = vim.fn.expand(path)
+            vim.fn.writefile(vim.split(text, '\n', { plain = true }), path, 'b')
+            vim.notify(('Exported %d rows to %s'):format(#rows, vim.fn.fnamemodify(path, ':~:.')))
+          end
+        end)
+      end
+    end)
+  end)
+end
+
+---------------------------------------------------------------------------
+-- Editing: UPDATE / DELETE on the table the query read from
+---------------------------------------------------------------------------
+
+-- Redraws the grid (psql style) from values, so edited cells of any width fit
+local function render(buf, g, rows)
+  local widths = {}
+  for i, c in ipairs(g.cols) do
+    widths[i] = vim.fn.strdisplaywidth(c.name)
+    for _, r in ipairs(rows) do
+      widths[i] = math.max(widths[i], vim.fn.strdisplaywidth(r[i]))
+    end
+  end
+  local numeric = numeric_columns(g, rows)
+  local function line(values, header)
+    local cells = {}
+    for i, v in ipairs(values) do
+      local pad = string.rep(' ', widths[i] - vim.fn.strdisplaywidth(v))
+      cells[i] = (numeric[i] and not header) and (pad .. v) or (v .. pad)
+    end
+    return ' ' .. table.concat(cells, ' | ')
+  end
+  local lines = {
+    line(
+      vim.tbl_map(function(c)
+        return c.name
+      end, g.cols),
+      true
+    ),
+  }
+  table.insert(
+    lines,
+    table.concat(
+      vim.tbl_map(function(w)
+        return string.rep('-', w + 2)
+      end, widths),
+      '+'
+    )
+  )
+  for _, r in ipairs(rows) do
+    table.insert(lines, line(r))
+  end
+  local last = g.last
+  local after = vim.api.nvim_buf_get_lines(buf, last, last + 1, false)[1]
+  if after and after:match '^%(%d+ rows?%)' then
+    last = last + 1
+  end
+  table.insert(lines, ('(%d %s)'):format(#rows, #rows == 1 and 'row' or 'rows'))
+  local readonly = vim.bo[buf].readonly
+  vim.bo[buf].readonly = false
+  vim.bo[buf].modifiable = true
+  vim.api.nvim_buf_set_lines(buf, g.header - 1, last, false, lines)
+  vim.bo[buf].modified = false
+  vim.bo[buf].modifiable = false
+  vim.bo[buf].readonly = readonly
+end
+
+-- WHERE that identifies a row: its primary key, or all its values when there is none
+local function where_clause(g, values, pk)
+  local conds = {}
+  local keys = #pk > 0 and pk or vim.tbl_map(function(c)
+    return c.name
+  end, g.cols)
+  for _, key in ipairs(keys) do
+    local index
+    for i, c in ipairs(g.cols) do
+      if c.name == key then
+        index = i
+      end
+    end
+    if not index then
+      return nil, 'the result has no column ' .. key .. ' (primary key)'
+    end
+    local v = values[index]
+    -- psql prints NULL and '' alike
+    table.insert(conds, v == '' and ("(%s is null or %s = '')"):format(key, key) or ('%s = %s'):format(key, quote_sql(v)))
+  end
+  return table.concat(conds, ' and ')
+end
+
+-- Runs a statement on the row under the cursor, after checking that its WHERE matches
+-- exactly one row and confirming; then on_done(g, lnum, index, value) updates the grid
+local function modify_row(buf, build, on_done)
+  local g, lnum, index = current(buf)
+  if not g or lnum < g.first or lnum > g.last then
+    return
+  end
+  local src = source(buf)
+  local tbl = src and source_table(src.query)
+  if not tbl then
+    return vim.notify('Editing works on results of a query from one table (no joins)', vim.log.levels.WARN)
+  end
+  local db_table = require 'pc.db_table'
+  local pk, err = db_table.primary_key(src.url, tbl)
+  if not pk then
+    return vim.notify(tbl .. ': ' .. err, vim.log.levels.ERROR)
+  end
+  local values = row_values(buf, g, lnum)
+  local where
+  where, err = where_clause(g, values, pk)
+  if not where then
+    return vim.notify(err, vim.log.levels.WARN)
+  end
+  build(tbl, where, g, index, values, function(statement, value)
+    local count
+    count, err = db_table.scalar(src.url, ('select count(*) from %s where %s'):format(tbl, where))
+    if not count then
+      return vim.notify(err, vim.log.levels.ERROR)
+    elseif count ~= '1' then
+      return vim.notify(('Not changed: the row matches %s rows in %s'):format(count, tbl), vim.log.levels.WARN)
+    end
+    local prompt = statement .. (#pk == 0 and '\n(no primary key: the row is matched on all columns)' or '')
+    if vim.fn.confirm(prompt, '&Execute\n&Cancel', 2) ~= 1 then
+      return
+    end
+    local ok
+    ok, err = db_table.run(src.url, statement .. ';\n')
+    if not ok then
+      return vim.notify(err, vim.log.levels.ERROR)
+    end
+    on_done(g, lnum, index, value)
+  end)
+end
+
+local function edit_cell(buf)
+  modify_row(buf, function(tbl, where, g, index, values, run)
+    vim.ui.input({ prompt = g.cols[index].name .. ' = ', default = values[index] }, function(value)
+      if value == nil or value == values[index] then
+        return
+      end
+      local literal = value == 'NULL' and 'NULL' or quote_sql(value)
+      run(('UPDATE %s SET %s = %s WHERE %s'):format(tbl, g.cols[index].name, literal, where), value == 'NULL' and '' or value)
+    end)
+  end, function(g, lnum, index, value)
+    local rows = all_rows(buf, g)
+    rows[lnum - g.first + 1][index] = value
+    render(buf, g, rows)
+    M.attach(buf)
+    goto_cell(grids[buf], lnum, index)
+  end)
+end
+
+local function delete_row(buf)
+  modify_row(buf, function(tbl, where, _, _, _, run)
+    run(('DELETE FROM %s WHERE %s'):format(tbl, where))
+  end, function(g, lnum, index)
+    local rows = all_rows(buf, g)
+    table.remove(rows, lnum - g.first + 1)
+    render(buf, g, rows)
+    M.attach(buf)
+    if #rows > 0 then
+      goto_cell(grids[buf], math.min(lnum, grids[buf].last), index)
+    end
+  end)
+end
+
+---------------------------------------------------------------------------
 -- Setup per result buffer
 ---------------------------------------------------------------------------
 
@@ -386,6 +754,9 @@ function M.attach(buf)
   map('S', function(b)
     sort(b, true)
   end, 'Original order')
+  map('E', export, 'Export data')
+  map('i', edit_cell, 'Edit cell (UPDATE)')
+  map('dd', delete_row, 'Delete row (DELETE)')
   local group = vim.api.nvim_create_augroup('pc-db-grid-' .. buf, { clear = true })
   vim.api.nvim_create_autocmd({ 'CursorMoved', 'WinScrolled', 'BufWinEnter' }, {
     group = group,

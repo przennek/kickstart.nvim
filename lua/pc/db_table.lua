@@ -113,8 +113,8 @@ local function run(url, sql, tabular)
     if s == 'sqlite' or s == 'sqlite3' then
       -- after dadbod's own options, so these win
       vim.list_extend(cmd, tabular and { '-header', '-column' } or { '-list', '-noheader' })
-    elseif tabular and (s == 'mysql' or s == 'mariadb') then
-      table.insert(cmd, 2, '--table')
+    elseif s == 'mysql' or s == 'mariadb' then
+      table.insert(cmd, 2, tabular and '--table' or '--skip-column-names')
     end
   end
   local result = vim.system(cmd, { stdin = sql, text = true, timeout = 15000 }):wait()
@@ -122,6 +122,49 @@ local function run(url, sql, tabular)
     return nil, vim.trim(result.stderr ~= '' and result.stderr or result.stdout or '')
   end
   return vim.split((result.stdout or ''):gsub('%s+$', ''), '\n')
+end
+
+M.run = run
+
+local PRIMARY_KEY = {
+  postgresql = [[
+select a.attname from pg_index i
+join pg_attribute a on a.attrelid = i.indrelid and a.attnum = any(i.indkey)
+where i.indrelid = '{table}'::regclass and i.indisprimary order by array_position(i.indkey, a.attnum)]],
+  sqlite = [[select name from pragma_table_info('{table}') where pk > 0 order by pk]],
+  mysql = [[
+select column_name from information_schema.key_column_usage
+where table_schema = database() and table_name = '{table}' and constraint_name = 'PRIMARY'
+order by ordinal_position]],
+}
+PRIMARY_KEY.postgres = PRIMARY_KEY.postgresql
+PRIMARY_KEY.sqlite3 = PRIMARY_KEY.sqlite
+PRIMARY_KEY.mariadb = PRIMARY_KEY.mysql
+
+--- First value of a one-value query (string), or nil + error
+function M.scalar(url, sql)
+  local is_pg = scheme(url):match '^postgres'
+  local lines, err = run(url, (is_pg and PG_PLAIN or '') .. sql .. ';\n')
+  if not lines then
+    return nil, err
+  end
+  return vim.trim(lines[#lines] or '')
+end
+
+--- Primary key columns of a table ({} when it has none), or nil + error
+function M.primary_key(url, tbl)
+  local sql = PRIMARY_KEY[scheme(url) or '']
+  if not sql then
+    return nil, 'not supported for this database'
+  end
+  local is_pg = scheme(url):match '^postgres'
+  local lines, err = run(url, (is_pg and PG_PLAIN or '') .. fill(sql, tbl) .. ';\n')
+  if not lines then
+    return nil, err
+  end
+  return vim.tbl_filter(function(l)
+    return l ~= ''
+  end, lines)
 end
 
 local function with_table(fn)
