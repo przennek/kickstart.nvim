@@ -87,7 +87,10 @@ return {
         local before = vim.api.nvim_win_get_cursor(0)
         vim.cmd.normal { dir == 'next' and ']c' or '[c', bang = true }
         local stuck = vim.deep_equal(before, vim.api.nvim_win_get_cursor(0))
-        if stuck and in_diffview then
+        if stuck and require('pc.split_diff').owns() then
+          -- diff in a split (<leader>d, Alt+D): next / previous changed file in the same place
+          require('pc.split_diff').step(dir)
+        elseif stuck and in_diffview then
           require('diffview.actions')[dir == 'next' and 'select_next_entry' or 'select_prev_entry']()
           -- Land on the first change of the next file (or the last one of the previous file)
           -- once Diffview has loaded it

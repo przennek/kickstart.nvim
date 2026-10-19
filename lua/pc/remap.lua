@@ -7,9 +7,7 @@
 --- append to system clipboard
 vim.opt.clipboard:append 'unnamedplus'
 
--- Clear highlights on search when pressing <Esc> in normal mode
---  See `:help hlsearch`
-vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
+-- <Esc> clears the search highlight (and closes a diff); it is defined in split_diff.lua
 
 -- Exit terminal mode in the builtin terminal with a shortcut that is a bit easier
 -- for people to discover. Otherwise, you normally need to press <C-\><C-n>, which
