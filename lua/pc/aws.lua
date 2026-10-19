@@ -8,11 +8,6 @@
 local M = {}
 
 local STATE = vim.fn.stdpath 'data' .. '/aws.json'
-local REGIONS = {
-  'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2',
-  'eu-central-1', 'eu-west-1', 'eu-west-2', 'eu-north-1',
-  'ap-southeast-1', 'ap-northeast-1',
-}
 
 local function save()
   local f = io.open(STATE, 'w')
@@ -72,9 +67,37 @@ function M.switch_profile()
   end)
 end
 
+-- Regions come from your own AWS config (region / sso_region of every profile and SSO
+-- session) plus the current one; "Other…" lets you type any region
+local function known_regions()
+  local regions, seen = {}, {}
+  local function add(r)
+    if r and r ~= '' and not seen[r] then
+      seen[r] = true
+      table.insert(regions, r)
+    end
+  end
+  add(vim.env.AWS_REGION)
+  local config = vim.env.AWS_CONFIG_FILE or vim.fs.joinpath(vim.env.HOME, '.aws', 'config')
+  local f = io.open(config)
+  if f then
+    for line in f:lines() do
+      add(line:match '^%s*region%s*=%s*(%S+)' or line:match '^%s*sso_region%s*=%s*(%S+)')
+    end
+    f:close()
+  end
+  table.sort(regions)
+  return regions
+end
+
 function M.switch_region()
-  vim.ui.select(REGIONS, { prompt = 'AWS region' }, function(r)
-    if r then
+  local regions = known_regions()
+  table.insert(regions, 'Other…')
+  vim.ui.select(regions, { prompt = 'AWS region' }, function(r)
+    if r == 'Other…' then
+      r = vim.trim(vim.fn.input 'AWS region: ')
+    end
+    if r and r ~= '' then
       vim.env.AWS_REGION = r
       save()
       vim.cmd.redrawstatus()
