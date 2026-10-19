@@ -126,6 +126,64 @@ return {
         },
       }
     end,
+    config = function(_, opts)
+      require('diffview').setup(opts)
+
+      -- A file opened from a diff window (Go to Class, gd, the project tree…) goes to an editor
+      -- split next to the diff, like in IDEA, instead of replacing one side of the diff.
+      -- Otherwise Diffview would later reuse that window for the next file (F7) and the
+      -- class you were reading would be gone.
+      vim.api.nvim_create_autocmd('BufWinEnter', {
+        group = vim.api.nvim_create_augroup('pc-diffview-guard', { clear = true }),
+        callback = function(event)
+          local win = vim.api.nvim_get_current_win()
+          vim.schedule(function()
+            local view = require('diffview.lib').get_current_view()
+            if not view or not view.cur_layout or not vim.api.nvim_win_is_valid(win) then
+              return
+            end
+            if vim.api.nvim_win_get_buf(win) ~= event.buf or vim.bo[event.buf].buftype ~= '' then
+              return
+            end
+            local owner
+            for _, w in ipairs(view.cur_layout.windows) do
+              if w.id == win then
+                owner = w
+              end
+            end
+            if not owner or not owner.file or owner.file.bufnr == event.buf then
+              return
+            end
+            -- Put the diff's own buffer back and show the file in an editor split instead
+            local cursor = vim.api.nvim_win_get_cursor(win)
+            vim.api.nvim_win_set_buf(win, owner.file.bufnr)
+            local target
+            for _, other in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+              local owned = other == view.panel.winid
+              for _, w in ipairs(view.cur_layout.windows) do
+                owned = owned or w.id == other
+              end
+              if not owned and vim.api.nvim_win_get_config(other).relative == '' then
+                target = other
+              end
+            end
+            if target then
+              vim.api.nvim_set_current_win(target)
+            else
+              vim.cmd 'botright vsplit'
+            end
+            vim.api.nvim_win_set_buf(0, event.buf)
+            pcall(vim.api.nvim_win_set_cursor, 0, cursor)
+            -- a split made from a diff window inherits its diff-only window options
+            vim.wo.diff = false
+            vim.wo.scrollbind = false
+            vim.wo.cursorbind = false
+            vim.wo.foldenable = false
+            vim.wo.foldcolumn = '0'
+          end)
+        end,
+      })
+    end,
   },
   -- Adds git related signs to the gutter, as well as utilities for managing changes
   {
