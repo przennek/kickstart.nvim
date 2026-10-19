@@ -3,6 +3,10 @@
 
 -- Compare with Branch: pick a local or remote branch, then diff the current file
 -- (or the whole working tree) against it in Diffview
+local function diff_with(ref, file)
+  vim.cmd('DiffviewOpen ' .. ref .. (file and (' -- ' .. vim.fn.fnameescape(file)) or ''))
+end
+
 local function compare_with_branch(file_only)
   return function()
     local file = vim.fn.expand '%:p'
@@ -13,16 +17,39 @@ local function compare_with_branch(file_only)
         actions.select_default:replace(function()
           local entry = require('telescope.actions.state').get_selected_entry()
           actions.close(prompt_bufnr)
-          local cmd = 'DiffviewOpen ' .. entry.value
-          if file_only then
-            cmd = cmd .. ' -- ' .. vim.fn.fnameescape(file)
-          end
-          vim.cmd(cmd)
+          diff_with(entry.value, file_only and file or nil)
         end)
         return true
       end,
     }
   end
+end
+
+-- Git Branches popup (<leader>d in .ideavimrc): type e.g. origin/main, then
+--   Enter   Show Diff with Working Tree (whole project)
+--   Ctrl+F  compare only the current file with that branch
+--   Ctrl+O  checkout the branch
+local function branches_popup()
+  local file = vim.fn.expand '%:p'
+  require('telescope.builtin').git_branches {
+    prompt_title = 'Git Branches · Enter: diff with working tree · C-f: this file · C-o: checkout',
+    attach_mappings = function(prompt_bufnr, map)
+      local actions = require 'telescope.actions'
+      local state = require 'telescope.actions.state'
+      actions.select_default:replace(function()
+        local ref = state.get_selected_entry().value
+        actions.close(prompt_bufnr)
+        diff_with(ref)
+      end)
+      map({ 'i', 'n' }, '<C-f>', function()
+        local ref = state.get_selected_entry().value
+        actions.close(prompt_bufnr)
+        diff_with(ref, file)
+      end)
+      map({ 'i', 'n' }, '<C-o>', actions.git_checkout)
+      return true
+    end,
+  }
 end
 
 return {
@@ -64,6 +91,9 @@ return {
       { '<leader>vd', '<cmd>DiffviewOpen<CR>', desc = 'VCS: [D]iff working tree' },
       { '<leader>vw', compare_with_branch(true), desc = 'VCS: Compare file [w]ith branch' },
       { '<leader>vW', compare_with_branch(false), desc = 'VCS: Compare project [W]ith branch' },
+      { '<leader>d', branches_popup, desc = 'Git branches (diff with working tree)' },
+      -- Show Diff (Cmd+D): the current file against HEAD
+      { '<M-d>', '<cmd>DiffviewOpen -- %<CR>', desc = 'VCS: Show diff of this file' },
     },
     opts = function()
       -- q closes a diff / history tab, like Esc on an IDEA dialog
@@ -81,6 +111,10 @@ return {
   {
     'lewis6991/gitsigns.nvim',
     opts = {
+      -- Inline blame of the current line, like GitToolbox
+      current_line_blame = true,
+      current_line_blame_opts = { delay = 500 },
+      current_line_blame_formatter = '<author>, <author_time:%Y-%m-%d> · <summary>',
       signs = {
         add = { text = '+' },
         change = { text = '~' },
@@ -113,6 +147,14 @@ return {
             gitsigns.nav_hunk 'prev'
           end
         end, { desc = 'Jump to previous git [c]hange' })
+
+        -- - / + = previous / next changed hunk, as in .ideavimrc (VcsShowPrev/NextChangeMarker)
+        map('n', '-', function()
+          gitsigns.nav_hunk 'prev'
+        end, { desc = 'Previous change marker' })
+        map('n', '+', function()
+          gitsigns.nav_hunk 'next'
+        end, { desc = 'Next change marker' })
 
         -- Actions
         -- visual mode

@@ -251,21 +251,25 @@ function M.rerun()
   end
 end
 
--- Run the test under the cursor without the picker (Ctrl+Shift+F10)
-function M.run_context()
-  local provider = providers[vim.bo.filetype]
-  if not provider then
-    return M.pick()
-  end
-  provider(function(items)
-    local first = items[1]
-    if first and first.label:sub(1, #RUN) == RUN then
-      execute(first)
-    else
-      M.pick()
+-- Run / Debug the test under the cursor without the picker (Ctrl+Shift+F10 / Ctrl+Shift+F9)
+local function context(prefix)
+  return function()
+    local provider = providers[vim.bo.filetype]
+    if not provider then
+      return M.pick()
     end
-  end)
+    provider(function(items)
+      for _, item in ipairs(items) do
+        if item.label:sub(1, #prefix) == prefix then
+          return execute(item)
+        end
+      end
+      M.pick()
+    end)
+  end
 end
+M.run_context = context(RUN)
+M.debug_context = context(DEBUG)
 
 local map = vim.keymap.set
 -- Inside tmux Shift+F10 arrives as F22 and Ctrl+Shift+F10 as F46
@@ -274,6 +278,8 @@ map('n', '<S-F10>', M.rerun, { desc = 'Rerun last configuration' })
 map('n', '<F22>', M.rerun, { desc = 'Rerun last configuration' })
 map('n', '<C-S-F10>', M.run_context, { desc = 'Run context configuration' })
 map('n', '<F46>', M.run_context, { desc = 'Run context configuration' })
+map('n', '<C-S-F9>', M.debug_context, { desc = 'Debug context configuration' })
+map('n', '<F45>', M.debug_context, { desc = 'Debug context configuration' })
 map('n', '<leader>xx', M.pick, { desc = 'Run / Debug Configurations' })
 map('n', '<leader>xR', M.rerun, { desc = 'Rerun last configuration' })
 

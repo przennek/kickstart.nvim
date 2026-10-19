@@ -29,6 +29,9 @@ return {
 
       -- Allows extra capabilities provided by nvim-cmp
       'hrsh7th/cmp-nvim-lsp',
+
+      -- JSON / YAML schemas (Kubernetes, GitHub Actions, docker-compose, …)
+      'b0o/SchemaStore.nvim',
     },
     config = function()
       -- Neovim's built-in gr* LSP maps would make `gr` (references) wait for a second key
@@ -51,6 +54,8 @@ return {
           map('gr', builtin.lsp_references, '[G]oto [R]eferences')
           map('gI', builtin.lsp_implementations, '[G]oto [I]mplementation')
           map('gD', vim.lsp.buf.declaration, '[G]oto [D]eclaration')
+          -- Go to Declaration (Cmd+B)
+          map('<M-b>', builtin.lsp_definitions, 'Go to Declaration')
           map('<leader>D', builtin.lsp_type_definitions, 'Type [D]efinition')
           map('<leader>ws', builtin.lsp_dynamic_workspace_symbols, '[W]orkspace [S]ymbols')
           -- Find Usages into the Find window at the bottom (Alt+F7; F55 inside tmux).
@@ -63,14 +68,15 @@ return {
               end,
             })
           end
+          map('<leader>f', find_usages, '[F]ind Usages')
           map('<M-F7>', find_usages, 'Find Usages')
           map('<F55>', find_usages, 'Find Usages')
-          -- Call hierarchy (Ctrl+Alt+H in IDEA)
-          map('<leader>ci', builtin.lsp_incoming_calls, '[C]all hierarchy: [i]ncoming')
-          map('<leader>co', builtin.lsp_outgoing_calls, '[C]all hierarchy: [o]utgoing')
+          -- Call Hierarchy (<leader>h in .ideavimrc): callers; <leader>H = callees
+          map('<leader>h', builtin.lsp_incoming_calls, 'Call [h]ierarchy (callers)')
+          map('<leader>H', builtin.lsp_outgoing_calls, 'Call [H]ierarchy (callees)')
 
-          -- Quick Documentation / Parameter Info
-          map('<leader>h', function()
+          -- Quick Documentation (gh; K is `ciw` from .ideavimrc) / Parameter Info (Cmd+P)
+          map('gh', function()
             vim.lsp.buf.hover { border = 'rounded' }
           end, 'Quick Documentation')
           map('<M-p>', function()
@@ -83,7 +89,7 @@ return {
           map('<F18>', vim.lsp.buf.rename, 'Rename')
 
           -- Show Context Actions (Alt+Enter) / Generate (<leader>g, Alt+Insert)
-          map('<leader>ca', vim.lsp.buf.code_action, '[C]ode [A]ction', { 'n', 'x' })
+          -- (no <leader>c… maps: <leader>c alone is Go to Class)
           map('<M-CR>', vim.lsp.buf.code_action, 'Show Context Actions', { 'n', 'x' })
           map('<leader>g', vim.lsp.buf.code_action, 'Generate', { 'n', 'x' })
           map('<M-Insert>', vim.lsp.buf.code_action, 'Generate')
@@ -153,18 +159,45 @@ return {
         clangd = {},
         -- Python: pyright for types/navigation, ruff for lint/format/imports
         pyright = {
-          -- Use the project's .venv as the interpreter, like IDEA's project SDK
-          before_init = function(_, config)
-            local venv = config.root_dir and vim.fs.joinpath(config.root_dir, '.venv', 'bin', 'python')
+          -- Use the project's .venv as the interpreter, like IDEA's project SDK.
+          -- (Settings are changed on the running client: edits made to `config` in
+          -- before_init don't reach the server.)
+          on_init = function(client)
+            local venv = client.root_dir and vim.fs.joinpath(client.root_dir, '.venv', 'bin', 'python')
             if venv and vim.uv.fs_stat(venv) then
-              config.settings = vim.tbl_deep_extend('force', config.settings or {}, { python = { pythonPath = venv } })
+              client.settings = vim.tbl_deep_extend('force', client.settings or {}, { python = { pythonPath = venv } })
+              client:notify('workspace/didChangeConfiguration', { settings = client.settings })
             end
           end,
         },
         ruff = {},
         gopls = {},
         ts_ls = {},
+        eslint = {},
         bashls = {},
+        -- YAML / Kubernetes: schemas from SchemaStore, Kubernetes for manifest directories
+        yamlls = {
+          settings = {
+            yaml = {
+              schemaStore = { enable = false, url = '' },
+              schemas = vim.tbl_extend('force', require('schemastore').yaml.schemas(), {
+                kubernetes = {
+                  '**/k8s/**/*.yaml', '**/k8s/**/*.yml',
+                  '**/*manifests*/**/*.yaml', '**/*manifests*/**/*.yml',
+                  '**/deploy/**/*.yaml', '**/deploy/**/*.yml',
+                  '**/kustomize/**/*.yaml', '**/kustomize/**/*.yml',
+                },
+              }),
+            },
+          },
+        },
+        jsonls = {
+          settings = {
+            json = { schemas = require('schemastore').json.schemas(), validate = { enable = true } },
+          },
+        },
+        terraformls = {},
+        dockerls = {},
         lua_ls = {
           settings = {
             Lua = {
@@ -193,6 +226,12 @@ return {
         'java-test',
         'debugpy',
         'codelldb',
+        -- linters / formatters / analysers from your IDEA plugins
+        'sonarlint-language-server',
+        'checkstyle', -- PMD isn't in Mason; lint.lua uses `pmd` when it is on PATH
+        'tflint',
+        'hadolint',
+        'prettier',
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 

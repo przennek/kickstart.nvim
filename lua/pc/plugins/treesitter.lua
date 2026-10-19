@@ -2,7 +2,11 @@
 -- nvim-treesitter `main` branch (the old `master` one breaks on Neovim 0.12, e.g. in Markdown).
 -- It only installs parsers and queries; highlighting/indent are started per filetype below.
 -- Needs tree-sitter-cli, which Mason installs (see lsp.lua).
-local parsers = { 'bash', 'c', 'cpp', 'diff', 'html', 'java', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'python', 'query', 'vim', 'vimdoc', 'xml', 'yaml', 'json' }
+local parsers = {
+  'bash', 'c', 'cpp', 'diff', 'html', 'java', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'python', 'query', 'vim', 'vimdoc', 'xml', 'yaml', 'json',
+  -- the rest of your IDEA stack: Terraform/HCL, SQL, TypeScript/React, Go, Docker, properties, Mermaid
+  'terraform', 'hcl', 'sql', 'typescript', 'tsx', 'javascript', 'go', 'dockerfile', 'properties', 'mermaid', 'http', 'gitcommit', 'git_rebase',
+}
 
 return {
   'nvim-treesitter/nvim-treesitter',

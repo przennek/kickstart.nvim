@@ -20,6 +20,10 @@ local function find_history(cmd)
   end
 end
 
+local function file_structure()
+  require('telescope').extensions.aerial.aerial()
+end
+
 return {
   -- Find / Problems tool windows at the bottom
   {
@@ -45,20 +49,17 @@ return {
       win = { size = 12 },
     },
   },
-  -- Structure (Alt+7) and File Structure popup (<leader>k)
+  -- Structure (Alt+7) and File Structure popup (<leader>k, Alt+F12)
   {
     'stevearc/aerial.nvim',
     dependencies = { 'nvim-treesitter/nvim-treesitter', 'nvim-tree/nvim-web-devicons' },
     cmd = { 'AerialToggle', 'AerialNavToggle' },
     keys = {
       { '<M-7>', '<cmd>AerialToggle! right<CR>', desc = 'Structure' },
-      {
-        '<leader>k',
-        function()
-          require('telescope').extensions.aerial.aerial()
-        end,
-        desc = 'File structure',
-      },
+      { '<leader>k', file_structure, desc = 'File structure' },
+      -- File Structure popup is Cmd+F12 in the macOS keymap (F60 inside tmux)
+      { '<M-F12>', file_structure, desc = 'File structure' },
+      { '<F60>', file_structure, desc = 'File structure' },
     },
     opts = {
       backends = { 'lsp', 'treesitter', 'markdown', 'man' },
@@ -70,28 +71,48 @@ return {
       require('telescope').load_extension 'aerial'
     end,
   },
-  -- Navigation bar / breadcrumbs on top of every window (<leader>n to pick a segment)
+  -- Navigation bar (<leader>nb, Alt+Home, Alt+\): breadcrumbs are off like in your IDEA
+  -- (SHOW_BREADCRUMBS=false); the key shows them in the current window and lets you pick
+  -- a segment, pressing it again hides them
   {
     'Bekaboo/dropbar.nvim',
     event = 'BufReadPost',
-    keys = {
-      {
-        '<leader>n',
-        function()
-          require('dropbar.api').pick()
-        end,
-        desc = '[N]avigation bar',
-      },
-    },
-    opts = {},
+    keys = function()
+      local function navbar()
+        local win = vim.api.nvim_get_current_win()
+        if vim.w[win].pc_navbar then
+          vim.w[win].pc_navbar = false
+          vim.wo[win].winbar = ''
+          return
+        end
+        vim.w[win].pc_navbar = true
+        require('dropbar.utils.bar').attach(vim.api.nvim_get_current_buf(), win)
+        vim.defer_fn(function()
+          pcall(require('dropbar.api').pick)
+        end, 50)
+      end
+      return {
+        { '<leader>nb', navbar, desc = '[N]avigation [b]ar' },
+        { '<M-Home>', navbar, desc = 'Navigation bar' },
+        { '<M-\\>', navbar, desc = 'Navigation bar' },
+      }
+    end,
+    opts = function()
+      local default_enable = require('dropbar.configs').opts.bar.enable
+      return {
+        bar = {
+          enable = function(buf, win, info)
+            return vim.w[win].pc_navbar == true and default_enable(buf, win, info)
+          end,
+        },
+      }
+    end,
   },
-  -- Terminal tool window (Alt+F12; F60 inside tmux), Alt+T like Cmd+T in your Mac keymap
+  -- Terminal tool window: Alt+T (Cmd+T in your macOS keymap)
   {
     'akinsho/toggleterm.nvim',
     version = '*',
     keys = {
-      { '<M-F12>', '<cmd>ToggleTerm<CR>', mode = { 'n', 't' }, desc = 'Terminal' },
-      { '<F60>', '<cmd>ToggleTerm<CR>', mode = { 'n', 't' }, desc = 'Terminal' },
       { '<M-t>', '<cmd>ToggleTerm<CR>', mode = { 'n', 't' }, desc = 'Terminal' },
     },
     opts = {

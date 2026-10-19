@@ -41,6 +41,8 @@ return {
       hijack_netrw_behavior = 'open_current',
       -- Opening the tree somewhere else must not change Neovim's cwd
       bind_to_cwd = false,
+      -- Autoscroll from source (on in your IDEA project view): the tree follows the open file
+      follow_current_file = { enabled = true },
       window = {
         mappings = {
           ['<A-1>'] = 'close_window',

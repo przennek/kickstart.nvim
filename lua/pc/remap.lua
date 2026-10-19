@@ -34,6 +34,13 @@ map('i', '<C-j>', '<Down>')
 map('i', '<C-k>', '<Up>')
 map('i', '<C-l>', '<Right>')
 
+-- Visual mode: Ctrl+J/K move and scroll the screen with the cursor, Ctrl+H/L move left/right
+-- (in normal mode Ctrl+H/J/K/L switch splits / tmux panes, as in .ideavimrc)
+map('x', '<C-j>', 'gj<C-e>')
+map('x', '<C-k>', 'gk<C-y>')
+map('x', '<C-h>', 'h')
+map('x', '<C-l>', 'l')
+
 -- Previous / next f/t match
 map({ 'n', 'v', 'o' }, 'H', ',', { desc = 'Previous f/t match' })
 map({ 'n', 'v', 'o' }, 'L', ';', { desc = 'Next f/t match' })
@@ -57,9 +64,45 @@ map('n', '<CR>', function()
 end, { expr = true, desc = 'Command line' })
 
 -- [[ IDE-like actions that don't need LSP ]]
-map('n', '<leader>d', function()
+-- (<leader>d is the Git branches popup now, as in the new .ideavimrc)
+map('n', '<leader>bd', function()
   require('mini.bufremove').delete()
-end, { desc = 'Close file (keep window)' })
+end, { desc = '[B]uffer: close file (keep window)' })
+
+-- Jump to last / next change (Ctrl+Alt+P / N in .ideavimrc) = Neovim's change list
+map('n', '<C-M-p>', 'g;', { desc = 'Jump to last change' })
+map('n', '<C-M-n>', 'g,', { desc = 'Jump to next change' })
+
+-- Cmd shortcuts from the macOS keymap, on Alt (the key next to space, like Cmd with Karabiner)
+map('n', '<M-/>', 'gcc', { remap = true, desc = 'Comment line' })
+map('x', '<M-/>', 'gc', { remap = true, desc = 'Comment selection' })
+map('n', '<M-S-Down>', '<cmd>move .+1<CR>==', { desc = 'Move statement down' })
+map('n', '<M-S-Up>', '<cmd>move .-2<CR>==', { desc = 'Move statement up' })
+map('x', '<M-S-Down>', ":move '>+1<CR>gv=gv", { desc = 'Move selection down' })
+map('x', '<M-S-Up>', ":move '<-2<CR>gv=gv", { desc = 'Move selection up' })
+map('n', '<M-s>', '<cmd>wall<CR>', { desc = 'Save all' })
+-- Replace word under cursor in file (gdefault already replaces every match in a line)
+map('n', '<M-r>', [[:%s/\<<C-r><C-w>\>//<Left>]], { desc = 'Replace' })
+map('n', '<M-e>', function()
+  require('telescope.builtin').oldfiles { cwd_only = true }
+end, { desc = 'Recent files' })
+map('n', '<M-E>', function()
+  require('telescope.builtin').jumplist()
+end, { desc = 'Recent locations' })
+map({ 'n', 'i' }, '<M-V>', function()
+  require('telescope.builtin').registers()
+end, { desc = 'Paste from history' })
+
+-- Scratch file (New Scratch File): an unnamed buffer with a filetype you pick
+map('n', '<leader>N', function()
+  vim.ui.select({ 'java', 'sql', 'json', 'yaml', 'python', 'markdown', 'sh', 'text' }, { prompt = 'Scratch file type' }, function(ft)
+    if ft then
+      vim.cmd 'enew'
+      vim.bo.buftype = 'nofile'
+      vim.bo.filetype = ft
+    end
+  end)
+end, { desc = '[N]ew scratch file' })
 
 -- Back / Forward (Ctrl+Alt+H/L in IDEA, but Ctrl+Alt+H/L switches GNOME workspaces here)
 map('n', '<M-h>', '<C-o>', { desc = 'Back' })

@@ -128,14 +128,30 @@ return {
       { '<F32>', dap 'toggle_breakpoint', desc = 'Debug: Toggle Breakpoint' },
       { '<C-S-F8>', conditional_breakpoint, desc = 'Debug: Conditional Breakpoint' },
       { '<F44>', conditional_breakpoint, desc = 'Debug: Conditional Breakpoint' },
-      { '<M-F8>', dapui 'eval', mode = { 'n', 'v' }, desc = 'Debug: Evaluate Expression' },
-      { '<F56>', dapui 'eval', mode = { 'n', 'v' }, desc = 'Debug: Evaluate Expression' },
+      -- Toggle Line Breakpoint is Cmd+F8 in the macOS keymap -> Alt+F8 (F56 inside tmux).
+      -- Evaluate Expression (Option+F8 there) is <leader>xe.
+      { '<M-F8>', dap 'toggle_breakpoint', desc = 'Debug: Toggle Breakpoint' },
+      { '<F56>', dap 'toggle_breakpoint', desc = 'Debug: Toggle Breakpoint' },
       { '<C-F2>', dap 'terminate', desc = 'Debug: Stop' },
       { '<F26>', dap 'terminate', desc = 'Debug: Stop' },
       { '<C-F5>', dap 'restart', desc = 'Debug: Rerun' },
       { '<F29>', dap 'restart', desc = 'Debug: Rerun' },
       -- Debug tool window (Alt+5)
       { '<M-5>', toggle_ui, desc = 'Debug: Toggle UI' },
+      -- Run tool window (Cmd+4): just the console with the program output
+      {
+        '<M-4>',
+        function()
+          for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+            local ft = vim.bo[vim.api.nvim_win_get_buf(win)].filetype
+            if ft == 'dapui_console' or ft == 'dap-repl' then
+              return require('dapui').close { layout = 2 }
+            end
+          end
+          require('dapui').open { layout = 2 }
+        end,
+        desc = 'Run window (toggle)',
+      },
 
       { '<leader>b', dap 'toggle_breakpoint', desc = 'Debug: Toggle Breakpoint' },
       { '<leader>B', conditional_breakpoint, desc = 'Debug: Conditional Breakpoint' },

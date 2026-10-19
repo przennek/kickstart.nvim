@@ -13,8 +13,17 @@ vim.opt.tabstop = 4 -- Number of spaces that a <Tab> in the file counts for
 
 vim.g.have_nerd_font = true
 
+-- Java from SDKMAN for every tool started from Neovim (sonarlint, checkstyle, pmd, Maven in
+-- terminals…), also when Neovim isn't started from a shell that ran sdkman-init
+local sdkman_java = vim.fs.joinpath(vim.env.HOME, '.sdkman', 'candidates', 'java', 'current')
+if vim.fn.executable 'java' == 0 and vim.uv.fs_stat(sdkman_java) then
+  vim.env.JAVA_HOME = sdkman_java
+  vim.env.PATH = sdkman_java .. '/bin:' .. vim.env.PATH
+end
+
 -- line numbers
-vim.opt.number = true -- Make line numbers default
+-- Like .ideavimrc: relative numbers only (`set number` is commented out there)
+vim.opt.number = false
 vim.opt.relativenumber = true
 
 -- Enable mouse mode, can be useful for resizing splits for example!
@@ -37,9 +46,9 @@ vim.opt.breakindent = true
 -- Save undo history
 vim.opt.undofile = true
 
--- Case-insensitive searching UNLESS \C or one or more capital letters in the search term
+-- Case-insensitive searching (use \C to match case); like .ideavimrc, no smartcase
 vim.opt.ignorecase = true
-vim.opt.smartcase = true
+vim.opt.smartcase = false
 
 -- :s replaces all matches in a line by default (same as `set gdefault` in .ideavimrc)
 vim.opt.gdefault = true
@@ -75,4 +84,7 @@ vim.opt.inccommand = 'split'
 vim.opt.cursorline = true
 
 -- Minimal number of screen lines to keep above and below the cursor.
-vim.opt.scrolloff = 20
+vim.opt.scrolloff = 1 -- as in .ideavimrc
+
+-- No soft wraps in the editor (IDEA: soft wraps only in the console)
+vim.opt.wrap = false

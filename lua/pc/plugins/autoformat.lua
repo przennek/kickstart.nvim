@@ -1,18 +1,9 @@
 return { -- Autoformat
   'stevearc/conform.nvim',
-  event = { 'BufWritePre' },
   cmd = { 'ConformInfo' },
   keys = {
     {
-      '<leader>f',
-      function()
-        require('conform').format { async = true, lsp_format = 'fallback' }
-      end,
-      mode = '',
-      desc = '[F]ormat buffer',
-    },
-    {
-      -- Reformat Code (Shift+Alt+L in IDEA)
+      -- Reformat Code (Cmd+Shift+L in IDEA; <leader>f is Find Usages)
       '<M-L>',
       function()
         require('conform').format { async = true, lsp_format = 'fallback' }
@@ -23,25 +14,22 @@ return { -- Autoformat
   },
   opts = {
     notify_on_error = false,
-    format_on_save = function(bufnr)
-      -- Disable "format_on_save lsp_fallback" for languages that don't
-      -- have a well standardized coding style. You can add additional
-      -- languages here or re-enable it for the disabled ones.
-      -- Java is formatted on demand only, like in IDEA.
-      local disable_filetypes = { c = true, cpp = true, java = true }
-      if disable_filetypes[vim.bo[bufnr].filetype] then
-        return nil
-      end
-      return {
-        timeout_ms = 500,
-        lsp_format = 'fallback',
-      }
-    end,
+    -- No format on save: like in IDEA, code is reformatted on demand with Alt+Shift+L,
+    -- so saving never rewrites whole files in shared repositories
     formatters_by_ft = {
       lua = { 'stylua' },
       python = { 'ruff_organize_imports', 'ruff_format' },
       c = { 'clang-format' },
       cpp = { 'clang-format' },
+      javascript = { 'prettier' },
+      javascriptreact = { 'prettier' },
+      typescript = { 'prettier' },
+      typescriptreact = { 'prettier' },
+      json = { 'prettier' },
+      yaml = { 'prettier' },
+      markdown = { 'prettier' },
+      terraform = { 'terraform_fmt' },
+      hcl = { 'terraform_fmt' },
       -- java: no formatter here, falls back to jdtls
     },
   },

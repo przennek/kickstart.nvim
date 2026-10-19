@@ -38,7 +38,13 @@ return { -- Autocompletion
     -- See `:help cmp`
     local cmp = require 'cmp'
     local luasnip = require 'luasnip'
-    luasnip.config.setup {}
+    luasnip.config.setup {
+      -- Surround With: select text in visual mode, press Tab, then expand a surround
+      -- snippet (AE, if, ON, OO) — it wraps what was selected
+      store_selection_keys = '<Tab>',
+    }
+    -- Your IDEA live templates (psf, pf, jut, tngt, …), see lua/pc/snippets/
+    require('luasnip.loaders.from_lua').lazy_load { paths = { vim.fn.stdpath 'config' .. '/lua/pc/snippets' } }
 
     cmp.setup {
       snippet = {
@@ -66,6 +72,33 @@ return { -- Autocompletion
         --  This will auto-import if your LSP supports it.
         --  This will expand snippets if the LSP sent a snippet.
         ['<C-y>'] = cmp.mapping.confirm { select = true },
+
+        -- Like IDEA: Tab accepts and replaces the word after the cursor
+        -- (Choose Lookup Item Replace), Enter accepts and inserts.
+        -- Tab / Shift+Tab also jump between template variables of an expanded snippet.
+        ['<Tab>'] = cmp.mapping(function(fallback)
+          if cmp.visible() then
+            cmp.confirm { behavior = cmp.ConfirmBehavior.Replace, select = true }
+          elseif luasnip.expand_or_locally_jumpable() then
+            luasnip.expand_or_jump()
+          else
+            fallback()
+          end
+        end, { 'i', 's' }),
+        ['<S-Tab>'] = cmp.mapping(function(fallback)
+          if luasnip.locally_jumpable(-1) then
+            luasnip.jump(-1)
+          else
+            fallback()
+          end
+        end, { 'i', 's' }),
+        ['<CR>'] = cmp.mapping(function(fallback)
+          if cmp.visible() and cmp.get_selected_entry() then
+            cmp.confirm { behavior = cmp.ConfirmBehavior.Insert }
+          else
+            fallback()
+          end
+        end, { 'i' }),
 
         -- If you prefer more traditional completion keymaps,
         -- you can uncomment the following lines

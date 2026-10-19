@@ -1,4 +1,5 @@
--- Line bookmarks like IDEA's: a sign in the gutter, optional description, searchable list.
+-- Line bookmarks like IDEA's (and the Code Remark plugin's notes): a sign in the gutter,
+-- optional description shown at the end of the line, searchable list.
 -- Keys follow .ideavimrc (<leader>pa / pr = ToggleBookmark, <leader>sb = ShowBookmarks)
 -- and the IDEA keymap (F11, Ctrl+F11 = with description, Shift+F11 = list).
 -- Stored globally in ~/.bookmarks, so they survive restarts.
@@ -30,6 +31,11 @@ return {
     { '<F35>', bm 'bookmark_ann', desc = 'Bookmark: with description' },
     { '<S-F11>', show_bookmarks, desc = 'Show bookmarks' },
     { '<F23>', show_bookmarks, desc = 'Show bookmarks' },
+    -- macOS keymap on Alt: Cmd+F11 = bookmark with description (also what Code Remark did),
+    -- Cmd+2 = Bookmarks tool window (F59 is Alt+F11 inside tmux)
+    { '<M-F11>', bm 'bookmark_ann', desc = 'Bookmark: with description' },
+    { '<F59>', bm 'bookmark_ann', desc = 'Bookmark: with description' },
+    { '<M-2>', show_bookmarks, desc = 'Bookmarks' },
   },
   config = function()
     require('bookmarks').setup {

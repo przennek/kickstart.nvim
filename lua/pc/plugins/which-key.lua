@@ -6,8 +6,11 @@ return {
     require('which-key').setup()
 
     -- Document existing key chains
+    -- (single-key leader actions from .ideavimrc: c class, n file, f usages, d branches,
+    --  h call hierarchy, k structure, q switcher, g generate)
     require('which-key').add {
-      { '<leader>c', group = '[C]ode / refactor', mode = { 'n', 'x' } },
+      { '<leader>b', group = '[B]uffer' },
+      { '<leader>e', group = '[E]xtract (refactor)', mode = { 'n', 'x' } },
       { '<leader>p', group = 'Bookmarks / Har[p]oon' },
       { '<leader>r', group = '[R]ename' },
       { '<leader>s', group = '[S]earch' },

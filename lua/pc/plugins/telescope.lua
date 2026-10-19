@@ -176,11 +176,13 @@ return {
     end
     vim.keymap.set('n', '<leader>sc', goto_class, { desc = '[S]earch [C]lass' })
     vim.keymap.set('n', '<leader>sn', goto_class, { desc = '[S]earch class by [N]ame' })
+    vim.keymap.set('n', '<leader>c', goto_class, { desc = 'Go to [C]lass' })
     vim.keymap.set('n', '<M-n>', goto_class, { desc = 'Go to Class' })
     vim.keymap.set('n', '<leader>sS', function()
       builtin.lsp_dynamic_workspace_symbols { bufnr = workspace_symbol_buf() }
     end, { desc = '[S]earch [S]ymbol' })
     vim.keymap.set('n', '<M-N>', builtin.find_files, { desc = 'Go to File' })
+    vim.keymap.set('n', '<leader>n', builtin.find_files, { desc = 'Go to File' })
     -- Switcher: open files, most recently used first
     vim.keymap.set('n', '<leader>q', function()
       builtin.buffers { sort_mru = true, ignore_current_buffer = true }
