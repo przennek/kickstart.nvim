@@ -9,6 +9,15 @@ local function bm(fn)
   end
 end
 
+-- Bookmark with description (Alt+F11 / <leader>pi): on a line that already has a bookmark the
+-- key removes it, like pressing the bookmark key again in IDEA, instead of editing its text
+local function bookmark_with_description()
+  local ns = vim.api.nvim_get_namespaces()['bookmarks_extmark_signs_']
+  local line = vim.fn.line '.' - 1
+  local marked = ns and #vim.api.nvim_buf_get_extmarks(0, ns, { line, 0 }, { line, -1 }, {}) > 0
+  require('bookmarks')[marked and 'bookmark_toggle' or 'bookmark_ann']()
+end
+
 local function show_bookmarks()
   require('telescope').extensions.bookmarks.list()
 end
@@ -20,7 +29,7 @@ return {
   keys = {
     { '<leader>pa', bm 'bookmark_toggle', desc = 'Bookmark: toggle' },
     { '<leader>pr', bm 'bookmark_toggle', desc = 'Bookmark: toggle' },
-    { '<leader>pi', bm 'bookmark_ann', desc = 'Bookmark: with description' },
+    { '<leader>pi', bookmark_with_description, desc = 'Bookmark: with description' },
     { '<leader>pn', bm 'bookmark_next', desc = 'Bookmark: next in file' },
     { '<leader>pp', bm 'bookmark_prev', desc = 'Bookmark: previous in file' },
     { '<leader>pc', bm 'bookmark_clean', desc = 'Bookmark: clear file' },
@@ -34,8 +43,8 @@ return {
     { '<F23>', show_bookmarks, desc = 'Show Bookmarks' },
     -- macOS keymap on Alt: Cmd+F11 = bookmark with description (also what Code Remark did),
     -- Cmd+2 = Bookmarks tool window (F59 is Alt+F11 inside tmux)
-    { '<M-F11>', bm 'bookmark_ann', desc = 'Bookmark: with description' },
-    { '<F59>', bm 'bookmark_ann', desc = 'Bookmark: with description' },
+    { '<M-F11>', bookmark_with_description, desc = 'Bookmark: with description' },
+    { '<F59>', bookmark_with_description, desc = 'Bookmark: with description' },
     { '<M-2>', show_bookmarks, desc = 'Show Bookmarks' },
   },
   config = function()
