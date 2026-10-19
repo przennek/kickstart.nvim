@@ -58,7 +58,7 @@ vim.opt.gdefault = true
 vim.opt.jumpoptions = 'stack,view'
 
 -- Keep signcolumn on by default
-vim.opt.signcolumn = 'yes'
+vim.opt.signcolumn = 'yes:2' -- two signs: git / diagnostics / breakpoints + hierarchy markers
 
 -- Decrease update time
 vim.opt.updatetime = 250
