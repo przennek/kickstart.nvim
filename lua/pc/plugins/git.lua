@@ -110,6 +110,9 @@ return {
       { '<leader>vh', '<cmd>DiffviewFileHistory %<CR>', desc = 'VCS: File [h]istory' },
       { '<leader>vh', ":'<,'>DiffviewFileHistory<CR>", mode = 'v', desc = 'VCS: Selection history' },
       { '<leader>vd', '<cmd>DiffviewOpen<CR>', desc = 'VCS: [D]iff working tree' },
+      { '<leader>vm', function() require('pc.merge').open() end, desc = 'VCS: Resolve conflicts ([m]erge tool)' },
+      { '<leader>vx', function() require('pc.merge').continue() end, desc = 'VCS: Continue merge / rebase' },
+      { '<leader>vX', function() require('pc.merge').abort() end, desc = 'VCS: Abort merge / rebase' },
       { '<leader>vw', compare_with_branch(true), desc = 'VCS: Compare file [w]ith branch' },
       { '<leader>vW', compare_with_branch(false), desc = 'VCS: Compare project [W]ith branch' },
       { '<leader>d', branches_popup, desc = 'Git Branches' },
@@ -120,9 +123,27 @@ return {
       -- q closes a diff / history tab, like Esc on an IDEA dialog
       local close = { 'n', 'q', '<cmd>DiffviewClose<CR>', { desc = 'Close Diffview' } }
       local esc = { 'n', '<Esc>', '<cmd>DiffviewClose<CR>', { desc = 'Close Diffview' } }
+      -- Merge tool: Accept Left / Right like IDEA, under <leader>m (<leader>c is Go to Class)
+      local actions = require 'diffview.actions'
+      local view = { close, esc }
+      for _, lhs in ipairs { 'co', 'ct', 'cb', 'ca', 'cO', 'cT', 'cB', 'cA' } do
+        table.insert(view, { 'n', '<leader>' .. lhs, false })
+      end
+      for key, side in pairs { l = 'ours', r = 'theirs', b = 'base', a = 'all', n = 'none' } do
+        table.insert(view, { 'n', '<leader>m' .. key, actions.conflict_choose(side), { desc = 'Conflict: accept ' .. side } })
+        table.insert(view, { 'n', '<leader>m' .. key:upper(), actions.conflict_choose_all(side), { desc = 'Conflicts in file: accept ' .. side } })
+      end
+      table.insert(view, {
+        'n',
+        '<leader>mm',
+        function()
+          require('pc.merge').resolve_simple()
+        end,
+        { desc = 'Resolve simple conflicts' },
+      })
       return {
         keymaps = {
-          view = { close, esc },
+          view = view,
           file_panel = { close, esc },
           file_history_panel = { close, esc },
         },
