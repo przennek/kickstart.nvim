@@ -3,6 +3,7 @@
 --                    (add a connection with `A` there, e.g. postgres://user@localhost/db)
 --   Alt+Enter        in a SQL buffer: execute the statement under the cursor / the selection
 --                    (Console.Jdbc.Execute is Cmd+Enter in your macOS keymap)
+-- Named consoles, schema, history, cancel: lua/pc/db_console.lua (<leader>Q…).
 -- Completion of tables and columns comes from the active connection.
 return {
   'kristijanhusak/vim-dadbod-ui',
@@ -35,8 +36,16 @@ return {
         -- Query buffers opened from the Database window know their connection; any other SQL
         -- file uses b:db / g:db, and asks for a saved connection when there is none.
         -- Both work on the last visual selection ('< '>).
+        -- Query consoles (<leader>Qq) run on their connection + schema.
         local function execute()
           require('lazy').load { plugins = { 'vim-dadbod-ui' } }
+          local console = require 'pc.db_console'
+          local first, last = vim.fn.line "'<", vim.fn.line "'>"
+          console.record(vim.api.nvim_buf_get_lines(0, first - 1, last, false), console.connection_name(0))
+          local url = console.url(0)
+          if url then
+            return vim.cmd("'<,'>DB " .. url)
+          end
           if vim.b.dbui_db_key_name then
             return vim.api.nvim_feedkeys(vim.keycode 'gv<Plug>(DBUI_ExecuteQuery)', 'm', false)
           end
