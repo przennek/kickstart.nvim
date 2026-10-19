@@ -6,9 +6,8 @@
 --   gutter      ↑ overrides / implements something above, ↓ has overrides / implementations
 --               below (↕ both). Click it: ↑ goes up, ↓ lists what is below.
 --   Alt+U       Go to Super Method / super type (Cmd+U); gI lists implementations / subtypes
--- Java and C++ use the language server's type hierarchy (jdtls, clangd). Python servers have
--- none, so for Python the hierarchy is read from the code: base classes from the class
--- declaration (treesitter), subclasses by searching the project (ripgrep).
+-- Java and C++ use the language server's type hierarchy (jdtls, clangd). Python and
+-- JavaScript / TypeScript servers have none, so there the hierarchy is read from the code.
 
 local M = {}
 
@@ -28,14 +27,20 @@ local function await(client, method, params, buf)
   local co = assert(coroutine.running())
   client:request(method, params, function(err, result)
     vim.schedule(function()
-      coroutine.resume(co, not err and result or nil)
+      local ok, msg = coroutine.resume(co, not err and result or nil)
+      if not ok then
+        vim.notify('hierarchy: ' .. tostring(msg), vim.log.levels.ERROR)
+      end
     end)
   end, buf)
   return coroutine.yield()
 end
 
 local function async(fn)
-  coroutine.wrap(fn)()
+  local ok, msg = coroutine.resume(coroutine.create(fn))
+  if not ok then
+    vim.notify('hierarchy: ' .. tostring(msg), vim.log.levels.ERROR)
+  end
 end
 
 local function pos_params(buf, pos)
@@ -81,14 +86,81 @@ local function lsp_provider(client, buf)
   return p
 end
 
--- Python: treesitter + project search
-local function python_provider(buf)
-  local root = vim.fs.root(buf, { 'pyproject.toml', 'setup.py', 'setup.cfg', '.git' }) or vim.fn.getcwd()
-  local p = { name = 'python' }
+-- Languages whose servers have no type hierarchy (Python, JavaScript / TypeScript): read it
+-- from the code — base classes from the class declaration (treesitter), subclasses by
+-- searching the project (ripgrep), super methods by looking into the base classes.
+local function names_in(node, bufnr, types, out)
+  for child in node:iter_children() do
+    if types[child:type()] then
+      table.insert(out, (vim.treesitter.get_node_text(child, bufnr):match '([%w_$]+)$'))
+    elseif child:named_child_count() > 0 and child:type() ~= 'type_arguments' then
+      names_in(child, bufnr, types, out)
+    end
+  end
+  return out
+end
+
+local SPECS = {
+  python = {
+    roots = { 'pyproject.toml', 'setup.py', 'setup.cfg', '.git' },
+    rg_types = { 'py' },
+    lang = function()
+      return 'python'
+    end,
+    class_types = { class_definition = true },
+    method_types = { function_definition = true },
+    bases = function(node, bufnr)
+      local bases = node:field('superclasses')[1]
+      return bases and names_in(bases, bufnr, { identifier = true, attribute = true }, {}) or {}
+    end,
+    definition = function(name)
+      return [[^\s*class\s+]] .. name .. [[\b]]
+    end,
+    subclass = function(name)
+      return [[^\s*class\s+\w+\s*\([^)]*\b]] .. name .. [[\b]]
+    end,
+  },
+  javascript = {
+    roots = { 'package.json', 'tsconfig.json', '.git' },
+    rg_types = { 'js', 'ts' },
+    lang = function(file)
+      local ext = file:match '%.(%w+)$'
+      return ({ ts = 'typescript', mts = 'typescript', cts = 'typescript', tsx = 'tsx' })[ext] or 'javascript'
+    end,
+    class_types = { class_declaration = true, class = true, abstract_class_declaration = true },
+    method_types = { method_definition = true },
+    bases = function(node, bufnr)
+      for child in node:iter_children() do
+        if child:type() == 'class_heritage' then
+          return names_in(child, bufnr, { identifier = true, type_identifier = true, property_identifier = true }, {})
+        end
+      end
+      return {}
+    end,
+    definition = function(name)
+      return [[\bclass\s+]] .. name .. [[\b]]
+    end,
+    subclass = function(name)
+      return [[\bclass\s+[\w$]+[^{]*\b(extends|implements)\b[^{]*\b]] .. name .. [[\b]]
+    end,
+  },
+}
+SPECS.typescript, SPECS.typescriptreact, SPECS.javascriptreact = SPECS.javascript, SPECS.javascript, SPECS.javascript
+
+local function code_provider(buf, spec)
+  local root = vim.fs.root(buf, spec.roots) or vim.fn.getcwd()
+  local p = { name = 'code' }
 
   local function parse(bufnr)
-    vim.fn.bufload(bufnr)
-    local ok, parser = pcall(vim.treesitter.get_parser, bufnr, 'python')
+    if not vim.api.nvim_buf_is_loaded(bufnr) then
+      -- only read for analysis: no swap file, so a file open in another Neovim doesn't
+      -- trigger the E325 "ATTENTION" prompt
+      vim.bo[bufnr].swapfile = false
+      if not pcall(vim.fn.bufload, bufnr) then
+        return nil
+      end
+    end
+    local ok, parser = pcall(vim.treesitter.get_parser, bufnr, spec.lang(vim.api.nvim_buf_get_name(bufnr)))
     return ok and parser:parse()[1]:root()
   end
 
@@ -108,7 +180,7 @@ local function python_provider(buf)
   local function class_node_at(bufnr, line, col)
     local tree = parse(bufnr)
     local node = tree and tree:named_descendant_for_range(line, col, line, col)
-    while node and node:type() ~= 'class_definition' do
+    while node and not spec.class_types[node:type()] do
       node = node:parent()
     end
     return node
@@ -116,16 +188,20 @@ local function python_provider(buf)
 
   -- class declarations in the project matching the ripgrep `regex`
   local function search_classes(regex)
-    local out = vim.system({ 'rg', '--json', '-t', 'py', '-e', regex, root }, { text = true }):wait()
+    local args = { 'rg', '--json', '-e', regex, root }
+    for _, t in ipairs(spec.rg_types) do
+      vim.list_extend(args, { '-t', t }, 1, 2)
+    end
+    local out = vim.system(args, { text = true }):wait()
     local items = {}
     for line in (out.stdout or ''):gmatch '[^\n]+' do
       local ok, msg = pcall(vim.json.decode, line)
       if ok and msg.type == 'match' then
         local text = msg.data.lines.text or ''
-        local indent, name = text:match '^(%s*)class%s+([%w_]+)'
+        local start, _, name = text:find 'class%s+([%w_$]+)'
         if name then
           local file = msg.data.path.text
-          local col = #indent + #'class '
+          local col = start - 1 + #text:match('class%s+', start)
           table.insert(items, {
             name = name,
             kind = 5,
@@ -150,33 +226,29 @@ local function python_provider(buf)
   function p.supertypes(item)
     local bufnr = vim.uri_to_bufnr(item.uri)
     local node = class_node_at(bufnr, item.selectionRange.start.line, item.selectionRange.start.character)
-    local bases = node and node:field('superclasses')[1]
     local result = {}
-    for base in bases and bases:iter_children() or function() end do
-      if base:named() and (base:type() == 'identifier' or base:type() == 'attribute') then
-        local name = vim.treesitter.get_node_text(base, bufnr):match '([%w_]+)$'
-        if name and not IGNORED_SUPERS[name] then
-          vim.list_extend(result, search_classes([[^\s*class\s+]] .. name .. [[\b]]))
-        end
+    for _, name in ipairs(node and spec.bases(node, bufnr) or {}) do
+      if name and not IGNORED_SUPERS[name] then
+        vim.list_extend(result, search_classes(spec.definition(name)))
       end
     end
     return result
   end
 
   function p.subtypes(item)
-    return search_classes([[^\s*class\s+\w+\s*\([^)]*\b]] .. item.name .. [[\b]])
+    return search_classes(spec.subclass(item.name))
   end
 
   -- methods with the same name in the base classes (nearest first)
   function p.method_supers(pos)
     local tree = parse(buf)
     local node = tree and tree:named_descendant_for_range(pos.line, pos.character, pos.line, pos.character)
-    while node and node:type() ~= 'function_definition' do
+    while node and not spec.method_types[node:type()] do
       node = node:parent()
     end
     local method = node and vim.treesitter.get_node_text(node:field('name')[1], buf)
     local cls = node and node:parent()
-    while cls and cls:type() ~= 'class_definition' do
+    while cls and not spec.class_types[cls:type()] do
       cls = cls:parent()
     end
     if not (method and cls) then
@@ -194,9 +266,9 @@ local function python_provider(buf)
         local body = cnode and cnode:field('body')[1]
         for child in body and body:iter_children() or function() end do
           local def = child:type() == 'decorated_definition' and child:field('definition')[1] or child
-          if def:type() == 'function_definition' and vim.treesitter.get_node_text(def:field('name')[1], bufnr) == method then
-            local n = def:field('name')[1]
-            local row, col, erow, ecol = n:range()
+          local name_node = spec.method_types[def:type()] and def:field('name')[1]
+          if name_node and vim.treesitter.get_node_text(name_node, bufnr) == method then
+            local row, col, erow, ecol = name_node:range()
             table.insert(found, {
               name = sup.name .. '.' .. method,
               kind = 6,
@@ -219,8 +291,9 @@ local function provider_for(buf)
   if client then
     return lsp_provider(client, buf)
   end
-  if vim.bo[buf].filetype == 'python' and vim.fn.executable 'rg' == 1 then
-    return python_provider(buf)
+  local spec = SPECS[vim.bo[buf].filetype]
+  if spec and vim.fn.executable 'rg' == 1 then
+    return code_provider(buf, spec)
   end
 end
 

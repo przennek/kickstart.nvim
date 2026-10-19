@@ -1,0 +1,27 @@
+[terminal]
+shell = { program = "zsh", args = ["-c", "tmux attach -t main || tmux new -s main"] }
+
+# Same family as the IntelliJ editor font; the Nerd Font variant has the icons Neovim uses
+[font]
+normal = { family = "JetBrainsMono Nerd Font" }
+
+# Terminals send Ctrl+Shift+<letter> the same as Ctrl+<letter>, so translate these into keys
+# neovim can tell apart: Ctrl+Shift+P / Ctrl+Shift+N = Back / Forward (sent as Alt+H / Alt+L).
+# (This replaces Alacritty's default Ctrl+Shift+N = new window.)
+[keyboard]
+bindings = [
+  { key = "P", mods = "Control|Shift", chars = "\u001bh" },
+  { key = "N", mods = "Control|Shift", chars = "\u001bl" },
+  # Alt+Shift+F12 (Hide All Windows) has no code tmux can pass on; send Ctrl+Shift+F12 instead
+  { key = "F12", mods = "Alt|Shift", chars = "\u001b[24;6~" },
+  # Ctrl+Shift+M (Maximize Editor in Split) is Enter for a terminal; send Alt+Shift+M instead
+  { key = "M", mods = "Control|Shift", chars = "\u001bM" },
+  # More IntelliJ keys a terminal can't send, as Ctrl+Shift+F1…F7 (Neovim: F37…F43, idea_keys.lua)
+  { key = "Tab", mods = "Control", chars = "\u001b[1;6P" },          # Switcher
+  { key = "Tab", mods = "Control|Shift", chars = "\u001b[1;6Q" },    # Switcher (back)
+  { key = "F", mods = "Control|Shift", chars = "\u001b[1;6R" },      # Find in Path
+  { key = "Enter", mods = "Control", chars = "\u001b[1;6S" },        # Generate / New…
+  { key = "R", mods = "Control|Shift", chars = "\u001b[15;6~" },     # Replace in Path
+  { key = "B", mods = "Control|Shift", chars = "\u001b[17;6~" },     # Go to Type Declaration
+  { key = "M", mods = "Control|Alt", chars = "\u001b[18;6~" },       # Extract Method
+]

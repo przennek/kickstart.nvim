@@ -1,0 +1,29 @@
+# macOS packages for this Neovim config:
+#   xcode-select --install        # C compiler, make (once)
+#   brew bundle --file=deps/Brewfile
+tap "hashicorp/tap"
+
+# Editor and core tools
+brew "neovim"
+brew "git"
+brew "ripgrep"
+brew "fd"
+brew "tmux"
+
+# Language toolchains (Mason installs the language servers with them)
+brew "node"
+brew "python"
+brew "go"
+brew "llvm"          # clangd (keg-only: Mason's clangd is used when it isn't on PATH)
+brew "clang-format"
+
+# Databases, cloud, infra
+brew "sqlite"
+brew "libpq"         # psql; keg-only: brew link --force libpq
+brew "mongosh"
+brew "awscli"
+brew "hashicorp/tap/terraform"
+
+# Terminal and font
+cask "alacritty"
+cask "font-jetbrains-mono-nerd-font"

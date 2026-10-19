@@ -195,17 +195,17 @@ return {
       -- online, please don't ask me how to install them :)
       ensure_installed = {
         -- Update this to ensure that you have the debuggers for the langs you want
-        'delve',           -- Go debugger
-        'debugpy',         -- Python debugger
-        'codelldb',        -- Rust/C++ debugger
+        'delve', -- Go debugger
+        'debugpy', -- Python debugger
+        'codelldb', -- Rust/C++ debugger
       },
     }
 
     -- Enhanced Dap UI setup with modern features
     dapui.setup {
-      icons = { 
-        expanded = '▾', 
-        collapsed = '▸', 
+      icons = {
+        expanded = '▾',
+        collapsed = '▸',
         current_frame = '▶',
         circular = '↻',
       },
@@ -313,7 +313,7 @@ return {
     }
 
     -- Telescope integration for debugging
-    require('telescope').load_extension('dap')
+    require('telescope').load_extension 'dap'
 
     -- Install golang specific config
     require('dap-go').setup {
@@ -326,21 +326,21 @@ return {
 
     -- Python debugging configuration with automatic debugpy installation
     local function get_debugpy_path()
-      local mason_path = vim.fn.stdpath('data') .. '/mason/packages/debugpy/venv/bin/python'
+      local mason_path = vim.fn.stdpath 'data' .. '/mason/packages/debugpy/venv/bin/python'
       if vim.fn.executable(mason_path) == 1 then
         return mason_path
       end
-      
+
       -- Try alternative Mason path
-      local alt_path = vim.fn.stdpath('data') .. '/mason/packages/debugpy/bin/python'
+      local alt_path = vim.fn.stdpath 'data' .. '/mason/packages/debugpy/bin/python'
       if vim.fn.executable(alt_path) == 1 then
         return alt_path
       end
-      
+
       -- Fallback to system python with debugpy
-      if vim.fn.executable('python3') == 1 then
+      if vim.fn.executable 'python3' == 1 then
         return 'python3'
-      elseif vim.fn.executable('python') == 1 then
+      elseif vim.fn.executable 'python' == 1 then
         return 'python'
       else
         return 'python3' -- Default fallback
@@ -355,12 +355,12 @@ return {
 
     -- Auto-install debugpy if not available
     local function ensure_debugpy_installed()
-      local mason_path = vim.fn.stdpath('data') .. '/mason/packages/debugpy/venv/bin/python'
-      local alt_path = vim.fn.stdpath('data') .. '/mason/packages/debugpy/bin/python'
-      
+      local mason_path = vim.fn.stdpath 'data' .. '/mason/packages/debugpy/venv/bin/python'
+      local alt_path = vim.fn.stdpath 'data' .. '/mason/packages/debugpy/bin/python'
+
       if vim.fn.executable(mason_path) == 0 and vim.fn.executable(alt_path) == 0 then
         vim.notify('🐍 debugpy not found. Installing via Mason...', vim.log.levels.INFO)
-        vim.cmd('MasonInstall debugpy')
+        vim.cmd 'MasonInstall debugpy'
         vim.notify('Please restart Neovim after installation completes.', vim.log.levels.WARN)
         return false
       end
@@ -385,7 +385,7 @@ return {
         request = 'attach',
         name = 'Attach to process',
         processId = function()
-          return vim.fn.input('Process ID: ')
+          return vim.fn.input 'Process ID: '
         end,
         python = function()
           return get_debugpy_path()
@@ -439,12 +439,40 @@ return {
         cwd = '${workspaceFolder}',
         stopOnEntry = false,
         args = function()
-          local args_string = vim.fn.input('Program arguments: ')
+          local args_string = vim.fn.input 'Program arguments: '
           return vim.split(args_string, ' ', { trimempty = true })
         end,
         runInTerminal = false,
       },
     }
+
+    -- JavaScript / TypeScript on Node: VS Code's js-debug (Mason: js-debug-adapter).
+    -- Node runs .ts files directly (type stripping), so the same configurations serve both.
+    dap.adapters['pwa-node'] = {
+      type = 'server',
+      host = 'localhost',
+      port = '${port}',
+      executable = { command = 'js-debug-adapter', args = { '${port}' } },
+    }
+    for _, ft in ipairs { 'javascript', 'typescript' } do
+      dap.configurations[ft] = {
+        {
+          type = 'pwa-node',
+          request = 'launch',
+          name = 'Launch file',
+          program = '${file}',
+          cwd = '${workspaceFolder}',
+          console = 'integratedTerminal',
+        },
+        {
+          type = 'pwa-node',
+          request = 'attach',
+          name = 'Attach to process',
+          processId = require('dap.utils').pick_process,
+          cwd = '${workspaceFolder}',
+        },
+      }
+    end
 
     -- C / C++ use the same codelldb launch configurations
     -- (build with -g, e.g. `gcc -g -O0`, to get proper breakpoints and variables)

@@ -120,16 +120,15 @@ local function xml_unescape(s)
   return (s:gsub('&lt;', '<'):gsub('&gt;', '>'):gsub('&quot;', '"'):gsub('&#10;', '\n'):gsub('&apos;', "'"):gsub('&amp;', '&'))
 end
 
-local function show_pytest_results(xml_file, dir)
+-- JUnit XML -> { {classname, name, failure, body} }  (pytest, node --test, vitest)
+local function read_junit(xml_file)
   local f = io.open(xml_file)
   if not f then
-    return
+    return nil
   end
   local xml = f:read '*a'
   f:close()
   os.remove(xml_file)
-  local qf, passed, failed = {}, 0, 0
-  local cleared = {}
   -- passed tests are self-closing <testcase …/>, others have a body up to </testcase>
   local cases, pos = {}, 1
   while true do
@@ -142,16 +141,62 @@ local function show_pytest_results(xml_file, dir)
       local close = xml:find('</testcase>', e, true)
       body = xml:sub(e + 1, (close or #xml + 1) - 1)
     end
-    table.insert(cases, { attrs = attrs, body = body })
+    local failure = body:match '<failure[^>]-message="([^"]*)"' or body:match '<error[^>]-message="([^"]*)"'
+    if not failure and body:match '<failure' then
+      failure = body:match '<failure[^>]*>%s*([^\n<]*)' or 'failed'
+    end
+    table.insert(cases, {
+      classname = attrs:match 'classname="([^"]*)"',
+      name = xml_unescape(attrs:match '%f[%w]name="([^"]*)"' or ''),
+      -- one line: "Expected values to be strictly equal: 30 !== 27"
+      failure = failure and vim.trim(xml_unescape(failure):gsub('%s*\n%s*', ' ')):sub(1, 160),
+      body = body,
+    })
     pos = e + 1
   end
-  for _, case in ipairs(cases) do
-    local attrs, body = case.attrs, case.body
-    local classname, name = attrs:match 'classname="([^"]*)"', attrs:match ' name="([^"]*)"'
-    name = name and name:gsub('%[.*$', '') -- parametrized: test_x[1] -> test_x
-    local failure = body:match '<failure message="([^"]*)"' or body:match '<error message="([^"]*)"'
+  return cases
+end
+
+--- ✓ / ✗ next to the tests, failures in the Find window.
+--- results: { {file, name, failure?, lnum?} }; find_line(lines, name) -> line number of the test
+local function show_test_results(results, find_line)
+  local qf, passed, failed, cleared = {}, 0, 0, {}
+  for _, r in ipairs(results) do
+    local buf = r.file and vim.fn.bufnr(r.file)
+    local line
+    if buf and buf > 0 and vim.api.nvim_buf_is_loaded(buf) then
+      if not cleared[buf] then
+        vim.api.nvim_buf_clear_namespace(buf, results_ns, 0, -1)
+        cleared[buf] = true
+      end
+      line = find_line(vim.api.nvim_buf_get_lines(buf, 0, -1, false), r.name)
+      if line then
+        vim.api.nvim_buf_set_extmark(buf, results_ns, line - 1, 0, {
+          virt_text = { r.failure and { '  ✗ ' .. r.failure, 'PcTestFailed' } or { '  ✓', 'PcTestPassed' } },
+        })
+      end
+    end
+    if r.failure then
+      failed = failed + 1
+      table.insert(qf, { filename = r.file, lnum = r.lnum or line or 1, text = r.name .. ': ' .. r.failure })
+    else
+      passed = passed + 1
+    end
+  end
+  if #qf > 0 then
+    vim.fn.setqflist({}, ' ', { title = 'Test failures', items = qf })
+  end
+  vim.notify(
+    ('Tests: %d passed, %d failed%s'):format(passed, failed, failed > 0 and ' (Alt+3: failures)' or ''),
+    failed > 0 and vim.log.levels.WARN or vim.log.levels.INFO
+  )
+end
+
+local function show_pytest_results(xml_file, dir)
+  local results = {}
+  for _, case in ipairs(read_junit(xml_file) or {}) do
     -- tests.test_calc.TestX -> tests/test_calc.py
-    local parts = vim.split(classname or '', '.', { plain = true })
+    local parts = vim.split(case.classname or '', '.', { plain = true })
     local file
     for n = #parts, 1, -1 do
       local candidate = vim.fs.joinpath(dir, table.concat(vim.list_slice(parts, 1, n), '/') .. '.py')
@@ -160,36 +205,21 @@ local function show_pytest_results(xml_file, dir)
         break
       end
     end
-    local buf = file and vim.fn.bufnr(file)
-    if buf and buf > 0 and vim.api.nvim_buf_is_loaded(buf) then
-      if not cleared[buf] then
-        vim.api.nvim_buf_clear_namespace(buf, results_ns, 0, -1)
-        cleared[buf] = true
-      end
-      for lnum, line in ipairs(vim.api.nvim_buf_get_lines(buf, 0, -1, false)) do
-        if line:match('^%s*def%s+' .. vim.pesc(name) .. '%s*%(') or line:match('^%s*async%s+def%s+' .. vim.pesc(name) .. '%s*%(') then
-          vim.api.nvim_buf_set_extmark(buf, results_ns, lnum - 1, 0, {
-            virt_text = { failure and { '  ✗ ' .. xml_unescape(failure):gsub('\n.*', ''), 'PcTestFailed' } or { '  ✓', 'PcTestPassed' } },
-          })
-          break
-        end
+    local lnum = case.failure and case.body:match(vim.pesc(vim.fn.fnamemodify(file or '', ':t')) .. ':(%d+)')
+    table.insert(results, {
+      file = file,
+      name = case.name:gsub('%[.*$', ''), -- parametrized: test_x[1] -> test_x
+      failure = case.failure,
+      lnum = tonumber(lnum),
+    })
+  end
+  show_test_results(results, function(lines, name)
+    for lnum, line in ipairs(lines) do
+      if line:match('^%s*def%s+' .. vim.pesc(name) .. '%s*%(') or line:match('^%s*async%s+def%s+' .. vim.pesc(name) .. '%s*%(') then
+        return lnum
       end
     end
-    if failure then
-      failed = failed + 1
-      local lnum = body:match(vim.pesc(vim.fn.fnamemodify(file or '', ':t')) .. ':(%d+)')
-      table.insert(qf, { filename = file, lnum = tonumber(lnum) or 1, text = name .. ': ' .. xml_unescape(failure):gsub('\n.*', '') })
-    else
-      passed = passed + 1
-    end
-  end
-  if #qf > 0 then
-    vim.fn.setqflist({}, ' ', { title = 'pytest failures', items = qf })
-  end
-  vim.notify(
-    ('Tests: %d passed, %d failed%s'):format(passed, failed, failed > 0 and ' (Alt+3: failures)' or ''),
-    failed > 0 and vim.log.levels.WARN or vim.log.levels.INFO
-  )
+  end)
 end
 
 local function pytest(python, target, dir)
@@ -388,7 +418,185 @@ local function c_items(callback)
   callback(items)
 end
 
-local providers = { java = java_items, python = python_items, c = c_items, cpp = c_items }
+---------------------------------------------------------------------------
+-- JavaScript / TypeScript (Node): files, npm scripts, tests (node --test, Jest, Vitest)
+---------------------------------------------------------------------------
+
+local function read_package_json(dir)
+  local f = io.open(vim.fs.joinpath(dir, 'package.json'))
+  if not f then
+    return {}
+  end
+  local ok, pkg = pcall(vim.json.decode, f:read '*a')
+  f:close()
+  return ok and type(pkg) == 'table' and pkg or {}
+end
+
+local function test_runner(pkg)
+  local deps = vim.tbl_extend('force', pkg.dependencies or {}, pkg.devDependencies or {})
+  return deps.vitest and 'vitest' or deps.jest and 'jest' or 'node'
+end
+
+-- name of the it('…') / test('…') around the cursor
+local function enclosing_js_test()
+  local ok, node = pcall(vim.treesitter.get_node)
+  while ok and node do
+    if node:type() == 'call_expression' then
+      local fn = node:field('function')[1]
+      local fname = fn and vim.treesitter.get_node_text(fn, 0):match '^([%w_]+)'
+      local args = node:field('arguments')[1]
+      local first = args and args:named_child(0)
+      if (fname == 'it' or fname == 'test') and first and (first:type() == 'string' or first:type() == 'template_string') then
+        return vim.treesitter.get_node_text(first, 0):sub(2, -2)
+      end
+    end
+    node = node:parent()
+  end
+end
+
+local function js_test_line(lines, name)
+  for lnum, line in ipairs(lines) do
+    if line:find('[\'"`]' .. vim.pesc(name) .. '[\'"`]') and (line:match '%f[%w]it%s*[%.(]' or line:match '%f[%w]test%s*[%.(]') then
+      return lnum
+    end
+  end
+end
+
+local function show_js_results(file, runner, report)
+  local results = {}
+  if runner == 'jest' then
+    local f = io.open(report)
+    local ok, data = f and pcall(vim.json.decode, f:read '*a')
+    if f then
+      f:close()
+      os.remove(report)
+    end
+    for _, suite in ipairs(ok and data.testResults or {}) do
+      for _, t in ipairs(suite.assertionResults or {}) do
+        if t.status == 'passed' or t.status == 'failed' then
+          table.insert(results, {
+            file = suite.name,
+            name = t.title,
+            failure = t.status == 'failed' and ((t.failureMessages or {})[1] or 'failed'):gsub('\27%[[%d;]*m', ''):gsub('\n.*', '') or nil,
+          })
+        end
+      end
+    end
+  else
+    for _, case in ipairs(read_junit(report) or {}) do
+      -- node --test also reports the describe() suites; keep the tests
+      if case.name ~= '' and js_test_line(vim.fn.readfile(file), case.name) then
+        local lnum = case.failure and case.body:match(vim.pesc(vim.fs.basename(file)) .. ':(%d+)')
+        table.insert(results, { file = file, name = case.name, failure = case.failure, lnum = tonumber(lnum) })
+      end
+    end
+  end
+  show_test_results(results, js_test_line)
+end
+
+local function js_test_command(runner, file, name, report)
+  local f = vim.fn.shellescape(file)
+  if runner == 'jest' then
+    return ('npx jest %s %s --json --outputFile=%s'):format(f, name and ('-t ' .. vim.fn.shellescape(name)) or '', report)
+  elseif runner == 'vitest' then
+    return ('npx vitest run %s %s --reporter=default --reporter=junit --outputFile.junit=%s'):format(
+      f,
+      name and ('-t ' .. vim.fn.shellescape(name)) or '',
+      report
+    )
+  end
+  local pattern = name and ('--test-name-pattern=' .. vim.fn.shellescape('^' .. vim.fn.escape(name, '^$.*+?()[]{}|\\') .. '$')) or ''
+  return ('node --test %s --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=%s %s'):format(
+    pattern,
+    report,
+    f
+  )
+end
+
+local function js_test_debug_config(runner, dir, file, name)
+  local config = { type = 'pwa-node', request = 'launch', name = 'Debug test', cwd = dir, console = 'integratedTerminal' }
+  if runner == 'jest' then
+    config.program = vim.fs.joinpath(dir, 'node_modules', 'jest', 'bin', 'jest.js')
+    config.args = { '--runInBand', file, name and '-t' or nil, name }
+  elseif runner == 'vitest' then
+    config.program = vim.fs.joinpath(dir, 'node_modules', 'vitest', 'vitest.mjs')
+    config.args = { 'run', file, '--no-file-parallelism', name and '-t' or nil, name }
+  else
+    config.runtimeArgs = { '--test', name and ('--test-name-pattern=^' .. vim.fn.escape(name, '^$.*+?()[]{}|\\') .. '$') or nil }
+    config.program = file
+  end
+  return config
+end
+
+local function js_items(callback)
+  local items = {}
+  local path = vim.fn.expand '%:p'
+  local name = vim.fn.expand '%:t'
+  local dir = root { 'package.json', '.git' }
+  local pkg = read_package_json(dir)
+  local runner = test_runner(pkg)
+
+  local function run_tests(test)
+    return function()
+      local report = vim.fn.tempname() .. (runner == 'jest' and '.json' or '.xml')
+      M.run_in_console(js_test_command(runner, path, test, report), dir, function()
+        show_js_results(path, runner, report)
+      end)
+    end
+  end
+  local function debug_tests(test)
+    return function()
+      require('dap').run(js_test_debug_config(runner, dir, path, test))
+    end
+  end
+
+  local is_test = name:match '%.test%.[jt]sx?$' or name:match '%.spec%.[jt]sx?$' or path:match '/__tests__/'
+  if is_test then
+    local test = enclosing_js_test()
+    if test then
+      table.insert(items, { label = RUN .. name .. '::' .. test, run = at_cursor(run_tests(test)) })
+      table.insert(items, { label = DEBUG .. name .. '::' .. test, run = at_cursor(debug_tests(test)) })
+    end
+    table.insert(items, { label = RUN .. name .. ' (all tests)', run = run_tests(nil) })
+    table.insert(items, { label = DEBUG .. name .. ' (all tests)', run = debug_tests(nil) })
+  end
+  if vim.bo.filetype ~= 'json' then
+    table.insert(items, { label = RUN .. name, run = task('node ' .. vim.fn.shellescape(path), dir) })
+    table.insert(items, {
+      label = DEBUG .. name,
+      run = at_cursor(function()
+        local dap = require 'dap'
+        dap.run(dap.configurations[vim.bo.filetype:gsub('react$', '')][1])
+      end),
+    })
+  end
+  -- npm scripts from package.json, like IDEA's npm tool window
+  local scripts = vim.tbl_keys(pkg.scripts or {})
+  table.sort(scripts)
+  for _, script in ipairs(scripts) do
+    table.insert(items, { label = TASK .. 'npm run ' .. script, run = task('npm run ' .. script, dir) })
+  end
+  callback(items)
+end
+
+local function json_items(callback)
+  if vim.fn.expand '%:t' == 'package.json' then
+    return js_items(callback)
+  end
+  callback {}
+end
+
+local providers = {
+  java = java_items,
+  python = python_items,
+  c = c_items,
+  cpp = c_items,
+  javascript = js_items,
+  typescript = js_items,
+  javascriptreact = js_items,
+  typescriptreact = js_items,
+  json = json_items,
+}
 
 local function execute(item)
   for i, entry in ipairs(history) do

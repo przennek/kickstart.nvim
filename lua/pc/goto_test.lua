@@ -5,7 +5,7 @@
 local M = {}
 
 local function root(buf)
-  return vim.fs.root(buf, { 'pyproject.toml', 'setup.py', 'Makefile', 'CMakeLists.txt', '.git' }) or vim.fn.getcwd()
+  return vim.fs.root(buf, { 'pyproject.toml', 'setup.py', 'package.json', 'Makefile', 'CMakeLists.txt', '.git' }) or vim.fn.getcwd()
 end
 
 local function find(dir, names)
@@ -24,10 +24,15 @@ function M.go()
   local stem = vim.fn.fnamemodify(file, ':t:r')
   local dir = root(buf)
 
-  local subject = stem:match '^test_(.+)$' or stem:match '^(.+)_test$'
+  local js = ext:match '^[jt]sx?$' or ext:match '^[mc][jt]s$'
+  local subject = stem:match '^test_(.+)$' or stem:match '^(.+)_test$' or (js and (stem:match '^(.+)%.test$' or stem:match '^(.+)%.spec$'))
   local candidates, create
   if subject then
     candidates = find(dir, { subject .. '.' .. ext })
+  elseif js then
+    -- foo.js <-> foo.test.js / foo.spec.js (anywhere, also __tests__/)
+    candidates = find(dir, { stem .. '.test.' .. ext, stem .. '.spec.' .. ext })
+    create = vim.fs.joinpath(dir, 'test', stem .. '.test.' .. ext)
   else
     candidates = find(dir, { 'test_' .. stem .. '.' .. ext, stem .. '_test.' .. ext })
     create = vim.fs.joinpath(dir, 'tests', 'test_' .. stem .. '.' .. ext)
@@ -63,7 +68,7 @@ function M.go()
 end
 
 vim.api.nvim_create_autocmd('FileType', {
-  pattern = { 'python', 'c', 'cpp' },
+  pattern = { 'python', 'c', 'cpp', 'javascript', 'typescript', 'javascriptreact', 'typescriptreact' },
   group = vim.api.nvim_create_augroup('pc-goto-test', { clear = true }),
   callback = function(event)
     vim.keymap.set('n', '<M-T>', M.go, { buffer = event.buf, desc = 'Go to Test' })

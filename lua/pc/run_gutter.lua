@@ -3,6 +3,7 @@
 --   Java    @Test / @ParameterizedTest methods, test classes, main()
 --   Python  test_* functions, Test* classes, `if __name__ == "__main__":`
 --   C/C++   main()
+--   JS/TS   it() / test() / describe() in test files, npm scripts in package.json
 -- The same configurations are on F10 / Ctrl+Shift+F10 (run.lua).
 
 local M = {}
@@ -91,6 +92,61 @@ function detectors.c(buf, root, found)
 end
 detectors.cpp = detectors.c
 
+-- it('…') / test('…') = one test, describe('…') = the file's tests
+function detectors.javascript(buf, root, found)
+  local name = vim.fs.basename(vim.api.nvim_buf_get_name(buf))
+  if not (name:match '%.test%.[jt]sx?$' or name:match '%.spec%.[jt]sx?$' or vim.api.nvim_buf_get_name(buf):match '/__tests__/') then
+    return
+  end
+  local function walk(node)
+    for child in node:iter_children() do
+      if child:type() == 'call_expression' then
+        local fn = child:field('function')[1]
+        local fname = fn and text(fn, buf):match '^([%w_]+)'
+        local args = child:field('arguments')[1]
+        local first = args and args:named_child(0)
+        if first and (first:type() == 'string' or first:type() == 'template_string') then
+          if fname == 'it' or fname == 'test' then
+            add(found, child, 'test', text(first, buf):sub(2, -2))
+          elseif fname == 'describe' then
+            add(found, child, 'class', text(first, buf):sub(2, -2))
+          end
+        end
+      end
+      if child:named_child_count() > 0 then
+        walk(child)
+      end
+    end
+  end
+  walk(root)
+end
+detectors.typescript = detectors.javascript
+detectors.javascriptreact = detectors.javascript
+detectors.typescriptreact = detectors.javascript
+
+-- package.json: a ▶ next to every npm script
+function detectors.json(buf, root, found)
+  if vim.fs.basename(vim.api.nvim_buf_get_name(buf)) ~= 'package.json' then
+    return
+  end
+  local function walk(node)
+    for child in node:iter_children() do
+      if child:type() == 'pair' and text(child:field('key')[1], buf) == '"scripts"' then
+        local obj = child:field('value')[1]
+        for pair in obj:iter_children() do
+          if pair:type() == 'pair' then
+            local key = pair:field('key')[1]
+            add(found, key, 'script', text(key, buf):sub(2, -2))
+          end
+        end
+      elseif child:named_child_count() > 0 then
+        walk(child)
+      end
+    end
+  end
+  walk(root)
+end
+
 function M.refresh(buf)
   buf = buf or vim.api.nvim_get_current_buf()
   local detect = detectors[vim.bo[buf].filetype]
@@ -113,7 +169,9 @@ local function filter_for(buf, m)
   local stem = vim.fn.fnamemodify(file, ':r')
   return function(label)
     local what = label:gsub('^%S+ ', '')
-    if m.kind == 'test' then
+    if m.kind == 'script' then
+      return what == 'npm run ' .. m.name
+    elseif m.kind == 'test' then
       return what:match('[.:]' .. vim.pesc(m.name) .. '$') ~= nil
     elseif m.kind == 'class' then
       return what:match '%(all tests%)$' ~= nil
@@ -137,7 +195,7 @@ end)
 
 vim.api.nvim_create_autocmd({ 'BufEnter', 'BufWritePost', 'InsertLeave' }, {
   group = vim.api.nvim_create_augroup('pc-run-gutter', { clear = true }),
-  pattern = { '*.java', '*.py', '*.c', '*.cpp', '*.cc' },
+  pattern = { '*.java', '*.py', '*.c', '*.cpp', '*.cc', '*.js', '*.mjs', '*.cjs', '*.jsx', '*.ts', '*.mts', '*.tsx', 'package.json' },
   callback = function(event)
     vim.schedule(function()
       if vim.api.nvim_buf_is_valid(event.buf) then

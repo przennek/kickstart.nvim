@@ -3,9 +3,37 @@
 -- It only installs parsers and queries; highlighting/indent are started per filetype below.
 -- Needs tree-sitter-cli, which Mason installs (see lsp.lua).
 local parsers = {
-  'bash', 'c', 'cpp', 'diff', 'html', 'java', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'python', 'query', 'vim', 'vimdoc', 'xml', 'yaml', 'json',
+  'bash',
+  'c',
+  'cpp',
+  'diff',
+  'html',
+  'java',
+  'lua',
+  'luadoc',
+  'markdown',
+  'markdown_inline',
+  'python',
+  'query',
+  'vim',
+  'vimdoc',
+  'xml',
+  'yaml',
+  'json',
   -- the rest of your IDEA stack: Terraform/HCL, SQL, TypeScript/React, Go, Docker, properties, Mermaid
-  'terraform', 'hcl', 'sql', 'typescript', 'tsx', 'javascript', 'go', 'dockerfile', 'properties', 'mermaid', 'http', 'gitcommit', 'git_rebase',
+  'terraform',
+  'hcl',
+  'sql',
+  'typescript',
+  'tsx',
+  'javascript',
+  'go',
+  'dockerfile',
+  'properties',
+  'mermaid',
+  'http',
+  'gitcommit',
+  'git_rebase',
 }
 
 return {
@@ -15,7 +43,19 @@ return {
   build = ':TSUpdate',
   config = function()
     local ts = require 'nvim-treesitter'
-    ts.install(parsers)
+    -- On a fresh machine tree-sitter-cli comes from Mason, which installs it after startup:
+    -- build the parsers once it is there
+    if vim.fn.executable 'tree-sitter' == 1 then
+      ts.install(parsers)
+    else
+      vim.api.nvim_create_autocmd('User', {
+        pattern = 'MasonToolsUpdateCompleted',
+        once = true,
+        callback = function()
+          ts.install(parsers)
+        end,
+      })
+    end
 
     vim.api.nvim_create_autocmd('FileType', {
       group = vim.api.nvim_create_augroup('pc-treesitter', { clear = true }),

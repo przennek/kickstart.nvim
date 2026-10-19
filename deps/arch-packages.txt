@@ -1,0 +1,30 @@
+# Arch Linux packages for this Neovim config:
+#   sudo pacman -S --needed - < deps/arch-packages.txt
+# Editor and core tools
+neovim
+git
+ripgrep
+fd
+make
+gcc
+unzip
+curl
+tar
+gzip
+zip
+wl-clipboard
+tmux
+# Language toolchains (Mason installs the language servers with them)
+nodejs
+npm
+python
+go
+clang
+# Databases, cloud, infra
+sqlite
+postgresql-libs
+aws-cli-v2
+terraform
+# Terminal and font
+alacritty
+ttf-jetbrains-mono-nerd

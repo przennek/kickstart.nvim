@@ -189,10 +189,14 @@ return {
               schemaStore = { enable = false, url = '' },
               schemas = vim.tbl_extend('force', require('schemastore').yaml.schemas(), {
                 kubernetes = {
-                  '**/k8s/**/*.yaml', '**/k8s/**/*.yml',
-                  '**/*manifests*/**/*.yaml', '**/*manifests*/**/*.yml',
-                  '**/deploy/**/*.yaml', '**/deploy/**/*.yml',
-                  '**/kustomize/**/*.yaml', '**/kustomize/**/*.yml',
+                  '**/k8s/**/*.yaml',
+                  '**/k8s/**/*.yml',
+                  '**/*manifests*/**/*.yaml',
+                  '**/*manifests*/**/*.yml',
+                  '**/deploy/**/*.yaml',
+                  '**/deploy/**/*.yml',
+                  '**/kustomize/**/*.yaml',
+                  '**/kustomize/**/*.yml',
                 },
               }),
             },
@@ -222,9 +226,7 @@ return {
       end
 
       -- Ensure the servers and tools above are installed (:Mason to check)
-      local ensure_installed = vim.tbl_filter(function(name)
-        return name ~= 'clangd' -- clangd comes from the system (pacman clang)
-      end, vim.tbl_keys(servers))
+      local ensure_installed = vim.tbl_keys(servers)
       vim.list_extend(ensure_installed, {
         'stylua', -- Used to format Lua code
         'tree-sitter-cli', -- Builds parsers for nvim-treesitter (main branch)
@@ -233,6 +235,7 @@ return {
         'java-test',
         'debugpy',
         'codelldb',
+        'js-debug-adapter', -- JavaScript / TypeScript (Node) debugger
         -- linters / formatters / analysers from your IDEA plugins
         'sonarlint-language-server',
         'checkstyle', -- PMD isn't in Mason; lint.lua uses `pmd` when it is on PATH
@@ -240,6 +243,48 @@ return {
         'hadolint',
         'prettier',
       })
+      -- Portable setup (Arch / macOS): a system clangd is used when there is one (pacman clang,
+      -- brew llvm), Mason's otherwise; tools whose language toolchain is missing are skipped
+      -- instead of failing on every start (packages to install: DEPENDENCIES.md)
+      local needs = {
+        clangd = 'clangd-missing',
+        gopls = 'go',
+        ts_ls = 'npm',
+        eslint = 'npm',
+        jsonls = 'npm',
+        yamlls = 'npm',
+        dockerls = 'npm',
+        bashls = 'npm',
+        prettier = 'npm',
+        basedpyright = 'python3',
+        debugpy = 'python3',
+        ['js-debug-adapter'] = 'node',
+        jdtls = 'java',
+        ['java-debug-adapter'] = 'java',
+        ['java-test'] = 'java',
+        ['sonarlint-language-server'] = 'java',
+        checkstyle = 'java',
+      }
+      local missing = {}
+      ensure_installed = vim.tbl_filter(function(name)
+        local tool = needs[name]
+        if tool == 'clangd-missing' then
+          return vim.fn.executable 'clangd' == 0
+        end
+        if tool and vim.fn.executable(tool) == 0 then
+          missing[tool] = true
+          return false
+        end
+        return true
+      end, ensure_installed)
+      if next(missing) then
+        vim.schedule(function()
+          vim.notify(
+            ('Not installed: %s — some language tools are skipped (see DEPENDENCIES.md)'):format(table.concat(vim.tbl_keys(missing), ', ')),
+            vim.log.levels.WARN
+          )
+        end)
+      end
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
       require('mason-lspconfig').setup {
