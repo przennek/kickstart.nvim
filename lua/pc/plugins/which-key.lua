@@ -13,6 +13,7 @@ return {
       { '<leader>e', group = '[E]xtract (refactor)', mode = { 'n', 'x' } },
       { '<leader>p', group = 'Bookmarks / Har[p]oon' },
       { '<leader>Q', group = '[Q]uery console (database)' },
+      { '<leader>M', group = '[M]aven' },
       { '<leader>r', group = '[R]ename' },
       { '<leader>s', group = '[S]earch' },
       { '<leader>w', group = '[W]orkspace' },
