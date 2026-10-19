@@ -64,6 +64,80 @@ local function diffview_toggle(cmd)
   end
 end
 
+-- Commit and Push (IDEA's Cmd+Alt+K): Neogit's commit message editor, then git push of the
+-- current branch (setting its upstream on the first push)
+local function push_current_branch()
+  local upstream = vim.system({ 'git', 'rev-parse', '--abbrev-ref', '@{u}' }, { text = true }):wait()
+  local cmd = upstream.code == 0 and { 'git', 'push' } or { 'git', 'push', '-u', 'origin', 'HEAD' }
+  vim.notify 'Pushing…'
+  vim.system(cmd, { text = true }, function(result)
+    vim.schedule(function()
+      local out = vim.trim(result.stderr ~= '' and result.stderr or result.stdout or '')
+      if result.code == 0 then
+        vim.notify('Pushed: ' .. (out:match '[^\n]*$' or ''))
+      else
+        vim.notify('Push failed:\n' .. out, vim.log.levels.ERROR)
+      end
+      pcall(function()
+        require('neogit').dispatch_refresh()
+      end)
+    end)
+  end)
+end
+
+local function commit_and_push()
+  local id
+  local function forget()
+    if id then
+      pcall(vim.api.nvim_del_autocmd, id)
+      id = nil
+    end
+  end
+  id = vim.api.nvim_create_autocmd('User', {
+    pattern = 'NeogitCommitComplete',
+    once = true,
+    callback = function()
+      id = nil
+      push_current_branch()
+    end,
+  })
+  -- a cancelled commit must not push on the next one
+  vim.api.nvim_create_autocmd('FileType', {
+    pattern = { 'gitcommit', 'NeogitCommitMessage' },
+    once = true,
+    callback = function(event)
+      vim.api.nvim_create_autocmd('BufUnload', {
+        buffer = event.buf,
+        once = true,
+        callback = function()
+          vim.defer_fn(forget, 10000)
+        end,
+      })
+    end,
+  })
+  vim.defer_fn(forget, 30 * 60 * 1000)
+  require 'neogit'
+  local async = require 'neogit.lib.async'
+  -- like neogit.action('commit', 'commit'), which loses the async context after the refresh
+  require('neogit.lib.git').repo:dispatch_refresh {
+    source = 'action',
+    callback = function()
+      async.void(function()
+        require('neogit.popups.commit.actions').commit {
+          close = function() end,
+          state = { env = {} },
+          get_arguments = function()
+            return {}
+          end,
+          get_internal_arguments = function()
+            return {}
+          end,
+        }
+      end)()
+    end,
+  }
+end
+
 local function commit_window_toggle()
   local status = require 'neogit.buffers.status'
   if status.is_open() then
@@ -90,6 +164,7 @@ return {
       { '<M-0>', commit_window_toggle, desc = 'VCS: Commit window (toggle)' },
       { '<leader>vv', '<cmd>Neogit<CR>', desc = 'VCS: Status / commit window' },
       { '<leader>vc', '<cmd>Neogit commit<CR>', desc = 'VCS: [C]ommit' },
+      { '<leader>vC', commit_and_push, desc = 'VCS: [C]ommit and Push' },
       { '<leader>vp', '<cmd>Neogit pull<CR>', desc = 'VCS: [p]ull' },
       { '<leader>vP', '<cmd>Neogit push<CR>', desc = 'VCS: [P]ush' },
       { '<leader>vB', '<cmd>Telescope git_branches<CR>', desc = 'VCS: [B]ranches' },
