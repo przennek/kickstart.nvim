@@ -87,6 +87,10 @@ return {
           map('<leader>rn', vim.lsp.buf.rename, 'Rename')
           map('<S-F6>', vim.lsp.buf.rename, 'Rename')
           map('<F18>', vim.lsp.buf.rename, 'Rename')
+          -- Move (F6): jdtls' Move, elsewhere the file to a new path with imports updated
+          map('<F6>', function()
+            require('pc.move').move()
+          end, 'Move')
 
           -- Show Context Actions (Alt+Enter) / Generate (<leader>g, Alt+Insert)
           -- (no <leader>c… maps: <leader>c alone is Go to Class)
