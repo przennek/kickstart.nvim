@@ -1,0 +1,443 @@
+{
+  "Profiles": [
+    {
+      "Name": "Neovim (IntelliJ keys)",
+      "Guid": "6f0c1d52-7a3e-4c55-9d1e-2b8f4a1c9e10",
+      "Dynamic Profile Parent Name": "Default",
+      "Option Key Sends": 2,
+      "Right Option Key Sends": 2,
+      "Normal Font": "JetBrainsMonoNFM-Regular 14",
+      "Custom Command": "Yes",
+      "Command": "/bin/zsh -lc \"tmux attach -t main || tmux new -s main\"",
+      "Keyboard Map": {
+        "0x10-0x60000": {
+          "Action": 10,
+          "Text": "h",
+          "Label": "Back"
+        },
+        "0x12-0x60000": {
+          "Action": 10,
+          "Text": "[15;6~",
+          "Label": "Replace in Path"
+        },
+        "0x19-0x60000": {
+          "Action": 10,
+          "Text": "[1;6Q",
+          "Label": "Switcher (back)"
+        },
+        "0x2-0x60000": {
+          "Action": 10,
+          "Text": "[17;6~",
+          "Label": "Go to Type Declaration"
+        },
+        "0x2b-0x120000": {
+          "Action": 10,
+          "Text": "+"
+        },
+        "0x2d-0x100000": {
+          "Action": 10,
+          "Text": "-"
+        },
+        "0x2d-0x120000": {
+          "Action": 10,
+          "Text": "_"
+        },
+        "0x2e-0x100000": {
+          "Action": 10,
+          "Text": "."
+        },
+        "0x2f-0x100000": {
+          "Action": 10,
+          "Text": "/"
+        },
+        "0x30-0x100000": {
+          "Action": 10,
+          "Text": "0"
+        },
+        "0x31-0x100000": {
+          "Action": 10,
+          "Text": "1"
+        },
+        "0x32-0x100000": {
+          "Action": 10,
+          "Text": "2"
+        },
+        "0x33-0x100000": {
+          "Action": 10,
+          "Text": "3"
+        },
+        "0x34-0x100000": {
+          "Action": 10,
+          "Text": "4"
+        },
+        "0x35-0x100000": {
+          "Action": 10,
+          "Text": "5"
+        },
+        "0x36-0x100000": {
+          "Action": 10,
+          "Text": "6"
+        },
+        "0x37-0x100000": {
+          "Action": 10,
+          "Text": "7"
+        },
+        "0x38-0x100000": {
+          "Action": 10,
+          "Text": "8"
+        },
+        "0x39-0x100000": {
+          "Action": 10,
+          "Text": "9"
+        },
+        "0x3d-0x100000": {
+          "Action": 10,
+          "Text": "="
+        },
+        "0x3d-0x120000": {
+          "Action": 10,
+          "Text": "+"
+        },
+        "0x41-0x120000": {
+          "Action": 10,
+          "Text": "A"
+        },
+        "0x42-0x60000": {
+          "Action": 10,
+          "Text": "[17;6~",
+          "Label": "Go to Type Declaration"
+        },
+        "0x45-0x120000": {
+          "Action": 10,
+          "Text": "E"
+        },
+        "0x46-0x60000": {
+          "Action": 10,
+          "Text": "[1;6R",
+          "Label": "Find in Path"
+        },
+        "0x4c-0x120000": {
+          "Action": 10,
+          "Text": "L"
+        },
+        "0x4d-0x120000": {
+          "Action": 10,
+          "Text": "M"
+        },
+        "0x4d-0x180000": {
+          "Action": 10,
+          "Text": "[18;6~",
+          "Label": "Extract Method"
+        },
+        "0x4d-0x60000": {
+          "Action": 10,
+          "Text": "M",
+          "Label": "Maximize Editor in Split"
+        },
+        "0x4d-0xc0000": {
+          "Action": 10,
+          "Text": "[18;6~",
+          "Label": "Extract Method"
+        },
+        "0x4e-0x120000": {
+          "Action": 10,
+          "Text": "N"
+        },
+        "0x4e-0x60000": {
+          "Action": 10,
+          "Text": "l",
+          "Label": "Forward"
+        },
+        "0x4f-0x120000": {
+          "Action": 10,
+          "Text": "O"
+        },
+        "0x50-0x60000": {
+          "Action": 10,
+          "Text": "h",
+          "Label": "Back"
+        },
+        "0x52-0x60000": {
+          "Action": 10,
+          "Text": "[15;6~",
+          "Label": "Replace in Path"
+        },
+        "0x54-0x120000": {
+          "Action": 10,
+          "Text": "T"
+        },
+        "0x56-0x120000": {
+          "Action": 10,
+          "Text": "V"
+        },
+        "0x57-0x120000": {
+          "Action": 10,
+          "Text": "W"
+        },
+        "0x5b-0x120000": {
+          "Action": 10,
+          "Text": "{"
+        },
+        "0x5c-0x100000": {
+          "Action": 10,
+          "Text": "\\"
+        },
+        "0x5d-0x120000": {
+          "Action": 10,
+          "Text": "}"
+        },
+        "0x5f-0x120000": {
+          "Action": 10,
+          "Text": "_"
+        },
+        "0x6-0x60000": {
+          "Action": 10,
+          "Text": "[1;6R",
+          "Label": "Find in Path"
+        },
+        "0x60-0x100000": {
+          "Action": 10,
+          "Text": "`"
+        },
+        "0x60-0x120000": {
+          "Action": 10,
+          "Text": "~"
+        },
+        "0x61-0x120000": {
+          "Action": 10,
+          "Text": "A"
+        },
+        "0x62-0x100000": {
+          "Action": 10,
+          "Text": "b"
+        },
+        "0x62-0x60000": {
+          "Action": 10,
+          "Text": "[17;6~",
+          "Label": "Go to Type Declaration"
+        },
+        "0x64-0x100000": {
+          "Action": 10,
+          "Text": "d"
+        },
+        "0x65-0x100000": {
+          "Action": 10,
+          "Text": "e"
+        },
+        "0x65-0x120000": {
+          "Action": 10,
+          "Text": "E"
+        },
+        "0x66-0x100000": {
+          "Action": 10,
+          "Text": "f"
+        },
+        "0x66-0x60000": {
+          "Action": 10,
+          "Text": "[1;6R",
+          "Label": "Find in Path"
+        },
+        "0x6c-0x120000": {
+          "Action": 10,
+          "Text": "L"
+        },
+        "0x6d-0x120000": {
+          "Action": 10,
+          "Text": "M"
+        },
+        "0x6d-0x180000": {
+          "Action": 10,
+          "Text": "[18;6~",
+          "Label": "Extract Method"
+        },
+        "0x6d-0x60000": {
+          "Action": 10,
+          "Text": "M",
+          "Label": "Maximize Editor in Split"
+        },
+        "0x6d-0xc0000": {
+          "Action": 10,
+          "Text": "[18;6~",
+          "Label": "Extract Method"
+        },
+        "0x6e-0x100000": {
+          "Action": 10,
+          "Text": "n"
+        },
+        "0x6e-0x120000": {
+          "Action": 10,
+          "Text": "N"
+        },
+        "0x6e-0x60000": {
+          "Action": 10,
+          "Text": "l",
+          "Label": "Forward"
+        },
+        "0x6f-0x100000": {
+          "Action": 10,
+          "Text": "o"
+        },
+        "0x6f-0x120000": {
+          "Action": 10,
+          "Text": "O"
+        },
+        "0x70-0x100000": {
+          "Action": 10,
+          "Text": "p"
+        },
+        "0x70-0x60000": {
+          "Action": 10,
+          "Text": "h",
+          "Label": "Back"
+        },
+        "0x72-0x100000": {
+          "Action": 10,
+          "Text": "r"
+        },
+        "0x72-0x60000": {
+          "Action": 10,
+          "Text": "[15;6~",
+          "Label": "Replace in Path"
+        },
+        "0x73-0x100000": {
+          "Action": 10,
+          "Text": "s"
+        },
+        "0x74-0x100000": {
+          "Action": 10,
+          "Text": "t"
+        },
+        "0x74-0x120000": {
+          "Action": 10,
+          "Text": "T"
+        },
+        "0x75-0x100000": {
+          "Action": 10,
+          "Text": "u"
+        },
+        "0x76-0x120000": {
+          "Action": 10,
+          "Text": "V"
+        },
+        "0x77-0x100000": {
+          "Action": 10,
+          "Text": "w"
+        },
+        "0x77-0x120000": {
+          "Action": 10,
+          "Text": "W"
+        },
+        "0x7b-0x120000": {
+          "Action": 10,
+          "Text": "{"
+        },
+        "0x7d-0x120000": {
+          "Action": 10,
+          "Text": "}"
+        },
+        "0x7e-0x120000": {
+          "Action": 10,
+          "Text": "~"
+        },
+        "0x7f-0x120000": {
+          "Action": 11,
+          "Text": "0x1b 0x7f",
+          "Label": "Jump to Last Change"
+        },
+        "0x8-0x120000": {
+          "Action": 11,
+          "Text": "0x1b 0x7f",
+          "Label": "Jump to Last Change"
+        },
+        "0x9-0x40000": {
+          "Action": 10,
+          "Text": "[1;6P",
+          "Label": "Switcher"
+        },
+        "0x9-0x60000": {
+          "Action": 10,
+          "Text": "[1;6Q",
+          "Label": "Switcher (back)"
+        },
+        "0xb5-0x180000": {
+          "Action": 10,
+          "Text": "[18;6~",
+          "Label": "Extract Method"
+        },
+        "0xd-0x100000": {
+          "Action": 11,
+          "Text": "0x1b 0x0d",
+          "Label": "View Source / Alt+Enter"
+        },
+        "0xd-0x40000": {
+          "Action": 10,
+          "Text": "[1;6S",
+          "Label": "Generate / New"
+        },
+        "0xd-0x60000": {
+          "Action": 10,
+          "Text": "M",
+          "Label": "Maximize Editor in Split"
+        },
+        "0xd-0xc0000": {
+          "Action": 10,
+          "Text": "[18;6~",
+          "Label": "Extract Method"
+        },
+        "0xe-0x60000": {
+          "Action": 10,
+          "Text": "l",
+          "Label": "Forward"
+        },
+        "0xf700-0x320000": {
+          "Action": 10,
+          "Text": "[1;4A",
+          "Label": "Move Statement Up"
+        },
+        "0xf701-0x320000": {
+          "Action": 10,
+          "Text": "[1;4B",
+          "Label": "Move Statement Down"
+        },
+        "0xf704-0x100000": {
+          "Action": 10,
+          "Text": "[1;3P"
+        },
+        "0xf705-0x100000": {
+          "Action": 10,
+          "Text": "[1;3Q"
+        },
+        "0xf706-0x100000": {
+          "Action": 10,
+          "Text": "[1;3R"
+        },
+        "0xf70a-0x100000": {
+          "Action": 10,
+          "Text": "[18;3~"
+        },
+        "0xf70b-0x100000": {
+          "Action": 10,
+          "Text": "[19;3~"
+        },
+        "0xf70e-0x100000": {
+          "Action": 10,
+          "Text": "[23;3~"
+        },
+        "0xf70f-0x100000": {
+          "Action": 10,
+          "Text": "[24;3~"
+        },
+        "0xf70f-0x120000": {
+          "Action": 10,
+          "Text": "[24;6~",
+          "Label": "Hide All Windows"
+        },
+        "0xf729-0x100000": {
+          "Action": 10,
+          "Text": "[1;3H",
+          "Label": "Navigation Bar"
+        }
+      }
+    }
+  ]
+}

@@ -39,10 +39,21 @@ sdk install gradle
 ## Terminal
 
 Skróty w stylu IntelliJ, których terminal sam nie wyśle (`Ctrl+Tab`, `Ctrl+Shift+F/R/B/P/N/M`,
-`Ctrl+Enter`, `Ctrl+Alt+M`, `Alt+Shift+F12`), tłumaczy Alacritty:
+`Ctrl+Enter`, `Ctrl+Alt+M`, `Alt+Shift+F12`), tłumaczy terminal:
 
-- **Linux**: `extras/alacritty/linux.toml` → `~/.config/alacritty/alacritty.toml`
+- **Linux**: Alacritty — `extras/alacritty/linux.toml` → `~/.config/alacritty/alacritty.toml`
   (zakłada też tmux jako powłokę startową).
+- **macOS**: iTerm2 — profil `extras/iterm2/nvim-idea.json`:
+
+  ```sh
+  mkdir -p ~/Library/Application\ Support/iTerm2/DynamicProfiles
+  ln -sf "$PWD/extras/iterm2/nvim-idea.json" ~/Library/Application\ Support/iTerm2/DynamicProfiles/
+  ```
+
+  W iTerm2: *Settings → Profiles → „Neovim (IntelliJ keys)” → Other Actions → Set as Default*.
+  Profil dziedziczy po „Default”, uruchamia tmux, ustawia Option jako Esc+ i wysyła
+  `Cmd+<klawisz>` jako `Alt+<klawisz>` — wciskasz to samo co w IntelliJ na Macu.
+  `Cmd+C` / `Cmd+V` / `Cmd+Q` / `Cmd+Tab` zostają skrótami macOS.
 
 Czcionka: JetBrains Mono Nerd Font (ikony w drzewie, na pasku statusu, w debuggerze).
 
