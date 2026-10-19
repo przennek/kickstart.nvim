@@ -16,9 +16,9 @@ map('n', '<F38>', tb('buffers', { sort_mru = true, ignore_current_buffer = true 
 
 -- Find (Cmd+F), Find Next / Previous (F3 / Shift+F3), Find Word at Caret (Cmd+F3)
 map('n', '<M-f>', '/', { desc = 'Find' })
-map('n', '<F3>', 'n', { desc = 'Find next' })
-map('n', '<S-F3>', 'N', { desc = 'Find previous' })
-map('n', '<F15>', 'N', { desc = 'Find previous' })
+map('n', '<F3>', 'n', { desc = 'Find Next' })
+map('n', '<S-F3>', 'N', { desc = 'Find Previous' })
+map('n', '<F15>', 'N', { desc = 'Find Previous' })
 map('n', '<M-F3>', '*', { desc = 'Find word at caret' })
 map('n', '<F51>', '*', { desc = 'Find word at caret' })
 
@@ -55,16 +55,16 @@ local function replace_in_path()
   end, 200)
 end
 map('n', '<F41>', replace_in_path, { desc = 'Replace in Path' })
-map('n', '<leader>sR', replace_in_path, { desc = '[S]earch and [R]eplace in path' })
+map('n', '<leader>sR', replace_in_path, { desc = 'Replace in Path' })
 
 -- Go to Type Declaration (Ctrl+Shift+B)
-map('n', '<F42>', tb 'lsp_type_definitions', { desc = 'Go to type declaration' })
+map('n', '<F42>', tb 'lsp_type_definitions', { desc = 'Go to Type Declaration' })
 
 -- Generate (Ctrl+Enter); in the project tree it is New… (see neo-tree.lua)
 map({ 'n', 'x' }, '<F40>', vim.lsp.buf.code_action, { desc = 'Generate' })
 
 -- Jump to Source (F4) / Jump to Last Window (F12) / Restore Default Layout (Shift+F12)
-map('n', '<F4>', tb 'lsp_definitions', { desc = 'Jump to source' })
+map('n', '<F4>', tb 'lsp_definitions', { desc = 'Jump to Source' })
 map({ 'n', 't' }, '<F12>', '<cmd>wincmd p<CR>', { desc = 'Jump to last window' })
 local function restore_layout()
   require('pc.hide_windows').reset()
@@ -82,7 +82,7 @@ end, { desc = 'Next project window' })
 map('n', '<M-~>', function()
   -- the <leader>d Git branches popup (a lazy-loaded key, so it is typed rather than called)
   vim.api.nvim_feedkeys(vim.keycode '<leader>d', 'm', false)
-end, { desc = 'Git branches' })
+end, { desc = 'Git Branches' })
 
 -- Jump to Last Change (Cmd+Shift+Backspace)
 map('n', '<M-BS>', 'g;', { desc = 'Jump to last change' })

@@ -50,14 +50,14 @@ return {
           local builtin = require 'telescope.builtin'
 
           -- Navigation. To jump back, press <C-o> / <M-h>.
-          map('gd', builtin.lsp_definitions, '[G]oto [D]efinition')
-          map('gr', builtin.lsp_references, '[G]oto [R]eferences')
-          map('gI', builtin.lsp_implementations, '[G]oto [I]mplementation')
-          map('gD', vim.lsp.buf.declaration, '[G]oto [D]eclaration')
+          map('gd', builtin.lsp_definitions, 'Go to Declaration')
+          map('gr', builtin.lsp_references, 'Show Usages (popup)')
+          map('gI', builtin.lsp_implementations, 'Go to Implementation')
+          map('gD', vim.lsp.buf.declaration, 'Go to declaration (C header / forward declaration)')
           -- Go to Declaration (Cmd+B)
           map('<M-b>', builtin.lsp_definitions, 'Go to Declaration')
-          map('<leader>D', builtin.lsp_type_definitions, 'Type [D]efinition')
-          map('<leader>ws', builtin.lsp_dynamic_workspace_symbols, '[W]orkspace [S]ymbols')
+          map('<leader>D', builtin.lsp_type_definitions, 'Go to Type Declaration')
+          map('<leader>ws', builtin.lsp_dynamic_workspace_symbols, 'Go to Symbol')
           -- Find Usages into the Find window at the bottom (Alt+F7; F55 inside tmux).
           -- `gr` is the popup version, like Ctrl+Alt+F7 / Show Usages.
           local function find_usages()
@@ -68,12 +68,12 @@ return {
               end,
             })
           end
-          map('<leader>f', find_usages, '[F]ind Usages')
+          map('<leader>f', find_usages, 'Find Usages')
           map('<M-F7>', find_usages, 'Find Usages')
           map('<F55>', find_usages, 'Find Usages')
           -- Call Hierarchy (<leader>h in .ideavimrc): callers; <leader>H = callees
-          map('<leader>h', builtin.lsp_incoming_calls, 'Call [h]ierarchy (callers)')
-          map('<leader>H', builtin.lsp_outgoing_calls, 'Call [H]ierarchy (callees)')
+          map('<leader>h', builtin.lsp_incoming_calls, 'Call Hierarchy (callers)')
+          map('<leader>H', builtin.lsp_outgoing_calls, 'Call Hierarchy (callees)')
 
           -- Quick Documentation (gh; K is `ciw` from .ideavimrc) / Parameter Info (Cmd+P)
           map('gh', function()
@@ -84,7 +84,7 @@ return {
           end, 'Parameter Info', { 'n', 'i' })
 
           -- Rename (also Shift+F6; F18 inside tmux)
-          map('<leader>rn', vim.lsp.buf.rename, '[R]e[n]ame')
+          map('<leader>rn', vim.lsp.buf.rename, 'Rename')
           map('<S-F6>', vim.lsp.buf.rename, 'Rename')
           map('<F18>', vim.lsp.buf.rename, 'Rename')
 

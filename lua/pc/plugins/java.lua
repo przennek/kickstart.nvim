@@ -83,7 +83,7 @@ local function start_jdtls()
       require('jdtls.dap').setup_dap_main_class_configs()
 
       local map = function(mode, keys, func, desc)
-        vim.keymap.set(mode, keys, func, { buffer = bufnr, desc = 'Java: ' .. desc })
+        vim.keymap.set(mode, keys, func, { buffer = bufnr, desc = desc })
       end
       -- Tests (run in the debugger, so breakpoints work)
       map('n', '<leader>xt', jdtls.test_nearest_method, 'Debug nearest test')
@@ -121,8 +121,8 @@ local function start_jdtls()
       -- Go to Test (Cmd+Shift+T) / Super method
       map('n', '<M-T>', function()
         require('jdtls.tests').goto_subjects()
-      end, 'Go to test / subject')
-      map('n', 'gs', jdtls.super_implementation, 'Go to super method')
+      end, 'Go to Test')
+      map('n', 'gs', jdtls.super_implementation, 'Go to Super Method')
     end,
   }
 end

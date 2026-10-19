@@ -628,9 +628,9 @@ vim.api.nvim_create_autocmd('LspAttach', {
       return
     end
     vim.b[buf].pc_hierarchy = true
-    vim.keymap.set('n', '<M-8>', M.toggle, { buffer = buf, desc = 'Hierarchy window' })
+    vim.keymap.set('n', '<M-8>', M.toggle, { buffer = buf, desc = 'Type hierarchy' })
     vim.keymap.set('n', 'gH', M.open, { buffer = buf, desc = 'Type hierarchy' })
-    vim.keymap.set('n', '<M-u>', M.go_super, { buffer = buf, desc = 'Go to super method / type' })
+    vim.keymap.set('n', '<M-u>', M.go_super, { buffer = buf, desc = 'Go to Super Method' })
     -- the project is still being imported when the server attaches
     vim.defer_fn(function()
       M.refresh_gutter(buf)

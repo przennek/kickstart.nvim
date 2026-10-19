@@ -23,7 +23,7 @@ return {
       map('<leader>em', 'extract_func', 'Extract method')
       -- a terminal can't tell Ctrl+Alt+M from Alt+Enter; Alacritty sends Ctrl+Shift+F7 (F43) instead
       map('<F43>', 'extract_func', 'Extract method')
-      map('<leader>ei', 'inline_var', 'Inline variable')
+      map('<leader>ei', 'inline_var', 'Inline')
     end
     vim.api.nvim_create_autocmd('FileType', {
       pattern = { 'python', 'c', 'cpp', 'go', 'typescript', 'typescriptreact', 'javascript', 'lua' },

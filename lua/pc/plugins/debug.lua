@@ -455,8 +455,8 @@ return {
     require('dap-python').setup(get_debugpy_path(), { include_configs = false })
     require('dap-python').test_runner = 'pytest'
     local function python_test_maps(buf)
-      vim.keymap.set('n', '<leader>xt', require('dap-python').test_method, { buffer = buf, desc = 'Python: Debug nearest test' })
-      vim.keymap.set('n', '<leader>xT', require('dap-python').test_class, { buffer = buf, desc = 'Python: Debug test class' })
+      vim.keymap.set('n', '<leader>xt', require('dap-python').test_method, { buffer = buf, desc = 'Debug nearest test' })
+      vim.keymap.set('n', '<leader>xT', require('dap-python').test_class, { buffer = buf, desc = 'Debug test class' })
     end
     vim.api.nvim_create_autocmd('FileType', {
       pattern = 'python',

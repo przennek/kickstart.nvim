@@ -112,7 +112,7 @@ return {
       { '<leader>vd', '<cmd>DiffviewOpen<CR>', desc = 'VCS: [D]iff working tree' },
       { '<leader>vw', compare_with_branch(true), desc = 'VCS: Compare file [w]ith branch' },
       { '<leader>vW', compare_with_branch(false), desc = 'VCS: Compare project [W]ith branch' },
-      { '<leader>d', branches_popup, desc = 'Git branches (diff with working tree)' },
+      { '<leader>d', branches_popup, desc = 'Git Branches' },
       -- Show Diff (Cmd+D): the current file against HEAD
       { '<M-d>', function() require('pc.split_diff').toggle_file_diff() end, desc = 'VCS: Show diff of this file (toggle)' },
     },

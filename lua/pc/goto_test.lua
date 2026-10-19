@@ -66,7 +66,7 @@ vim.api.nvim_create_autocmd('FileType', {
   pattern = { 'python', 'c', 'cpp' },
   group = vim.api.nvim_create_augroup('pc-goto-test', { clear = true }),
   callback = function(event)
-    vim.keymap.set('n', '<M-T>', M.go, { buffer = event.buf, desc = 'Go to test / subject' })
+    vim.keymap.set('n', '<M-T>', M.go, { buffer = event.buf, desc = 'Go to Test' })
   end,
 })
 

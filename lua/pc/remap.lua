@@ -83,7 +83,7 @@ map('n', '<M-s>', '<cmd>wall<CR>', { desc = 'Save all' })
 map('n', '<M-r>', [[:%s/\<<C-r><C-w>\>//<Left>]], { desc = 'Replace' })
 map('n', '<M-e>', function()
   require('telescope.builtin').oldfiles { cwd_only = true }
-end, { desc = 'Recent files' })
+end, { desc = 'Recent Files' })
 map('n', '<M-E>', function()
   require('telescope.builtin').jumplist()
 end, { desc = 'Recent locations' })

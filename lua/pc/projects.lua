@@ -89,8 +89,8 @@ end
 vim.keymap.set('n', 'gt', cycle 'next', { desc = 'Next project window' })
 vim.keymap.set('n', 'gT', cycle 'prev', { desc = 'Previous project window' })
 -- Alt+F2 arrives as F50 inside tmux
-vim.keymap.set('n', '<M-F2>', M.pick, { desc = 'Switch project' })
-vim.keymap.set('n', '<F50>', M.pick, { desc = 'Switch project' })
-vim.keymap.set('n', '<leader>P', M.pick, { desc = 'Switch [P]roject' })
+vim.keymap.set('n', '<M-F2>', M.pick, { desc = 'Switch Project' })
+vim.keymap.set('n', '<F50>', M.pick, { desc = 'Switch Project' })
+vim.keymap.set('n', '<leader>P', M.pick, { desc = 'Switch Project' })
 
 return M

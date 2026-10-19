@@ -1,3 +1,4 @@
+require 'pc.actions' -- first: records the keymaps defined below for Find Action
 require 'pc.config'
 require 'pc.remap'
 require 'pc.autocmds'
