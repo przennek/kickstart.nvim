@@ -50,11 +50,21 @@ return {
       require('trouble').open 'quickfix'
     end
 
+    -- Like IDEA popups: pressing the key that opened a picker again closes it
+    -- (Alt+F2 projects, Alt+Shift+N files, Alt+E / Alt+Shift+E recent, Alt+F12 structure,
+    -- Alt+2 / Shift+F11 bookmarks, Alt+Shift+A actions, Alt+Shift+V clipboard, F10 run
+    -- configurations; F50 / F60 / F23 are how some of them arrive inside tmux).
+    -- Alt+N stays special in Go to Class: it toggles non-project classes, as in IDEA.
+    local close_with_opening_key = {}
+    for _, key in ipairs { '<M-F2>', '<F50>', '<M-N>', '<M-e>', '<M-E>', '<M-F12>', '<F60>', '<M-2>', '<S-F11>', '<F23>', '<M-A>', '<M-V>', '<F10>' } do
+      close_with_opening_key[key] = 'close'
+    end
+
     require('telescope').setup {
       defaults = {
         mappings = {
-          i = { ['<C-t>'] = open_in_find_window },
-          n = { ['<C-t>'] = open_in_find_window },
+          i = vim.tbl_extend('force', close_with_opening_key, { ['<C-t>'] = open_in_find_window }),
+          n = vim.tbl_extend('force', close_with_opening_key, { ['<C-t>'] = open_in_find_window }),
         },
       },
       -- You can put your default mappings / updates / etc. in here

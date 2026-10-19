@@ -52,6 +52,26 @@ local function branches_popup()
   }
 end
 
+-- Tool windows toggle like in IDEA: the same key closes what it opened
+local function diffview_toggle(cmd)
+  return function()
+    if package.loaded['diffview'] and require('diffview.lib').get_current_view() then
+      vim.cmd 'DiffviewClose'
+    else
+      vim.cmd(cmd)
+    end
+  end
+end
+
+local function commit_window_toggle()
+  local status = require 'neogit.buffers.status'
+  if status.is_open() then
+    status.instance():close()
+  else
+    vim.cmd 'Neogit'
+  end
+end
+
 return {
   -- The git fugitive (Annotate = :Git blame)
   {
@@ -66,7 +86,7 @@ return {
     dependencies = { 'nvim-lua/plenary.nvim', 'sindrets/diffview.nvim', 'nvim-telescope/telescope.nvim' },
     cmd = 'Neogit',
     keys = {
-      { '<M-0>', '<cmd>Neogit<CR>', desc = 'VCS: Commit window' },
+      { '<M-0>', commit_window_toggle, desc = 'VCS: Commit window (toggle)' },
       { '<leader>vv', '<cmd>Neogit<CR>', desc = 'VCS: Status / commit window' },
       { '<leader>vc', '<cmd>Neogit commit<CR>', desc = 'VCS: [C]ommit' },
       { '<leader>vp', '<cmd>Neogit pull<CR>', desc = 'VCS: [p]ull' },
@@ -84,7 +104,7 @@ return {
     'sindrets/diffview.nvim',
     cmd = { 'DiffviewOpen', 'DiffviewFileHistory' },
     keys = {
-      { '<M-9>', '<cmd>DiffviewFileHistory<CR>', desc = 'VCS: Git log' },
+      { '<M-9>', diffview_toggle 'DiffviewFileHistory', desc = 'VCS: Git log (toggle)' },
       { '<leader>vl', '<cmd>DiffviewFileHistory<CR>', desc = 'VCS: [L]og' },
       { '<leader>vh', '<cmd>DiffviewFileHistory %<CR>', desc = 'VCS: File [h]istory' },
       { '<leader>vh', ":'<,'>DiffviewFileHistory<CR>", mode = 'v', desc = 'VCS: Selection history' },
@@ -93,7 +113,7 @@ return {
       { '<leader>vW', compare_with_branch(false), desc = 'VCS: Compare project [W]ith branch' },
       { '<leader>d', branches_popup, desc = 'Git branches (diff with working tree)' },
       -- Show Diff (Cmd+D): the current file against HEAD
-      { '<M-d>', '<cmd>DiffviewOpen -- %<CR>', desc = 'VCS: Show diff of this file' },
+      { '<M-d>', diffview_toggle 'DiffviewOpen -- %', desc = 'VCS: Show diff of this file (toggle)' },
     },
     opts = function()
       -- q closes a diff / history tab, like Esc on an IDEA dialog
