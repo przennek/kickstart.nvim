@@ -549,6 +549,9 @@ end
 
 function M.refresh_gutter(buf)
   buf = buf or vim.api.nvim_get_current_buf()
+  if not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
   local provider = provider_for(buf)
   local symbols_client = client_with(buf, 'textDocument/documentSymbol')
   if not provider or not symbols_client or running[buf] then
