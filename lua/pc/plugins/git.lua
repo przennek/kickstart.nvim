@@ -119,11 +119,12 @@ return {
     opts = function()
       -- q closes a diff / history tab, like Esc on an IDEA dialog
       local close = { 'n', 'q', '<cmd>DiffviewClose<CR>', { desc = 'Close Diffview' } }
+      local esc = { 'n', '<Esc>', '<cmd>DiffviewClose<CR>', { desc = 'Close Diffview' } }
       return {
         keymaps = {
-          view = { close },
-          file_panel = { close },
-          file_history_panel = { close },
+          view = { close, esc },
+          file_panel = { close, esc },
+          file_history_panel = { close, esc },
         },
       }
     end,

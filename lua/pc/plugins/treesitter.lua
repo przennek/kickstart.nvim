@@ -27,6 +27,10 @@ return {
         local function start()
           if vim.api.nvim_buf_is_valid(event.buf) and pcall(vim.treesitter.start, event.buf, lang) then
             vim.bo[event.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+            -- code folding (Alt+- / Alt+=), everything unfolded when a file opens
+            vim.wo.foldmethod = 'expr'
+            vim.wo.foldexpr = 'v:lua.vim.treesitter.foldexpr()'
+            vim.wo.foldlevel = 99
           end
         end
         -- Autoinstall languages that are not installed yet

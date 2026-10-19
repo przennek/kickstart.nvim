@@ -1,0 +1,107 @@
+-- The rest of your IntelliJ keymap (macOS keymap, Cmd -> Alt) that isn't part of a feature
+-- module. Keys a terminal can't send (Ctrl+Tab, Ctrl+Shift+<letter>, Ctrl+Enter) are
+-- translated by Alacritty into Ctrl+Shift+F1…F7, which arrive here as F37…F43.
+-- The full IDEA ↔ Neovim comparison is in ~/Projects/test/KEYMAP.md.
+
+local map = vim.keymap.set
+local function tb(picker, opts)
+  return function()
+    require('telescope.builtin')[picker](opts)
+  end
+end
+
+-- Switcher (Ctrl+Tab / Ctrl+Shift+Tab): recent files; keep pressing Ctrl+Tab to move down
+map('n', '<F37>', tb('buffers', { sort_mru = true, ignore_current_buffer = true }), { desc = 'Switcher' })
+map('n', '<F38>', tb('buffers', { sort_mru = true, ignore_current_buffer = true }), { desc = 'Switcher' })
+
+-- Find (Cmd+F), Find Next / Previous (F3 / Shift+F3), Find Word at Caret (Cmd+F3)
+map('n', '<M-f>', '/', { desc = 'Find' })
+map('n', '<F3>', 'n', { desc = 'Find next' })
+map('n', '<S-F3>', 'N', { desc = 'Find previous' })
+map('n', '<F15>', 'N', { desc = 'Find previous' })
+map('n', '<M-F3>', '*', { desc = 'Find word at caret' })
+map('n', '<F51>', '*', { desc = 'Find word at caret' })
+
+-- Find in Path (Ctrl+Shift+F)
+map('n', '<F39>', tb 'live_grep', { desc = 'Find in Path' })
+
+-- Replace in Path (Ctrl+Shift+R): matches go to the Find window, then confirm to replace all
+local function replace_in_path()
+  local search = vim.fn.input('Replace in Path: ', vim.fn.expand '<cword>')
+  if search == '' then
+    return
+  end
+  local replacement = vim.fn.input('Replace "' .. search .. '" with: ')
+  local out = vim.system({ 'rg', '--vimgrep', '--fixed-strings', '--', search }, { text = true, cwd = vim.fn.getcwd() }):wait()
+  local lines = vim.split(out.stdout or '', '\n', { trimempty = true })
+  if #lines == 0 then
+    return vim.notify('No occurrences of ' .. search)
+  end
+  vim.fn.setqflist({}, ' ', { title = ('Replace %s → %s'):format(search, replacement), lines = lines, efm = '%f:%l:%c:%m' })
+  require('trouble').open 'quickfix'
+  -- ask once the Find window has opened (it takes the focus asynchronously)
+  vim.defer_fn(function()
+    vim.ui.select({ ('Replace all %d occurrences'):format(#lines), 'Cancel' }, { prompt = 'Replace in Path' }, function(choice)
+      if choice and choice:match '^Replace' then
+        -- gdefault is on, so no g flag: every match in a line is replaced
+        vim.cmd(('silent cfdo %%s/\\V%s/%s/e | update'):format(vim.fn.escape(search, '/\\'), vim.fn.escape(replacement, '/\\&~')))
+        local files = {}
+        for _, line in ipairs(lines) do
+          files[line:match '^[^:]+'] = true
+        end
+        vim.notify(('Replaced %d occurrences in %d files'):format(#lines, vim.tbl_count(files)))
+      end
+    end)
+  end, 200)
+end
+map('n', '<F41>', replace_in_path, { desc = 'Replace in Path' })
+map('n', '<leader>sR', replace_in_path, { desc = '[S]earch and [R]eplace in path' })
+
+-- Go to Type Declaration (Ctrl+Shift+B)
+map('n', '<F42>', tb 'lsp_type_definitions', { desc = 'Go to type declaration' })
+
+-- Generate (Ctrl+Enter); in the project tree it is New… (see neo-tree.lua)
+map({ 'n', 'x' }, '<F40>', vim.lsp.buf.code_action, { desc = 'Generate' })
+
+-- Jump to Source (F4) / Jump to Last Window (F12) / Restore Default Layout (Shift+F12)
+map('n', '<F4>', tb 'lsp_definitions', { desc = 'Jump to source' })
+map({ 'n', 't' }, '<F12>', '<cmd>wincmd p<CR>', { desc = 'Jump to last window' })
+local function restore_layout()
+  require('pc.hide_windows').reset()
+  vim.cmd 'wincmd ='
+end
+map('n', '<S-F12>', restore_layout, { desc = 'Restore default layout' })
+map('n', '<F24>', restore_layout, { desc = 'Restore default layout' })
+
+-- Next project window (Cmd+`), Git Branches (Cmd+Shift+`)
+map('n', '<M-`>', function()
+  if vim.env.TMUX then
+    vim.system { 'tmux', 'switch-client', '-n' }
+  end
+end, { desc = 'Next project window' })
+map('n', '<M-~>', function()
+  -- the <leader>d Git branches popup (a lazy-loaded key, so it is typed rather than called)
+  vim.api.nvim_feedkeys(vim.keycode '<leader>d', 'm', false)
+end, { desc = 'Git branches' })
+
+-- Jump to Last Change (Cmd+Shift+Backspace)
+map('n', '<M-BS>', 'g;', { desc = 'Jump to last change' })
+
+-- Collapse / Expand (Cmd+- / Cmd+=): treesitter folds, all open by default
+map('n', '<M-->', 'zc', { desc = 'Collapse' })
+map('n', '<M-=>', 'zo', { desc = 'Expand' })
+map('x', '<M-.>', 'zf', { desc = 'Collapse selection' })
+
+-- Tab after an auto-inserted closing bracket / quote jumps over it (BraceOrQuoteOut);
+-- completion and snippets come first (autocomplete.lua)
+return {
+  brace_out = function()
+    local col = vim.fn.col '.'
+    local next_char = vim.api.nvim_get_current_line():sub(col, col)
+    if next_char:match '[%)%]%}"\'`>]' then
+      vim.api.nvim_win_set_cursor(0, { vim.fn.line '.', col })
+      return true
+    end
+    return false
+  end,
+}

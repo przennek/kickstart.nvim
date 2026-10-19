@@ -141,17 +141,20 @@ return {
       { '<F29>', dap 'restart', desc = 'Debug: Rerun' },
       -- Debug tool window (Alt+5)
       { '<M-5>', toggle_ui, desc = 'Debug: Toggle UI' },
-      -- Run tool window (Cmd+4): just the console with the program output
+      -- Run tool window (Cmd+4): the Run window used last — the program output of Python / C /
+      -- Maven runs (run.lua) or the debugger's console for Java runs
       {
         '<M-4>',
         function()
-          for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-            local ft = vim.bo[vim.api.nvim_win_get_buf(win)].filetype
-            if ft == 'dapui_console' or ft == 'dap-repl' then
-              return require('dapui').close { layout = 2 }
+          require('pc.run').toggle_run_window(function()
+            for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+              local ft = vim.bo[vim.api.nvim_win_get_buf(win)].filetype
+              if ft == 'dapui_console' or ft == 'dap-repl' then
+                return require('dapui').close { layout = 2 }
+              end
             end
-          end
-          require('dapui').open { layout = 2 }
+            require('dapui').open { layout = 2 }
+          end)
         end,
         desc = 'Run window (toggle)',
       },

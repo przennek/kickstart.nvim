@@ -157,8 +157,15 @@ return {
       local servers = {
         -- C / C++ (needs compile_commands.json for real projects, e.g. `bear -- make` or CMake)
         clangd = {},
-        -- Python: pyright for types/navigation, ruff for lint/format/imports
-        pyright = {
+        -- Python: basedpyright (pyright fork: adds Go to Implementation, inlay hints, semantic
+        -- highlighting) for types / navigation, ruff for lint / format / imports
+        basedpyright = {
+          settings = {
+            basedpyright = {
+              -- "recommended" (the default) is much stricter than IDEA's inspections
+              analysis = { typeCheckingMode = 'standard' },
+            },
+          },
           -- Use the project's .venv as the interpreter, like IDEA's project SDK.
           -- (Settings are changed on the running client: edits made to `config` in
           -- before_init don't reach the server.)
@@ -237,7 +244,7 @@ return {
 
       require('mason-lspconfig').setup {
         ensure_installed = {},
-        automatic_enable = { exclude = { 'jdtls' } },
+        automatic_enable = { exclude = { 'jdtls', 'pyright' } },
       }
       vim.lsp.enable 'clangd'
     end,

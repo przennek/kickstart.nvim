@@ -1,30 +1,28 @@
 -- Inheritance navigation, like IDEA's Hierarchy tool window and gutter icons.
---   Alt+8       Hierarchy window (toggle) for the type at the cursor (or the type the cursor is in);
+--   Alt+8       Hierarchy window (toggle) for the type at the cursor (or the type the cursor is in)
 --   gH          show the hierarchy of the type at the cursor (also when the window is open);
 --               inside: t = type hierarchy, s = supertypes, c = subtypes (children),
---               Enter / double-click = go to the type, q / Alt+8 = close
+--               Enter / F4 / double-click = go to the type, q / Alt+8 = close
 --   gutter      ↑ overrides / implements something above, ↓ has overrides / implementations
 --               below (↕ both). Click it: ↑ goes up, ↓ lists what is below.
 --   Alt+U       Go to Super Method / super type (Cmd+U); gI lists implementations / subtypes
--- Works with language servers that support type hierarchy (jdtls for Java).
+-- Java and C++ use the language server's type hierarchy (jdtls, clangd). Python servers have
+-- none, so for Python the hierarchy is read from the code: base classes from the class
+-- declaration (treesitter), subclasses by searching the project (ripgrep).
 
 local M = {}
 
 local ns = vim.api.nvim_create_namespace 'pc-hierarchy-gutter'
 local TYPE_KINDS = { [5] = true, [10] = true, [11] = true, [23] = true } -- class, enum, interface, struct
-local METHOD_KINDS = { [6] = true, [9] = true } -- method, constructor
-local IGNORED_SUPERS = { Object = true, Enum = true, Record = true }
+local METHOD_KINDS = { [6] = true } -- method
+local IGNORED_SUPERS = { Object = true, Enum = true, Record = true, object = true }
 
 vim.api.nvim_set_hl(0, 'PcHierarchySign', { link = 'Function', default = true })
 vim.api.nvim_set_hl(0, 'PcHierarchyRoot', { link = 'Title', default = true })
 
 ---------------------------------------------------------------------------
--- LSP helpers (run inside a coroutine)
+-- Async helpers (everything below runs inside a coroutine)
 ---------------------------------------------------------------------------
-
-local function client_for(buf)
-  return vim.lsp.get_clients({ bufnr = buf, method = 'textDocument/prepareTypeHierarchy' })[1]
-end
 
 local function await(client, method, params, buf)
   local co = assert(coroutine.running())
@@ -44,26 +42,198 @@ local function pos_params(buf, pos)
   return { textDocument = { uri = vim.uri_from_bufnr(buf) }, position = pos }
 end
 
-local function prepare(client, buf, pos)
-  local items = await(client, 'textDocument/prepareTypeHierarchy', pos_params(buf, pos), buf)
-  return items and items[1]
+local function client_with(buf, method)
+  return vim.lsp.get_clients({ bufnr = buf, method = method })[1]
 end
 
-local function supertypes(client, buf, item)
+local function not_ignored(items)
   return vim.tbl_filter(function(i)
     return not IGNORED_SUPERS[i.name]
-  end, await(client, 'typeHierarchy/supertypes', { item = item }, buf) or {})
+  end, items or {})
 end
 
-local function subtypes(client, buf, item)
-  return await(client, 'typeHierarchy/subtypes', { item = item }, buf) or {}
+---------------------------------------------------------------------------
+-- Providers: prepare(pos) -> item, supertypes(item), subtypes(item), method_supers(pos)
+-- Items are LSP TypeHierarchyItem-like: { name, kind, detail, uri, selectionRange }
+---------------------------------------------------------------------------
+
+local function lsp_provider(client, buf)
+  local p = { name = client.name }
+  function p.prepare(pos)
+    local items = await(client, 'textDocument/prepareTypeHierarchy', pos_params(buf, pos), buf)
+    return items and items[1]
+  end
+  function p.supertypes(item)
+    return not_ignored(await(client, 'typeHierarchy/supertypes', { item = item }, buf))
+  end
+  function p.subtypes(item)
+    return await(client, 'typeHierarchy/subtypes', { item = item }, buf) or {}
+  end
+  function p.method_supers(pos)
+    if client.name ~= 'jdtls' then
+      return {}
+    end
+    local links = await(client, 'java/findLinks', { type = 'superImplementation', position = pos_params(buf, pos) }, buf) or {}
+    return vim.tbl_map(function(l)
+      return { name = l.displayName or '', uri = l.uri, selectionRange = l.range, kind = 6 }
+    end, links)
+  end
+  return p
 end
 
--- Position of the type declaration the cursor is in (treesitter), for prepareTypeHierarchy
+-- Python: treesitter + project search
+local function python_provider(buf)
+  local root = vim.fs.root(buf, { 'pyproject.toml', 'setup.py', 'setup.cfg', '.git' }) or vim.fn.getcwd()
+  local p = { name = 'python' }
+
+  local function parse(bufnr)
+    vim.fn.bufload(bufnr)
+    local ok, parser = pcall(vim.treesitter.get_parser, bufnr, 'python')
+    return ok and parser:parse()[1]:root()
+  end
+
+  local function class_item(bufnr, node)
+    local name = node:field('name')[1]
+    local row, col, erow, ecol = name:range()
+    local file = vim.api.nvim_buf_get_name(bufnr)
+    return {
+      name = vim.treesitter.get_node_text(name, bufnr),
+      kind = 5,
+      detail = vim.fs.relpath(root, file) or file,
+      uri = vim.uri_from_fname(file),
+      selectionRange = { start = { line = row, character = col }, ['end'] = { line = erow, character = ecol } },
+    }
+  end
+
+  local function class_node_at(bufnr, line, col)
+    local tree = parse(bufnr)
+    local node = tree and tree:named_descendant_for_range(line, col, line, col)
+    while node and node:type() ~= 'class_definition' do
+      node = node:parent()
+    end
+    return node
+  end
+
+  -- class declarations in the project matching the ripgrep `regex`
+  local function search_classes(regex)
+    local out = vim.system({ 'rg', '--json', '-t', 'py', '-e', regex, root }, { text = true }):wait()
+    local items = {}
+    for line in (out.stdout or ''):gmatch '[^\n]+' do
+      local ok, msg = pcall(vim.json.decode, line)
+      if ok and msg.type == 'match' then
+        local text = msg.data.lines.text or ''
+        local indent, name = text:match '^(%s*)class%s+([%w_]+)'
+        if name then
+          local file = msg.data.path.text
+          local col = #indent + #'class '
+          table.insert(items, {
+            name = name,
+            kind = 5,
+            detail = vim.fs.relpath(root, file) or file,
+            uri = vim.uri_from_fname(vim.fn.fnamemodify(file, ':p')),
+            selectionRange = {
+              start = { line = msg.data.line_number - 1, character = col },
+              ['end'] = { line = msg.data.line_number - 1, character = col + #name },
+            },
+          })
+        end
+      end
+    end
+    return items
+  end
+
+  function p.prepare(pos)
+    local node = class_node_at(buf, pos.line, pos.character)
+    return node and class_item(buf, node)
+  end
+
+  function p.supertypes(item)
+    local bufnr = vim.uri_to_bufnr(item.uri)
+    local node = class_node_at(bufnr, item.selectionRange.start.line, item.selectionRange.start.character)
+    local bases = node and node:field('superclasses')[1]
+    local result = {}
+    for base in bases and bases:iter_children() or function() end do
+      if base:named() and (base:type() == 'identifier' or base:type() == 'attribute') then
+        local name = vim.treesitter.get_node_text(base, bufnr):match '([%w_]+)$'
+        if name and not IGNORED_SUPERS[name] then
+          vim.list_extend(result, search_classes([[^\s*class\s+]] .. name .. [[\b]]))
+        end
+      end
+    end
+    return result
+  end
+
+  function p.subtypes(item)
+    return search_classes([[^\s*class\s+\w+\s*\([^)]*\b]] .. item.name .. [[\b]])
+  end
+
+  -- methods with the same name in the base classes (nearest first)
+  function p.method_supers(pos)
+    local tree = parse(buf)
+    local node = tree and tree:named_descendant_for_range(pos.line, pos.character, pos.line, pos.character)
+    while node and node:type() ~= 'function_definition' do
+      node = node:parent()
+    end
+    local method = node and vim.treesitter.get_node_text(node:field('name')[1], buf)
+    local cls = node and node:parent()
+    while cls and cls:type() ~= 'class_definition' do
+      cls = cls:parent()
+    end
+    if not (method and cls) then
+      return {}
+    end
+    local found, seen = {}, {}
+    local queue = p.supertypes(class_item(buf, cls))
+    while #queue > 0 and #found == 0 do
+      local sup = table.remove(queue, 1)
+      local key = sup.uri .. sup.name
+      if not seen[key] then
+        seen[key] = true
+        local bufnr = vim.uri_to_bufnr(sup.uri)
+        local cnode = class_node_at(bufnr, sup.selectionRange.start.line, sup.selectionRange.start.character)
+        local body = cnode and cnode:field('body')[1]
+        for child in body and body:iter_children() or function() end do
+          local def = child:type() == 'decorated_definition' and child:field('definition')[1] or child
+          if def:type() == 'function_definition' and vim.treesitter.get_node_text(def:field('name')[1], bufnr) == method then
+            local n = def:field('name')[1]
+            local row, col, erow, ecol = n:range()
+            table.insert(found, {
+              name = sup.name .. '.' .. method,
+              kind = 6,
+              uri = sup.uri,
+              selectionRange = { start = { line = row, character = col }, ['end'] = { line = erow, character = ecol } },
+            })
+          end
+        end
+        vim.list_extend(queue, p.supertypes(sup))
+      end
+    end
+    return found
+  end
+
+  return p
+end
+
+local function provider_for(buf)
+  local client = client_with(buf, 'textDocument/prepareTypeHierarchy')
+  if client then
+    return lsp_provider(client, buf)
+  end
+  if vim.bo[buf].filetype == 'python' and vim.fn.executable 'rg' == 1 then
+    return python_provider(buf)
+  end
+end
+
+---------------------------------------------------------------------------
+-- Shared helpers
+---------------------------------------------------------------------------
+
+-- Position of the type declaration the cursor is in (treesitter)
 local function enclosing_type_pos(buf)
   local ok, node = pcall(vim.treesitter.get_node, { bufnr = buf })
   while ok and node do
-    if node:type():match 'class' or node:type():match 'interface' or node:type():match 'enum' or node:type():match 'record' then
+    local t = node:type()
+    if t:match 'class' or t:match 'interface' or t:match 'enum' or t:match 'record' or t:match 'struct' then
       local name = node:field('name')[1]
       if name then
         local row, col = name:start()
@@ -101,7 +271,7 @@ end
 -- Hierarchy window
 ---------------------------------------------------------------------------
 
-local view = { buf = nil, win = nil, origin = nil, root = nil, client = nil, src = nil, mode = 'type', lines = {} }
+local view = { buf = nil, win = nil, origin = nil, root = nil, provider = nil, mode = 'type', lines = {} }
 
 local function window_open()
   return view.win and vim.api.nvim_win_is_valid(view.win)
@@ -127,64 +297,51 @@ local function render(rows)
   for lnum, row in pairs(view.lines) do
     if row.root then
       vim.api.nvim_buf_set_extmark(view.buf, ns, lnum - 1, 0, { end_col = #text[lnum], hl_group = 'PcHierarchyRoot' })
-    end
-  end
-  for lnum, row in pairs(view.lines) do
-    if row.root and window_open() then
-      vim.api.nvim_win_set_cursor(view.win, { lnum, 0 })
+      if window_open() then
+        vim.api.nvim_win_set_cursor(view.win, { lnum, 0 })
+      end
     end
   end
 end
 
 local function row(item, depth, is_root)
   local icon = ({ [5] = '󰠱 ', [10] = ' ', [11] = ' ', [23] = '󰙅 ' })[item.kind] or '  '
-  local pkg = item.detail and item.detail ~= '' and ('  ' .. item.detail) or ''
-  return { item = item, root = is_root, text = string.rep('  ', depth) .. (is_root and '● ' or '') .. icon .. item.name .. pkg }
+  local detail = item.detail and item.detail ~= '' and ('  ' .. item.detail) or ''
+  return { item = item, root = is_root, text = string.rep('  ', depth) .. (is_root and '● ' or '') .. icon .. item.name .. detail }
 end
 
 -- Build the rows for the current mode (inside a coroutine)
 local function build()
-  local c, b, root = view.client, view.src, view.root
+  local p, root = view.provider, view.root
   local rows, seen, budget = {}, {}, 300
 
   local function key(i)
     return i.uri .. ':' .. i.name
   end
-  local function down(item, depth)
-    for _, sub in ipairs(subtypes(c, b, item)) do
-      if budget <= 0 or seen[key(sub)] or depth > 8 then
+  local function walk(item, depth, next_items, limit)
+    for _, child in ipairs(next_items(item)) do
+      if budget <= 0 or seen[key(child)] or depth > limit then
         return
       end
-      seen[key(sub)] = true
+      seen[key(child)] = true
       budget = budget - 1
-      table.insert(rows, row(sub, depth))
-      down(sub, depth + 1)
-    end
-  end
-  local function up(item, depth)
-    for _, sup in ipairs(supertypes(c, b, item)) do
-      if budget <= 0 or seen[key(sup)] or depth > 10 then
-        return
-      end
-      seen[key(sup)] = true
-      budget = budget - 1
-      table.insert(rows, row(sup, depth))
-      up(sup, depth + 1)
+      table.insert(rows, row(child, depth))
+      walk(child, depth + 1, next_items, limit)
     end
   end
 
   seen[key(root)] = true
   if view.mode == 'sub' then
     table.insert(rows, row(root, 0, true))
-    down(root, 1)
+    walk(root, 1, p.subtypes, 8)
   elseif view.mode == 'super' then
     table.insert(rows, row(root, 0, true))
-    up(root, 1)
+    walk(root, 1, p.supertypes, 10)
   else
     -- the chain of supertypes of the same kind (classes for a class) above, subtypes below
     local chain, item = {}, root
     while #chain < 10 do
-      local sups = supertypes(c, b, item)
+      local sups = p.supertypes(item)
       local next_item = vim.tbl_filter(function(s)
         return s.kind == root.kind
       end, sups)[1] or (root.kind ~= 5 and sups[1]) or nil
@@ -199,7 +356,7 @@ local function build()
       table.insert(rows, row(sup, depth - 1))
     end
     table.insert(rows, row(root, #chain, true))
-    down(root, #chain + 1)
+    walk(root, #chain + 1, p.subtypes, 8)
   end
   return rows
 end
@@ -234,9 +391,9 @@ local function open_window()
         jump_to(r.item, view.origin)
       end
     end
-    map('<CR>', go)
-    map('o', go)
-    map('<2-LeftMouse>', go)
+    for _, lhs in ipairs { '<CR>', 'o', '<F4>', '<2-LeftMouse>' } do
+      map(lhs, go)
+    end
     for lhs, mode in pairs { t = 'type', s = 'super', c = 'sub' } do
       map(lhs, function()
         view.mode = mode
@@ -260,25 +417,33 @@ end
 --- Hierarchy window for the type at / around the cursor (gH re-targets an open window)
 function M.open()
   local buf, win = vim.api.nvim_get_current_buf(), vim.api.nvim_get_current_win()
-  local client = client_for(buf)
-  if not client then
-    return vim.notify('No type hierarchy for this file (language server without support)', vim.log.levels.WARN)
+  local provider = provider_for(buf)
+  if not provider then
+    return vim.notify('No type hierarchy for this file', vim.log.levels.WARN)
   end
   local cursor = vim.api.nvim_win_get_cursor(win)
   async(function()
-    local item = prepare(client, buf, { line = cursor[1] - 1, character = cursor[2] })
+    local item = provider.prepare { line = cursor[1] - 1, character = cursor[2] }
     if not item then
       local pos = enclosing_type_pos(buf)
-      item = pos and prepare(client, buf, pos)
+      item = pos and provider.prepare(pos)
     end
     if not item then
       return vim.notify('No type at the cursor', vim.log.levels.WARN)
     end
-    view.root, view.client, view.src, view.origin = item, client, buf, win
+    view.root, view.provider, view.origin = item, provider, win
     view.mode = 'type' -- like IDEA, a new hierarchy starts as the full type hierarchy
     open_window()
     refresh()
   end)
+end
+
+--- Alt+8: the Hierarchy tool window, again closes it
+function M.toggle()
+  if window_open() then
+    return M.close_window()
+  end
+  M.open()
 end
 
 ---------------------------------------------------------------------------
@@ -294,37 +459,47 @@ local function place(buf, lnum, m)
   vim.api.nvim_buf_set_extmark(buf, ns, lnum, 0, { sign_text = text, sign_hl_group = 'PcHierarchySign', priority = 5 })
 end
 
+local function has_implementations(client, buf, pos)
+  if not client then
+    return false
+  end
+  local impls = await(client, 'textDocument/implementation', pos_params(buf, pos), buf) or {}
+  if impls.uri then
+    impls = { impls }
+  end
+  local uri = vim.uri_from_bufnr(buf)
+  return #vim.tbl_filter(function(l)
+    local range = l.range or l.targetSelectionRange
+    return not ((l.uri or l.targetUri) == uri and range and range.start.line == pos.line)
+  end, impls) > 0
+end
+
 function M.refresh_gutter(buf)
   buf = buf or vim.api.nvim_get_current_buf()
-  local client = client_for(buf)
-  if not client or running[buf] then
+  local provider = provider_for(buf)
+  local symbols_client = client_with(buf, 'textDocument/documentSymbol')
+  if not provider or not symbols_client or running[buf] then
     return
   end
+  local impl_client = client_with(buf, 'textDocument/implementation')
   running[buf] = true
   async(function()
     local tick = vim.b[buf].changedtick
-    local symbols = await(client, 'textDocument/documentSymbol', { textDocument = { uri = vim.uri_from_bufnr(buf) } }, buf) or {}
+    local symbols = await(symbols_client, 'textDocument/documentSymbol', { textDocument = { uri = vim.uri_from_bufnr(buf) } }, buf) or {}
     local found = {}
     local function walk(list)
       for _, s in ipairs(list) do
         local pos = (s.selectionRange or (s.location and s.location.range) or {}).start
         if pos and (TYPE_KINDS[s.kind] or METHOD_KINDS[s.kind]) then
           local m = { up = false, down = false, pos = pos, method = METHOD_KINDS[s.kind] ~= nil }
-          if m.method and s.kind == 6 then
-            local impls = await(client, 'textDocument/implementation', pos_params(buf, pos), buf) or {}
-            m.down = #vim.tbl_filter(function(l)
-              local range = l.range or l.targetSelectionRange
-              return not (l.uri == vim.uri_from_bufnr(buf) and range and range.start.line == pos.line)
-            end, impls) > 0
-            if client.name == 'jdtls' then
-              local sup = await(client, 'java/findLinks', { type = 'superImplementation', position = pos_params(buf, pos) }, buf)
-              m.up = sup ~= nil and #sup > 0
-            end
-          elseif not m.method then
-            local item = prepare(client, buf, pos)
+          if m.method then
+            m.down = has_implementations(impl_client, buf, pos)
+            m.up = #provider.method_supers(pos) > 0
+          else
+            local item = provider.prepare(pos)
             if item then
-              m.up = #supertypes(client, buf, item) > 0
-              m.down = #subtypes(client, buf, item) > 0
+              m.up = #provider.supertypes(item) > 0
+              m.down = #provider.subtypes(item) > 0
             end
           end
           if m.up or m.down then
@@ -354,23 +529,22 @@ end
 ---------------------------------------------------------------------------
 
 local function go_up(buf, m)
-  local client = client_for(buf)
-  if not client then
-    return
-  end
-  if m.method then
-    if client.name == 'jdtls' then
-      return require('jdtls').super_implementation()
-    end
+  local provider = provider_for(buf)
+  if not provider then
     return
   end
   async(function()
-    local item = prepare(client, buf, m.pos)
-    local sups = item and supertypes(client, buf, item) or {}
-    if #sups == 0 then
-      return vim.notify 'No supertypes'
+    local targets
+    if m.method then
+      targets = provider.method_supers(m.pos)
+    else
+      local item = provider.prepare(m.pos)
+      targets = item and provider.supertypes(item) or {}
     end
-    pick(sups, 'Go to supertype', function(i)
+    if #targets == 0 then
+      return vim.notify 'Nothing above'
+    end
+    pick(targets, 'Go to super', function(i)
       jump_to(i)
     end)
   end)
@@ -381,10 +555,10 @@ local function go_down(buf, m)
   if m.method then
     return require('telescope.builtin').lsp_implementations()
   end
-  local client = client_for(buf)
+  local provider = provider_for(buf)
   async(function()
-    local item = prepare(client, buf, m.pos)
-    local subs = item and subtypes(client, buf, item) or {}
+    local item = provider.prepare(m.pos)
+    local subs = item and provider.subtypes(item) or {}
     if #subs == 0 then
       return vim.notify 'No subtypes'
     end
@@ -416,17 +590,24 @@ local function marker_action(buf, lnum)
   return true
 end
 
---- Go to Super (Alt+U): the method / type at the cursor line, else the enclosing method / type
+--- Go to Super (Alt+U): the method / type on the cursor line, else the enclosing method / type
 function M.go_super()
   local buf = vim.api.nvim_get_current_buf()
-  local lnum = vim.fn.line '.' - 1
-  local m = (marks[buf] or {})[lnum]
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  local m = (marks[buf] or {})[cursor[1] - 1]
   if m and m.up then
     return go_up(buf, m)
   end
-  local client = client_for(buf)
-  if client and client.name == 'jdtls' then
-    return require('jdtls').super_implementation()
+  local ok, node = pcall(vim.treesitter.get_node)
+  while ok and node do
+    local t = node:type()
+    if t:match 'method' or t == 'function_definition' then
+      return go_up(buf, { pos = { line = cursor[1] - 1, character = cursor[2] }, method = true })
+    end
+    if t:match 'class' or t:match 'interface' then
+      break
+    end
+    node = node:parent()
   end
   local pos = enclosing_type_pos(buf)
   if pos then
@@ -438,23 +619,15 @@ end
 -- Wiring
 ---------------------------------------------------------------------------
 
---- Alt+8: the Hierarchy tool window, again closes it
-function M.toggle()
-  if window_open() then
-    return M.close_window()
-  end
-  M.open()
-end
-
 local group = vim.api.nvim_create_augroup('pc-hierarchy', { clear = true })
 vim.api.nvim_create_autocmd('LspAttach', {
   group = group,
   callback = function(event)
-    local client = vim.lsp.get_client_by_id(event.data.client_id)
-    if not (client and client:supports_method 'textDocument/prepareTypeHierarchy') then
+    local buf = event.buf
+    if vim.b[buf].pc_hierarchy or not provider_for(buf) then
       return
     end
-    local buf = event.buf
+    vim.b[buf].pc_hierarchy = true
     vim.keymap.set('n', '<M-8>', M.toggle, { buffer = buf, desc = 'Hierarchy window' })
     vim.keymap.set('n', 'gH', M.open, { buffer = buf, desc = 'Type hierarchy' })
     vim.keymap.set('n', '<M-u>', M.go_super, { buffer = buf, desc = 'Go to super method / type' })
@@ -472,21 +645,9 @@ vim.api.nvim_create_autocmd('LspAttach', {
   end,
 })
 
--- Clicking a hierarchy marker in the sign column (the first 4 screen columns of a window with
--- signcolumn=yes:2) navigates; any other click works as usual
-vim.keymap.set('n', '<LeftMouse>', function()
-  local mouse = vim.fn.getmousepos()
-  if mouse.winid ~= 0 and mouse.line > 0 and mouse.wincol <= 4 then
-    local buf = vim.api.nvim_win_get_buf(mouse.winid)
-    if (marks[buf] or {})[mouse.line - 1] then
-      vim.schedule(function()
-        vim.api.nvim_set_current_win(mouse.winid)
-        marker_action(buf, mouse.line - 1)
-      end)
-      return ''
-    end
-  end
-  return '<LeftMouse>'
-end, { expr = true, desc = 'Click: hierarchy marker or move cursor' })
+-- Clicking a marker navigates (see gutter.lua)
+require('pc.gutter').on_click(function(buf, lnum)
+  return marker_action(buf, lnum)
+end)
 
 return M

@@ -59,6 +59,10 @@ return {
     for _, key in ipairs { '<M-F2>', '<F50>', '<M-N>', '<M-e>', '<M-E>', '<M-F12>', '<F60>', '<M-2>', '<S-F11>', '<F23>', '<M-A>', '<M-V>', '<F10>' } do
       close_with_opening_key[key] = 'close'
     end
+    -- Switcher: Ctrl+Tab / Ctrl+Shift+Tab (F37 / F38) move through the list, F4 opens
+    close_with_opening_key['<F37>'] = 'move_selection_next'
+    close_with_opening_key['<F38>'] = 'move_selection_previous'
+    close_with_opening_key['<F4>'] = 'select_default'
 
     require('telescope').setup {
       defaults = {

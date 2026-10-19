@@ -100,6 +100,23 @@ local function start_jdtls()
       map('x', '<leader>em', function()
         jdtls.extract_method(true)
       end, 'Extract method')
+      -- Ctrl+Alt+M is Extract Method in your IDEA keymap too (Alacritty sends it as F43:
+      -- a terminal can't tell Ctrl+Alt+M from Alt+Enter)
+      map('x', '<F43>', function()
+        jdtls.extract_method(true)
+      end, 'Extract method')
+      map({ 'n', 'x' }, '<leader>ei', function()
+        vim.lsp.buf.code_action { context = { only = { 'refactor.inline' }, diagnostics = {} } }
+      end, 'Inline')
+      -- Override / Implement Methods (Cmd+O)
+      map('n', '<M-o>', function()
+        vim.lsp.buf.code_action {
+          filter = function(a)
+            return a.title:match 'Override' ~= nil
+          end,
+          context = { only = { 'source' }, diagnostics = {} },
+        }
+      end, 'Override / implement methods')
       map('n', '<M-O>', jdtls.organize_imports, 'Optimize Imports')
       -- Go to Test (Cmd+Shift+T) / Super method
       map('n', '<M-T>', function()

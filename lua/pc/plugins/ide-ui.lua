@@ -46,6 +46,7 @@ return {
       focus = true, -- jump into the window, like IDEA's tool windows
       auto_preview = true,
       follow = false, -- don't move the selection along with the editor cursor
+      keys = { ['<F4>'] = 'jump' }, -- Jump to Source
       win = { size = 12 },
     },
   },

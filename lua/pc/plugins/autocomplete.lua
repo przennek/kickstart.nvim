@@ -81,7 +81,7 @@ return { -- Autocompletion
             cmp.confirm { behavior = cmp.ConfirmBehavior.Replace, select = true }
           elseif luasnip.expand_or_locally_jumpable() then
             luasnip.expand_or_jump()
-          else
+          elseif not require('pc.idea_keys').brace_out() then
             fallback()
           end
         end, { 'i', 's' }),

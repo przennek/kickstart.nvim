@@ -41,6 +41,10 @@ local function hide()
     state.qf = true
     vim.cmd 'cclose'
   end
+  if require('pc.run').console_visible() then
+    state.run = true
+    require('pc.run').hide_console()
+  end
   if package.loaded['toggleterm'] then
     state.terms = {}
     for _, term in ipairs(require('toggleterm.terminal').get_all()) do
@@ -75,6 +79,9 @@ local function restore(state)
   if state.qf then
     vim.cmd 'copen'
   end
+  if state.run then
+    require('pc.run').show_console()
+  end
   for _, term in ipairs(state.terms or {}) do
     term:open()
   end
@@ -88,6 +95,15 @@ local function restore(state)
   end
 end
 
+--- Restore Default Layout (Shift+F12): close every tool window, forget what was hidden
+function M.reset()
+  hidden = nil
+  if vim.bo.buftype ~= '' then
+    vim.cmd 'wincmd p'
+  end
+  hide()
+end
+
 function M.toggle()
   if hidden then
     local state = hidden
@@ -99,7 +115,7 @@ function M.toggle()
       vim.cmd 'wincmd p'
     end
     local state = hide()
-    if next(state.terms or {}) or next(state.trouble or {}) or state.tree or state.aerial or state.qf or state.dapui then
+    if next(state.terms or {}) or next(state.trouble or {}) or state.tree or state.aerial or state.qf or state.run or state.dapui then
       hidden = state
     end
   end

@@ -1,7 +1,7 @@
 -- Line bookmarks like IDEA's (and the Code Remark plugin's notes): a sign in the gutter,
 -- optional description shown at the end of the line, searchable list.
 -- Keys follow .ideavimrc (<leader>pa / pr = ToggleBookmark, <leader>sb = ShowBookmarks)
--- and the IDEA keymap (F11, Ctrl+F11 = with description, Shift+F11 = list).
+-- and the IDEA keymap (F11 / Ctrl+F11 = toggle, Alt+F11 = with description, Shift+F11 = list).
 -- Stored globally in ~/.bookmarks, so they survive restarts.
 local function bm(fn)
   return function()
@@ -27,8 +27,9 @@ return {
     { '<leader>sb', show_bookmarks, desc = '[S]earch [B]ookmarks' },
     -- F11 / Ctrl+F11 / Shift+F11 (F35 / F23 inside tmux)
     { '<F11>', bm 'bookmark_toggle', desc = 'Bookmark: toggle' },
-    { '<C-F11>', bm 'bookmark_ann', desc = 'Bookmark: with description' },
-    { '<F35>', bm 'bookmark_ann', desc = 'Bookmark: with description' },
+    -- Ctrl+F11 toggles too, as in your keymap
+    { '<C-F11>', bm 'bookmark_toggle', desc = 'Bookmark: toggle' },
+    { '<F35>', bm 'bookmark_toggle', desc = 'Bookmark: toggle' },
     { '<S-F11>', show_bookmarks, desc = 'Show bookmarks' },
     { '<F23>', show_bookmarks, desc = 'Show bookmarks' },
     -- macOS keymap on Alt: Cmd+F11 = bookmark with description (also what Code Remark did),

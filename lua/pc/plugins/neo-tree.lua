@@ -46,6 +46,9 @@ return {
       window = {
         mappings = {
           ['<A-1>'] = 'close_window',
+          -- New… (Ctrl+Enter, sent as F40 by Alacritty) and Jump to Source (F4)
+          ['<F40>'] = 'add',
+          ['<F4>'] = 'open',
           ['<space>'] = {
             'toggle_node',
             nowait = false, -- disable `nowait` if you have existing combos starting with this char that you want to use
