@@ -77,6 +77,12 @@ bindings = [
   { key = "]", mods = "Command|Shift", chars = "\u001b}" },
   { key = "-", mods = "Command|Shift", chars = "\u001b_" },
   { key = "=", mods = "Command|Shift", chars = "\u001b+" },
+  # Alacritty matches the character with Shift applied ({ for Shift+[), so both spellings
+  { key = "~", mods = "Command|Shift", chars = "\u001b~" },
+  { key = "{", mods = "Command|Shift", chars = "\u001b{" },
+  { key = "}", mods = "Command|Shift", chars = "\u001b}" },
+  { key = "_", mods = "Command|Shift", chars = "\u001b_" },
+  { key = "+", mods = "Command|Shift", chars = "\u001b+" },
   { key = ",", mods = "Command", chars = "\u001b\u0013" },  # Settings (Cmd+,) = Ctrl+Alt+S
   { key = "Enter", mods = "Command", chars = "\u001b\r" },  # Show Context Actions
   { key = "Home", mods = "Command", chars = "\u001b[1;3H" },  # Navigation Bar
