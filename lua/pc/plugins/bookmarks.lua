@@ -30,6 +30,8 @@ return {
     { '<leader>pa', bm 'bookmark_toggle', desc = 'Bookmark: toggle' },
     { '<leader>pr', bm 'bookmark_toggle', desc = 'Bookmark: toggle' },
     { '<leader>pi', bookmark_with_description, desc = 'Bookmark: with description' },
+    -- Edit Bookmark / Rename (the description of the bookmark on this line; adds one if there is none)
+    { '<leader>pe', bm 'bookmark_ann', desc = 'Bookmark: [e]dit description' },
     { '<leader>pn', bm 'bookmark_next', desc = 'Bookmark: next in file' },
     { '<leader>pp', bm 'bookmark_prev', desc = 'Bookmark: previous in file' },
     { '<leader>pc', bm 'bookmark_clean', desc = 'Bookmark: clear file' },
