@@ -1,3 +1,4 @@
 # AUR packages (yay / paru):
 #   yay -S --needed - < deps/aur-packages.txt
 mongosh-bin
+lazysql

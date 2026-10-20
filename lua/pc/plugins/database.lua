@@ -1,5 +1,6 @@
 -- Database tool window + SQL console, like IDEA's Database plugin (vim-dadbod).
---   <leader>S        Database window: connections, schemas, tables, saved queries
+--   <leader>S        Database window: lazysql (lua/pc/db_tui.lua) when installed, or dadbod-ui's
+--                    tree below (Settings → Editor → Database): connections, schemas, tables
 --                    (add a connection with `A` there, e.g. postgres://user@localhost/db)
 --   Alt+Enter        in a SQL buffer: execute the statement under the cursor / the selection
 --                    (Console.Jdbc.Execute is Cmd+Enter in your macOS keymap)
@@ -17,6 +18,11 @@ return {
     {
       '<leader>S',
       function()
+        -- lazysql (lua/pc/db_tui.lua) or dadbod-ui's tree: Settings → Editor → Database
+        local tui = require 'pc.db_tui'
+        if (vim.g.pc_settings or {}).db_window ~= 'dadbod-ui' and tui.available() then
+          return tui.toggle()
+        end
         local tw = require 'pc.tool_window'
         tw.activate(tw.filetypes 'dbui', function()
           vim.cmd 'DBUIToggle'
@@ -31,6 +37,9 @@ return {
     vim.g.db_ui_use_nerd_fonts = 1
     vim.g.db_ui_show_database_icon = 1
     vim.g.db_ui_execute_on_save = 0
+    -- its <leader>S (execute) in SQL buffers would hide the Database window key; executing is
+    -- Alt+Enter here, save query / bind parameters stay below
+    vim.g.db_ui_disable_mappings_sql = 1
     -- Connections and saved queries live outside the projects
     vim.g.db_ui_save_location = vim.fn.stdpath 'data' .. '/dadbod'
 
@@ -44,6 +53,8 @@ return {
             sources = { { name = 'vim-dadbod-completion' }, { name = 'luasnip' } },
           }
         end
+        vim.keymap.set('n', '<leader>W', '<Plug>(DBUI_SaveQuery)', { buffer = event.buf, desc = 'Save query' })
+        vim.keymap.set('n', '<leader>E', '<Plug>(DBUI_EditBindParameters)', { buffer = event.buf, desc = 'Edit bind parameters' })
         -- Execute the statement under the cursor (paragraph) / the selection.
         -- Query buffers opened from the Database window know their connection; any other SQL
         -- file uses b:db / g:db, and asks for a saved connection when there is none.

@@ -21,6 +21,7 @@ brew "clang-format"
 brew "sqlite"
 brew "libpq"         # psql; keg-only: brew link --force libpq
 brew "mongosh"
+brew "lazysql"       # Database window (<leader>S)
 brew "awscli"
 brew "hashicorp/tap/terraform"
 

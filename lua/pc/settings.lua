@@ -3,7 +3,8 @@
 --                                        Structure, Maven, Run/Debug Configurations
 -- Editor holds what IDEA keeps under Editor → General / Appearance (whitespace, soft wraps, line
 -- numbers, caret line, inlay hints, breadcrumbs, indentation, format on save, inline blame,
--- notifications); it is saved in stdpath('data')/pc_settings.json and applied at startup.
+-- notifications) and which Database window to use; it is saved in
+-- stdpath('data')/pc_settings.json and applied at startup.
 
 local M = {}
 
@@ -24,6 +25,7 @@ local DEFAULTS = {
   inline_blame = true,
   notify_echo_errors = true,
   notify_status_bar = true,
+  db_window = 'lazysql',
 }
 
 local function read()
@@ -114,6 +116,8 @@ function M.editor()
       { header = 'Notifications (<leader>tn)' },
       { key = 'notify_echo_errors', label = 'Show errors in the command line', check = true },
       { key = 'notify_status_bar', label = 'Show the last message in the status bar', check = true },
+      { header = 'Database (<leader>S)' },
+      { key = 'db_window', label = 'Database window', choices = { 'lazysql', 'dadbod-ui' } },
     },
     buttons = {
       {

@@ -319,6 +319,11 @@ function M.disconnect()
   end)
 end
 
+--- Saved data sources: { name, url, pc = form settings }
+function M.list()
+  return read_connections()
+end
+
 --- Starts the tunnel of a saved connection by name (consoles, Database window)
 function M.ensure_tunnel(name)
   for _, c in ipairs(read_connections()) do

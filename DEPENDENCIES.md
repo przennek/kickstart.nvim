@@ -11,7 +11,7 @@ które go wymagają, są pomijane i raz pokazuje się komunikat, czego brakuje.
 
 ```sh
 sudo pacman -S --needed - < deps/arch-packages.txt
-yay -S --needed - < deps/aur-packages.txt      # mongosh (MongoDB)
+yay -S --needed - < deps/aur-packages.txt      # mongosh (MongoDB), lazysql (Database window)
 ```
 
 ## macOS
