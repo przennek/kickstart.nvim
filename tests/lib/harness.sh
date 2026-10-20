@@ -18,7 +18,7 @@ RUN_CTX='\e[21;6~'; DEBUG_CTX='\e[20;6~'; CF2='\e[1;5Q'; SF6='\e[17;2~'; HIDE_AL
 
 start() {   # start <dir> <file>
   t kill-session -t $SES 2>/dev/null; rm -f $S
-  t new-session -d -s $SES -x 200 -y 50 "cd $1 && XDG_CACHE_HOME=$WORK/cache nvim --listen $S -n -i NONE --cmd 'source $LIB/fakeclip.vim' $2"
+  t new-session -d -s $SES -x 200 -y 50 "cd $1 && XDG_CACHE_HOME=$WORK/cache XDG_STATE_HOME=$WORK/state nvim --listen $S -n -i NONE --cmd 'source $LIB/fakeclip.vim' $2"
 }
 stop() { q "execute('qa!')" >/dev/null; sleep 2; t kill-server 2>/dev/null; }
 

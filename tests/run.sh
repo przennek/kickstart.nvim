@@ -10,6 +10,8 @@
 #                              tests again, then N (default 60) random tool-window / IDE actions
 #   tests/run.sh all           both
 # Exit status: the number of failures. KEEP=1 keeps the scratch directory for a look.
+# Your nvim state (undo, Neogit, logs) and cache stay untouched: both point into the scratch
+# directory; Local History entries of the scratch files are removed at the end.
 # Needs: nvim with this config's plugins installed, tmux, git, java + mvn (jdtls), python3,
 # cc + make; Python's debugger test needs pytest (a .venv is made with pip, skipped offline).
 set -u
@@ -52,7 +54,7 @@ if python3 -m venv "$WORK/python/.venv" >/dev/null 2>&1 && "$WORK/python/.venv/b
 
 headless() {  # headless <dir> <file> <script> [env…]
   local dir=$1 file=$2 script=$3; shift 3
-  (cd "$dir" && env XDG_CACHE_HOME="$WORK/cache" "$@" timeout 180 nvim --headless -n -i NONE --cmd "source $LIB/fakeclip.vim" $file -c "luafile $LIB/$script" 2>&1 | grep -E '^(OK|FAIL|STOPPED|TIMEOUT)' | tail -1)
+  (cd "$dir" && env XDG_CACHE_HOME="$WORK/cache" XDG_STATE_HOME="$WORK/state" "$@" timeout 180 nvim --headless -n -i NONE --cmd "source $LIB/fakeclip.vim" $file -c "luafile $LIB/$script" 2>&1 | grep -E '^(OK|FAIL|STOPPED|TIMEOUT)' | tail -1)
 }
 
 regression() {
