@@ -66,7 +66,9 @@ map('n', '<leader>sR', replace_in_path, { desc = 'Replace in Path' })
 map('n', '<F42>', tb 'lsp_type_definitions', { desc = 'Go to Type Declaration' })
 
 -- Generate (Ctrl+Enter); in the project tree it is New… (see neo-tree.lua)
-map({ 'n', 'x' }, '<F40>', vim.lsp.buf.code_action, { desc = 'Generate' })
+map({ 'n', 'x' }, '<F40>', function()
+  require('pc.code_actions').show()
+end, { desc = 'Generate' })
 
 -- Jump to Source (F4) / Jump to Last Window (F12) / Restore Default Layout (Shift+F12)
 map('n', '<F4>', tb 'lsp_definitions', { desc = 'Jump to Source' })

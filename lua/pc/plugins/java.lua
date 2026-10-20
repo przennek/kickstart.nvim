@@ -63,6 +63,23 @@ local function start_jdtls()
           'org.mockito.Mockito.*',
           'org.assertj.core.api.Assertions.*',
         },
+        -- never suggested / auto-imported: jdtls' defaults + your IDEA auto-import exclusions
+        filteredTypes = {
+          'java.awt.*',
+          'com.sun.*',
+          'sun.*',
+          'jdk.*',
+          'org.graalvm.*',
+          'io.micrometer.shaded.*',
+          'org.hamcrest.CoreMatchers',
+          'org.hamcrest.EasyMock2Matchers.equalTo',
+          'org.hamcrest.JMock1Matchers',
+        },
+      },
+      -- Generate (equals / hashCode, …) like your IDEA: instanceof in equals, braces always
+      codeGeneration = {
+        hashCodeEquals = { useInstanceof = true, useJava7Objects = true },
+        useBlocks = true,
       },
     },
   }

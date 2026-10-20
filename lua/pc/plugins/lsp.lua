@@ -93,9 +93,10 @@ return {
 
           -- Show Context Actions (Alt+Enter) / Generate (<leader>g, Alt+Insert)
           -- (no <leader>c… maps: <leader>c alone is Go to Class)
-          map('<M-CR>', vim.lsp.buf.code_action, 'Show Context Actions', { 'n', 'x' })
-          map('<leader>g', vim.lsp.buf.code_action, 'Generate', { 'n', 'x' })
-          map('<M-Insert>', vim.lsp.buf.code_action, 'Generate')
+          local actions = require('pc.code_actions').show
+          map('<M-CR>', actions, 'Show Context Actions', { 'n', 'x' })
+          map('<leader>g', actions, 'Generate', { 'n', 'x' })
+          map('<M-Insert>', actions, 'Generate')
 
           -- Optimize Imports (Shift+Alt+O)
           map('<M-O>', function()
