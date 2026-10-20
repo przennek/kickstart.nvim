@@ -60,6 +60,55 @@ return {
         -- file uses b:db / g:db, and asks for a saved connection when there is none.
         -- Both work on the last visual selection ('< '>).
         -- Query consoles (<leader>Qq) run on their connection + schema.
+        -- Lines of the statement under the cursor: inside its paragraph, a statement ends with ;
+        -- and a new one starts with a statement keyword at column 0 — not after UNION / EXCEPT /
+        -- INTERSECT, a comma or an opening parenthesis, and a SELECT continues a WITH / INSERT /
+        -- CREATE (CTE, INSERT … SELECT, CREATE … AS SELECT)
+        local STARTS = { 'select', 'with', 'insert', 'update', 'delete', 'merge', 'create', 'alter', 'drop', 'truncate', 'grant', 'revoke', 'explain', 'analyze', 'vacuum', 'begin', 'commit', 'rollback', 'set', 'show', 'copy', 'call', 'do', 'refresh', 'comment' }
+        local function keyword(line)
+          local word = line:match '^(%a+)'
+          return word and vim.tbl_contains(STARTS, word:lower()) and word:lower() or nil
+        end
+        local function boundary(line, prev, head)
+          if vim.trim(prev):match ';$' then
+            return true
+          end
+          local word = keyword(line)
+          if not word then
+            return false
+          end
+          local tail = vim.trim(prev):lower()
+          if tail:match '[,(]$' or tail:match '%f[%a]union$' or tail:match '%f[%a]all$' or tail:match '%f[%a]except$' or tail:match '%f[%a]intersect$' then
+            return false
+          end
+          return not (word == 'select' and (head == 'with' or head == 'insert' or head == 'create'))
+        end
+        local function statement_lines()
+          local cur = vim.fn.line '.'
+          local total = vim.fn.line '$'
+          local function blank(n)
+            return vim.trim(vim.fn.getline(n)) == ''
+          end
+          local p1, p2 = cur, cur
+          while p1 > 1 and not blank(p1 - 1) do
+            p1 = p1 - 1
+          end
+          while p2 < total and not blank(p2 + 1) do
+            p2 = p2 + 1
+          end
+          -- split the paragraph into statements, keep the one with the cursor
+          local first, head = p1, keyword(vim.fn.getline(p1))
+          for n = p1 + 1, p2 do
+            if boundary(vim.fn.getline(n), vim.fn.getline(n - 1), head) then
+              if n > cur then
+                return first, n - 1
+              end
+              first, head = n, keyword(vim.fn.getline(n))
+            end
+          end
+          return first, p2
+        end
+
         local function execute()
           require('lazy').load { plugins = { 'vim-dadbod-ui' } }
           local console = require 'pc.db_console'
@@ -88,7 +137,11 @@ return {
           end)
         end
         vim.keymap.set('n', '<M-CR>', function()
-          vim.cmd 'normal! vip\27'
+          -- the statement under the cursor (like IDEA, also when two are not separated by an
+          -- empty line), then executed as a selection
+          local first, last = statement_lines()
+          vim.fn.setpos("'<", { 0, first, 1, 0 })
+          vim.fn.setpos("'>", { 0, last, vim.v.maxcol, 0 })
           execute()
         end, { buffer = event.buf, desc = 'Execute statement' })
         vim.keymap.set('x', '<M-CR>', function()

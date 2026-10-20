@@ -54,6 +54,10 @@ function M.open(opts, on_confirm)
     if vim.api.nvim_win_is_valid(win) then
       vim.api.nvim_win_close(win, true)
     end
+    -- back to the window it was opened from (closing a float can land in another one)
+    if vim.api.nvim_win_is_valid(origin) then
+      vim.api.nvim_set_current_win(origin)
+    end
     if value and value ~= '' and history[#history] ~= value then
       table.insert(history, value)
     end

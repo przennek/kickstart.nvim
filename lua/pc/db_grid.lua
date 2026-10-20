@@ -809,7 +809,8 @@ local function submit(buf)
     end
   end
   local prompt = table.concat(statements, ';\n') .. ';' .. (#pk == 0 and '\n(no primary key: rows are matched on all columns)' or '')
-  if vim.fn.confirm(prompt, '&Submit\n&Cancel', 2) ~= 1 then
+  -- the statements to check; Enter submits (it is what Submit was pressed for), Esc / c cancels
+  if vim.fn.confirm(prompt, '&Submit\n&Cancel', 1) ~= 1 then
     return
   end
   local scheme = src.url:match '^(%w+):' or ''
