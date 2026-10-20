@@ -390,6 +390,27 @@ local function python_items(callback)
   callback(items)
 end
 
+-- The Makefile target built from `rel` (a path relative to the Makefile): the first rule that
+-- lists it among its prerequisites, e.g. build/shop: src/main.c src/discount.c
+local function make_target(dir, rel)
+  local f = io.open(dir .. '/Makefile')
+  if not f then
+    return nil
+  end
+  for line in f:lines() do
+    local target, deps = line:match '^([%w_./%-]+)%s*:%s*([^=]*)$'
+    if target and not target:match '^%.' then
+      for dep in deps:gmatch '[^%s|]+' do
+        if dep == rel then
+          f:close()
+          return target
+        end
+      end
+    end
+  end
+  f:close()
+end
+
 local function c_items(callback)
   local items = {}
   local path = vim.fn.expand '%:p'
@@ -398,6 +419,29 @@ local function c_items(callback)
   local compiler = vim.bo.filetype == 'cpp' and 'c++' or 'cc'
   local compile = { compiler, '-g', '-O0', '-Wall', path, '-o', exe }
   local dir = root { 'Makefile', 'CMakeLists.txt', 'compile_commands.json', '.git' }
+
+  -- a file of a Makefile project: build its target and run that program (like CLion), not the
+  -- file alone (which misses the other sources and fails to link)
+  local target = make_target(dir, path:sub(#dir + 2))
+  if target then
+    local program = dir .. '/' .. target
+    table.insert(items, {
+      label = RUN .. vim.fs.basename(target) .. ' (make ' .. target .. ')',
+      run = task('make ' .. vim.fn.shellescape(target) .. ' && ' .. vim.fn.shellescape(program), dir),
+    })
+    table.insert(items, {
+      label = DEBUG .. vim.fs.basename(target) .. ' (make ' .. target .. ')',
+      run = function()
+        local result = vim.system({ 'make', target }, { cwd = dir, text = true }):wait()
+        if result.code ~= 0 then
+          vim.notify(result.stderr ~= '' and result.stderr or result.stdout, vim.log.levels.ERROR, { title = 'make ' .. target .. ' failed' })
+          return
+        end
+        local dap = require 'dap'
+        dap.run(vim.tbl_extend('force', dap.configurations.c[1], { program = program, cwd = dir }))
+      end,
+    })
+  end
 
   table.insert(items, {
     label = RUN .. name,

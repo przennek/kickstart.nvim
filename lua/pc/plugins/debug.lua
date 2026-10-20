@@ -515,6 +515,18 @@ return {
     -- Python tests: debug the test method / class under the cursor with pytest
     require('dap-python').setup(get_debugpy_path(), { include_configs = false })
     require('dap-python').test_runner = 'pytest'
+    -- the program and its tests run on the project's interpreter (.venv / venv, else python3 from
+    -- the PATH, as Run does), not on debugpy's own one, which has no pytest nor the project's packages
+    require('dap-python').resolve_python = function()
+      local root = vim.fs.root(0, { 'pyproject.toml', 'setup.py', 'setup.cfg', 'requirements.txt', '.venv', 'venv', '.git' }) or vim.fn.getcwd()
+      for _, dir in ipairs { '.venv', 'venv', 'env', '.env' } do
+        local python = root .. '/' .. dir .. '/bin/python'
+        if vim.uv.fs_stat(python) then
+          return python
+        end
+      end
+      return vim.fn.exepath 'python3'
+    end
     local function python_test_maps(buf)
       vim.keymap.set('n', '<leader>xt', require('dap-python').test_method, { buffer = buf, desc = 'Debug nearest test' })
       vim.keymap.set('n', '<leader>xT', require('dap-python').test_class, { buffer = buf, desc = 'Debug test class' })
