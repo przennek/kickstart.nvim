@@ -43,16 +43,22 @@ Skróty w stylu IntelliJ, których terminal sam nie wyśle (`Ctrl+Tab`, `Ctrl+Sh
 
 - **Linux**: Alacritty — `extras/alacritty/linux.toml` → `~/.config/alacritty/alacritty.toml`
   (zakłada też tmux jako powłokę startową).
-- **macOS**: iTerm2 — profil `extras/iterm2/nvim-idea.json`:
+- **macOS**: iTerm2 — profil `extras/iterm2/nvim-idea.json`. Zamknij iTerm2 (`Cmd+Q`) i z
+  Terminal.app uruchom:
 
   ```sh
-  mkdir -p ~/Library/Application\ Support/iTerm2/DynamicProfiles
-  ln -sf "$PWD/extras/iterm2/nvim-idea.json" ~/Library/Application\ Support/iTerm2/DynamicProfiles/
+  extras/iterm2/install.sh
   ```
 
-  W iTerm2: *Settings → Profiles → „Neovim (IntelliJ keys)” → Other Actions → Set as Default*.
-  Profil dziedziczy po „Default”, uruchamia tmux, ustawia Option jako Esc+ i wysyła
-  `Cmd+<klawisz>` jako `Alt+<klawisz>` — wciskasz to samo co w IntelliJ na Macu.
+  Skrypt podpina profil „Neovim (IntelliJ keys)” i ustawia go jako domyślny oraz zwalnia
+  `Cmd+1…9`: iTerm2 domyślnie przełącza nimi karty *zanim* zadziała mapowanie z profilu, więc
+  `Cmd+1` nic nie robiło, a drzewo otwierało tylko `Option+1`. Ręcznie to samo: *Settings → Keys
+  → Navigation Shortcuts → Shortcut to choose a tab: No shortcut* oraz *Settings → Profiles →
+  „Neovim (IntelliJ keys)” → Other Actions → Set as Default*. Karty iTerm2 przełączysz z menu
+  *Window* (profil i tak startuje tmux, więc zwykle wystarcza jedna karta).
+  Profil dziedziczy po „Default”, uruchamia tmux i wysyła `Cmd+<klawisz>` jako `Alt+<klawisz>` —
+  wciskasz to samo co w IntelliJ na Macu. Option działa jako Esc+, więc `Option+<klawisz>` daje
+  to samo co `Cmd+<klawisz>` (nie przeszkadza, ale nie trzeba go używać).
   `Cmd+C` / `Cmd+V` / `Cmd+Q` / `Cmd+Tab` zostają skrótami macOS.
 
 Czcionka: JetBrains Mono Nerd Font (ikony w drzewie, na pasku statusu, w debuggerze).
