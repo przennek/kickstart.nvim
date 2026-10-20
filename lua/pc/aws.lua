@@ -1,6 +1,6 @@
 -- AWS connection, like the AWS Toolkit's credentials / region switcher:
---   <leader>A   menu: switch profile, switch region, SSO login / logout, who am I,
---               configure a new SSO profile (aws configure sso)
+--   <leader>A   menu: AWS Explorer (pc.aws_explorer), switch profile, switch region,
+--               SSO login / logout, who am I, configure a new SSO profile (aws configure sso)
 -- The choice sets AWS_PROFILE / AWS_REGION for everything started from Neovim (terminals,
 -- Terraform, run configurations), shows in the status line and is remembered between sessions.
 -- Terminals that were already open keep their old environment.
@@ -14,6 +14,10 @@ local function save()
   if f then
     f:write(vim.json.encode { profile = vim.env.AWS_PROFILE, region = vim.env.AWS_REGION })
     f:close()
+  end
+  -- an open AWS Explorer shows the new profile / region
+  if package.loaded['pc.aws_explorer'] then
+    require('pc.aws_explorer').reset()
   end
 end
 
@@ -118,6 +122,12 @@ end
 function M.menu()
   local profile = vim.env.AWS_PROFILE or '(none)'
   local items = {
+    {
+      label = 'Explorer (S3, CloudWatch Logs, Lambda)',
+      run = function()
+        require('pc.aws_explorer').toggle()
+      end,
+    },
     { label = 'Profile: ' .. profile, run = M.switch_profile },
     { label = 'Region: ' .. (vim.env.AWS_REGION or '(default)'), run = M.switch_region },
     {
