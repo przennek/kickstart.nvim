@@ -123,6 +123,11 @@ scenario() {
   # tests again: the agent fixed the threshold, all pass
   editor; ex 'e src/test/java/example/shop/OrderServiceTest.java'; ex 9; esc "$RUN_CTX"; sleep 20; check rerun
   expect "tests window: 3 of 3 passed" "$(screen | grep -c 'OrderServiceTest  3/3 passed')" 1
+  # Extract Constant from the literal under the cursor, named in the rename box
+  editor; ex 'e src/main/java/example/shop/OrderService.java'
+  q "execute('call search(\"\\\"100\\\"\") | normal! l')" >/dev/null
+  k ' ec'; sleep 3; lit THRESHOLD; k Enter; sleep 4; check extract-constant
+  expect "Extract Constant: named and used" "$(grep -c 'THRESHOLD' "$dir/src/main/java/example/shop/OrderService.java")" 2
   # the terminal types at once; restored by Hide All it leaves the editor in Normal mode
   editor; k M-t; sleep 1.5
   expect "Alt+T: the terminal takes typing" "$(q 'mode()')" t

@@ -128,13 +128,41 @@ local function start_jdtls()
       -- Refactor > Extract: <leader>e + v(ariable) / c(onstant) / m(ethod)
       -- (Cmd+Alt+V/C/M in IDEA; <leader>c alone is Go to Class)
       -- jdtls reads the selection from the '< '> marks, which are only set once Visual mode ends
+      -- Like IDEA: without a selection the expression under the cursor is taken (a literal, a
+      -- call, an operation…), and the new variable / constant / method gets its name in the
+      -- rename box right away (the suggested name selected: type to replace it, Enter keeps it)
+      local EXPRESSION = { '_literal$', '_expression$', '^method_invocation$', '^field_access$', '^array_access$', '^object_creation_expression$' }
+      local function select_expression()
+        local ok, node = pcall(vim.treesitter.get_node)
+        while ok and node do
+          for _, pattern in ipairs(EXPRESSION) do
+            if node:type():match(pattern) then
+              local sr, sc, er, ec = node:range()
+              vim.fn.setpos("'<", { 0, sr + 1, sc + 1, 0 })
+              vim.fn.setpos("'>", { 0, er + 1, ec, 0 })
+              return true
+            end
+          end
+          node = node:parent()
+        end
+        return false
+      end
       local function extract(fn)
         return function()
           local visual = vim.fn.mode():match '^[vV\22]' ~= nil
           if visual then
             vim.api.nvim_feedkeys(vim.keycode '<Esc>', 'nx', false)
+          else
+            visual = select_expression()
           end
-          fn(visual)
+          fn {
+            visual = visual,
+            name = function()
+              vim.schedule(function()
+                vim.lsp.buf.rename(nil, { name = 'jdtls' })
+              end)
+            end,
+          }
         end
       end
       map({ 'n', 'x' }, '<leader>ev', extract(jdtls.extract_variable), 'Extract variable')
