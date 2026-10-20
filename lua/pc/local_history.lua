@@ -3,6 +3,9 @@
 --                   Enter = side-by-side diff in a new tab (q closes), Ctrl+R = revert to that version
 --                   (undo brings the current text back)
 --   :LocalHistoryDeleted   files deleted from this project that are still in the history, Enter restores
+--   <leader>vE / :RecentChanges   Recent Changes (IDEA's Alt+Shift+C): every saved change in this
+--                   project, newest first, with what it changed; Enter = the file before that
+--                   change against now (side by side), Ctrl+R = put the file back to before it
 -- Versions are in stdpath('data')/local_history/<path with / as %>/<time>; the version from before
 -- the first save and changes made outside nvim are kept too.
 
@@ -208,6 +211,84 @@ function M.show(buf)
     :find()
 end
 
+--- Recent Changes: the saves of all files of this project, newest first
+function M.recent()
+  local cwd = vim.fn.getcwd() .. '/'
+  local changes = {}
+  for dir, kind in vim.fs.dir(ROOT) do
+    local path = path_of(dir)
+    if kind == 'directory' and vim.startswith(path, cwd) then
+      local list = versions(path)
+      -- each version but the oldest is a change made to the one before it
+      for i = 1, #list - 1 do
+        table.insert(changes, { path = path, version = list[i], before = list[i + 1] })
+      end
+    end
+  end
+  if #changes == 0 then
+    return vim.notify('Local History: no changes saved in this project yet', vim.log.levels.INFO)
+  end
+  table.sort(changes, function(a, b)
+    return a.version.name > b.version.name
+  end)
+  local pickers = require 'telescope.pickers'
+  local finders = require 'telescope.finders'
+  local previewers = require 'telescope.previewers'
+  local actions = require 'telescope.actions'
+  local state = require 'telescope.actions.state'
+  local function diff_of(c, opts)
+    return vim.diff(read(c.before.file) or '', read(c.version.file) or '', opts)
+  end
+  pickers
+    .new({}, {
+      prompt_title = 'Recent Changes',
+      finder = finders.new_table {
+        results = vim.list_slice(changes, 1, 500),
+        entry_maker = function(c)
+          local added, removed = 0, 0
+          for _, h in ipairs(diff_of(c, { result_type = 'indices' })) do
+            removed, added = removed + h[2], added + h[4]
+          end
+          local display = ('%s  %-12s %-8s %s'):format(os.date('%m-%d %H:%M:%S', c.version.time), ago(c.version.time), ('+%d -%d'):format(added, removed), c.path:sub(#cwd + 1))
+          return { value = c, display = display, ordinal = display }
+        end,
+      },
+      sorter = require('telescope.config').values.generic_sorter {},
+      previewer = previewers.new_buffer_previewer {
+        title = 'What this save changed',
+        define_preview = function(self, entry)
+          local diff = diff_of(entry.value, { ctxlen = 3 })
+          vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, vim.split(diff ~= '' and diff or 'No changes', '\n'))
+          vim.bo[self.state.bufnr].filetype = 'diff'
+        end,
+      },
+      attach_mappings = function(prompt_bufnr, map)
+        actions.select_default:replace(function()
+          local entry = state.get_selected_entry()
+          actions.close(prompt_bufnr)
+          if not entry then
+            return
+          end
+          if not vim.uv.fs_stat(entry.value.path) then
+            return vim.notify('Deleted since: :LocalHistoryDeleted restores it', vim.log.levels.WARN)
+          end
+          open_diff(entry.value.path, entry.value.before)
+        end)
+        map({ 'i', 'n' }, '<C-r>', function()
+          local entry = state.get_selected_entry()
+          actions.close(prompt_bufnr)
+          if entry then
+            -- shown, so the reverted text can be checked (u undoes, :w saves)
+            vim.cmd.edit(vim.fn.fnameescape(entry.value.path))
+            revert(entry.value.path, entry.value.before)
+          end
+        end, { desc = 'Revert the file to before this change' })
+        return true
+      end,
+    })
+    :find()
+end
+
 function M.deleted()
   local cwd = vim.fn.getcwd() .. '/'
   local files = {}
@@ -239,12 +320,13 @@ function M.deleted()
 end
 
 local group = vim.api.nvim_create_augroup('pc-local-history', { clear = true })
--- the version on disk before the first save, then every saved version
+-- the version on disk before a save (the first one, or changed outside nvim since the last
+-- version: checkout, another editor…), then every saved version
 vim.api.nvim_create_autocmd('BufWritePre', {
   group = group,
   callback = function(event)
     local path = tracked(event.buf)
-    if path and #versions(path) == 0 then
+    if path then
       snapshot(path)
     end
   end,
@@ -270,5 +352,7 @@ vim.api.nvim_create_user_command('LocalHistory', function()
   M.show()
 end, { desc = 'Local History of this file' })
 vim.api.nvim_create_user_command('LocalHistoryDeleted', M.deleted, { desc = 'Restore a deleted file from Local History' })
+vim.keymap.set('n', '<leader>vE', M.recent, { desc = 'VCS: Recent Changes (Local History of the project)' })
+vim.api.nvim_create_user_command('RecentChanges', M.recent, { desc = 'Recent Changes (Local History of the project)' })
 
 return M

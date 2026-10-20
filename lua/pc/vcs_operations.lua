@@ -18,6 +18,7 @@ local ITEMS = {
   { 'Show Log (y copy hash, gR revert commit)', '<M-9>' },
   { 'Show History of this file', '<leader>vh' },
   { 'Local History of this file', '<leader>vH' },
+  { 'Recent Changes (Local History of the project)', '<leader>vE' },
   { 'Annotate (blame)', '<leader>va' },
   { 'Copy Revision Number of this line', '<leader>vn' },
   { 'Show Diff of this file', '<M-d>' },
