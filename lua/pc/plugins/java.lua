@@ -55,6 +55,8 @@ local function start_jdtls()
       contentProvider = { preferred = 'fernflower' }, -- decompiler, like IDEA
       sources = { organizeImports = { starThreshold = 5, staticStarThreshold = 3 } },
       completion = {
+        -- postfix templates come from lua/pc/postfix.lua (jdtls' .var always says Object)
+        postfix = { enabled = false },
         favoriteStaticMembers = {
           'org.junit.jupiter.api.Assertions.*',
           'org.junit.Assert.*',

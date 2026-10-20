@@ -45,6 +45,8 @@ return { -- Autocompletion
     }
     -- Your IDEA live templates (psf, pf, jut, tngt, …), see lua/pc/snippets/
     require('luasnip.loaders.from_lua').lazy_load { paths = { vim.fn.stdpath 'config' .. '/lua/pc/snippets' } }
+    -- Postfix completion (.var, .nn, .for, …), see lua/pc/postfix.lua
+    require('pc.postfix').setup()
 
     cmp.setup {
       snippet = {
