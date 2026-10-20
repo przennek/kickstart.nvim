@@ -84,7 +84,11 @@ scenario() {
   start "$dir" src/test/java/example/shop/OrderServiceTest.java
   sleep 45
   check start
+  # Search Everywhere finds a method (jdtls lists only classes unless told otherwise)
+  k ' ' ' '; sleep 1; lit loyaltyDisc; sleep 3; k Enter; sleep 1.5; check search-everywhere
+  expect "Search Everywhere: a method" "$(q "expand('%:t').':'.line('.')")" OrderService.java:10
   # tests from the context: one of the two fails
+  editor; ex 'e src/test/java/example/shop/OrderServiceTest.java'
   ex 9; esc "$RUN_CTX"; sleep 20; check run-tests
   expect "tests window: 1 of 2 passed" "$(screen | grep -c 'OrderServiceTest  1/2 passed')" 1
   # debug the failing test with a breakpoint in the service

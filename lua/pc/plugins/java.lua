@@ -76,6 +76,8 @@ local function start_jdtls()
           'org.hamcrest.JMock1Matchers',
         },
       },
+      -- Go to Symbol / Search Everywhere → Symbols find methods too, not only classes
+      symbols = { includeSourceMethodDeclarations = true },
       -- Generate (equals / hashCode, …) like your IDEA: instanceof in equals, braces always
       codeGeneration = {
         hashCodeEquals = { useInstanceof = true, useJava7Objects = true },
