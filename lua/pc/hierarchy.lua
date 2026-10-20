@@ -4,7 +4,8 @@
 --               inside: t = type hierarchy, s = supertypes, c = subtypes (children),
 --               Enter / F4 / double-click = go to the type, q / Alt+8 = close
 --   gutter      ↑ overrides / implements something above, ↓ has overrides / implementations
---               below (↕ both). Click it: ↑ goes up, ↓ lists what is below.
+--               below (↑↓ both). Click: ↑ goes to it (a list when there are several), ↓ lists
+--               what is below (one = straight there), like IDEA's gutter icons.
 --   Alt+U       Go to Super Method / super type (Cmd+U); gI lists implementations / subtypes
 -- Java and C++ use the language server's type hierarchy (jdtls, clangd). Python and
 -- JavaScript / TypeScript servers have none, so there the hierarchy is read from the code.
@@ -535,7 +536,7 @@ local marks = {}
 local running = {}
 
 local function place(buf, lnum, m)
-  local text = (m.up and m.down) and '↕' or (m.up and '↑' or '↓')
+  local text = (m.up and m.down) and '↑↓' or (m.up and '↑' or '↓')
   vim.api.nvim_buf_set_extmark(buf, ns, lnum, 0, { sign_text = text, sign_hl_group = 'PcHierarchySign', priority = 5 })
 end
 
@@ -633,10 +634,44 @@ local function go_up(buf, m)
   end)
 end
 
+-- Overriding methods / implementations as hierarchy items: the class (file) name and where
+local function implementations(buf, pos)
+  local client = client_with(buf, 'textDocument/implementation')
+  local locs = client and await(client, 'textDocument/implementation', pos_params(buf, pos), buf) or {}
+  if locs.uri then
+    locs = { locs }
+  end
+  local items, own = {}, vim.uri_from_bufnr(buf)
+  for _, l in ipairs(locs) do
+    local uri, range = l.uri or l.targetUri, l.range or l.targetSelectionRange
+    if range and not (uri == own and range.start.line == pos.line) then
+      local file = vim.uri_to_fname(uri)
+      table.insert(items, {
+        name = vim.fn.fnamemodify(file, ':t:r'),
+        detail = ('%s:%d'):format(vim.fn.fnamemodify(file, ':~:.'), range.start.line + 1),
+        uri = uri,
+        selectionRange = range,
+      })
+    end
+  end
+  table.sort(items, function(a, b)
+    return a.name < b.name
+  end)
+  return items
+end
+
 local function go_down(buf, m)
   vim.api.nvim_win_set_cursor(0, { m.pos.line + 1, m.pos.character })
   if m.method then
-    return require('telescope.builtin').lsp_implementations()
+    return async(function()
+      local items = implementations(buf, m.pos)
+      if #items == 0 then
+        return vim.notify 'No implementations'
+      end
+      pick(items, 'Choose implementation', function(i)
+        jump_to(i)
+      end)
+    end)
   end
   local provider = provider_for(buf)
   async(function()
@@ -651,20 +686,19 @@ local function go_down(buf, m)
   end)
 end
 
-local function marker_action(buf, lnum)
+local function marker_action(buf, lnum, sign, cell)
   local m = (marks[buf] or {})[lnum]
-  if not m then
+  if not m or not (sign:find '↑' or sign:find '↓') then
     return false
   end
   vim.api.nvim_win_set_cursor(0, { lnum + 1, m.pos.character })
   if m.up and m.down then
-    vim.ui.select({ 'Go to super', 'Show overriding / subtypes' }, { prompt = 'Hierarchy' }, function(choice)
-      if choice == 'Go to super' then
-        go_up(buf, m)
-      elseif choice then
-        go_down(buf, m)
-      end
-    end)
+    -- ↑↓: the clicked half (the space after a single arrow counts as the arrow)
+    if cell == '↓' then
+      go_down(buf, m)
+    else
+      go_up(buf, m)
+    end
   elseif m.up then
     go_up(buf, m)
   else
@@ -730,8 +764,6 @@ vim.api.nvim_create_autocmd('LspAttach', {
 })
 
 -- Clicking a marker navigates (see gutter.lua)
-require('pc.gutter').on_click(function(buf, lnum)
-  return marker_action(buf, lnum)
-end)
+require('pc.gutter').on_click(marker_action)
 
 return M

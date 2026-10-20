@@ -183,9 +183,9 @@ local function filter_for(buf, m)
   end
 end
 
-require('pc.gutter').on_click(function(buf, lnum)
+require('pc.gutter').on_click(function(buf, lnum, sign)
   local m = (markers[buf] or {})[lnum]
-  if not m then
+  if not m or not sign:find '▶' then
     return false
   end
   vim.api.nvim_win_set_cursor(0, { lnum + 1, m.col })
