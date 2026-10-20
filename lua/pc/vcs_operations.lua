@@ -10,11 +10,12 @@ local M = {}
 local ITEMS = {
   { 'Commit…', '<leader>vc' },
   { 'Commit and Push…', '<leader>vC' },
+  { 'Amend last commit…', '<leader>vA' },
   { 'Commit window (status, stage, discard)', '<M-0>' },
   { 'Push…', '<leader>vP' },
   { 'Pull / Update Project', '<leader>vp' },
   { 'Branches…', '<leader>d' },
-  { 'Show Log', '<M-9>' },
+  { 'Show Log (y copy hash, gR revert commit)', '<M-9>' },
   { 'Show History of this file', '<leader>vh' },
   { 'Local History of this file', '<leader>vH' },
   { 'Annotate (blame)', '<leader>va' },

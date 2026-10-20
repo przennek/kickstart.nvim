@@ -64,6 +64,51 @@ local function diffview_toggle(cmd)
   end
 end
 
+-- Runs one of Neogit's commit actions (commit, amend…) like neogit.action('commit', name),
+-- which loses the async context after the refresh
+local function commit_action(name)
+  require 'neogit'
+  local async = require 'neogit.lib.async'
+  require('neogit.lib.git').repo:dispatch_refresh {
+    source = 'action',
+    callback = function()
+      async.void(function()
+        require('neogit.popups.commit.actions')[name] {
+          close = function() end,
+          state = { env = {} },
+          get_arguments = function()
+            return {}
+          end,
+          get_internal_arguments = function()
+            return {}
+          end,
+        }
+      end)()
+    end,
+  }
+end
+
+-- Revert Commit from the Git log (gR on a commit in Alt+9 / <leader>vl / <leader>vh)
+local function revert_commit()
+  local view = require('diffview.lib').get_current_view()
+  local item = view and view.panel and view.panel.get_item_at_cursor and view.panel:get_item_at_cursor()
+  if not item or not item.commit then
+    return vim.notify('Revert: put the cursor on a commit in the log', vim.log.levels.INFO)
+  end
+  local hash, subject = item.commit.hash, item.commit.subject or ''
+  if vim.fn.confirm(('Revert commit %s "%s"?'):format(hash:sub(1, 10), subject), '&Revert\n&Cancel', 2) ~= 1 then
+    return
+  end
+  local dir = view.adapter and view.adapter.ctx and view.adapter.ctx.toplevel or vim.fn.getcwd()
+  local r = vim.system({ 'git', '-C', dir, 'revert', '--no-edit', hash }, { text = true }):wait()
+  if r.code == 0 then
+    vim.notify(('Reverted %s: %s'):format(hash:sub(1, 10), subject))
+  else
+    vim.notify('Revert stopped:\n' .. vim.trim(r.stderr ~= '' and r.stderr or r.stdout) .. '\n(conflicts: <leader>vm, then <leader>vx / <leader>vX)', vim.log.levels.WARN)
+  end
+  vim.cmd 'silent! checktime'
+end
+
 -- Commit and Push (IDEA's Cmd+Alt+K): Neogit's commit message editor, then git push of the
 -- current branch (setting its upstream on the first push)
 local function push_current_branch()
@@ -116,26 +161,7 @@ local function commit_and_push()
     end,
   })
   vim.defer_fn(forget, 30 * 60 * 1000)
-  require 'neogit'
-  local async = require 'neogit.lib.async'
-  -- like neogit.action('commit', 'commit'), which loses the async context after the refresh
-  require('neogit.lib.git').repo:dispatch_refresh {
-    source = 'action',
-    callback = function()
-      async.void(function()
-        require('neogit.popups.commit.actions').commit {
-          close = function() end,
-          state = { env = {} },
-          get_arguments = function()
-            return {}
-          end,
-          get_internal_arguments = function()
-            return {}
-          end,
-        }
-      end)()
-    end,
-  }
+  commit_action 'commit'
 end
 
 local function commit_window_toggle()
@@ -165,6 +191,7 @@ return {
       { '<leader>vv', '<cmd>Neogit<CR>', desc = 'VCS: Status / commit window' },
       { '<leader>vc', '<cmd>Neogit commit<CR>', desc = 'VCS: [C]ommit' },
       { '<leader>vC', commit_and_push, desc = 'VCS: [C]ommit and Push' },
+      { '<leader>vA', function() commit_action 'amend' end, desc = 'VCS: [A]mend last commit' },
       { '<leader>vp', '<cmd>Neogit pull<CR>', desc = 'VCS: [p]ull' },
       { '<leader>vP', '<cmd>Neogit push<CR>', desc = 'VCS: [P]ush' },
       { '<leader>vB', '<cmd>Telescope git_branches<CR>', desc = 'VCS: [B]ranches' },
@@ -220,7 +247,7 @@ return {
         keymaps = {
           view = view,
           file_panel = { close, esc },
-          file_history_panel = { close, esc },
+          file_history_panel = { close, esc, { 'n', 'gR', revert_commit, { desc = 'Revert this commit' } } },
         },
       }
     end,
