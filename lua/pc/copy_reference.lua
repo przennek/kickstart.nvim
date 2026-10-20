@@ -4,6 +4,7 @@
 --   Alt+Shift+C / <leader>yp   Copy Path/Reference… popup: reference, absolute path, path from
 --                   the project root, file name, path:line, and the web URL of the line when the
 --                   file is in a git repository with a GitHub / GitLab / Bitbucket remote
+--   <leader>yo      Open in Browser: that web URL of the current line (or selection) in the browser
 
 local M = {}
 
@@ -64,7 +65,7 @@ function M.reference()
 end
 
 -- https://host/owner/repo/blob/<commit>/<path>#L<line> for the usual hosts
-local function web_url()
+local function web_url(line)
   local file = vim.api.nvim_buf_get_name(0)
   local dir = vim.fs.dirname(file)
   local function git(args)
@@ -88,13 +89,44 @@ local function web_url()
     return nil
   end
   local rel = vim.fs.relpath(root, file)
-  local line = vim.fn.line '.'
+  line = line or vim.fn.line '.'
   if host:find 'gitlab' then
     return ('https://%s/%s/-/blob/%s/%s#L%d'):format(host, path, commit, rel, line)
   elseif host:find 'bitbucket' then
     return ('https://%s/%s/src/%s/%s#lines-%d'):format(host, path, commit, rel, line)
   end
   return ('https://%s/%s/blob/%s/%s#L%d'):format(host, path, commit, rel, line)
+end
+
+-- Lines of the visual selection (or the current line) for the web URL
+local function line_range()
+  local mode = vim.fn.mode()
+  if mode == 'v' or mode == 'V' then
+    local a, b = vim.fn.line 'v', vim.fn.line '.'
+    vim.api.nvim_feedkeys(vim.keycode '<Esc>', 'nx', false)
+    return math.min(a, b), math.max(a, b)
+  end
+  local l = vim.fn.line '.'
+  return l, l
+end
+
+function M.open_in_browser()
+  local first, last = line_range()
+  local url = web_url(first)
+  if not url then
+    return vim.notify('Open in Browser: no GitHub / GitLab / Bitbucket remote for this file', vim.log.levels.WARN)
+  end
+  if last > first then
+    if url:find 'bitbucket' then
+      url = url .. ':' .. last
+    elseif url:find 'gitlab' then
+      url = url .. '-' .. last
+    else
+      url = url:gsub('#L%d+$', ('#L%d-L%d'):format(first, last))
+    end
+  end
+  vim.ui.open(url)
+  vim.notify('Opened ' .. url)
 end
 
 local function copy(text)
@@ -135,5 +167,6 @@ end
 vim.keymap.set('n', '<leader>yr', M.copy_reference, { desc = 'Copy [r]eference' })
 vim.keymap.set('n', '<leader>yp', M.popup, { desc = 'Copy [p]ath / reference…' })
 vim.keymap.set('n', '<M-C>', M.popup, { desc = 'Copy Path/Reference…' })
+vim.keymap.set({ 'n', 'v' }, '<leader>yo', M.open_in_browser, { desc = 'Open in Browser (GitHub / GitLab)' })
 
 return M
