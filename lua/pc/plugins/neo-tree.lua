@@ -117,6 +117,9 @@ return {
     -- to the cwd as a path that doesn't exist
     local manager = require 'neo-tree.sources.manager'
     local path_to_reveal = manager.get_path_to_reveal
+    if type(path_to_reveal) ~= 'function' then
+      return -- changed in neo-tree (tests/run.sh reports it): follow the file as neo-tree does
+    end
     manager.get_path_to_reveal = function(include_terminals)
       local name = vim.api.nvim_buf_get_name(0)
       local repo, rel = name:match '^diffview://(.-)/%.git/[^/]+/(.+)$'

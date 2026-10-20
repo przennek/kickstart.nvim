@@ -88,7 +88,7 @@ end
 local capture
 local function hook_watches()
   local ok, dapui = pcall(require, 'dapui')
-  if not ok or not dapui.elements.watches or dapui.elements.watches.pc_hooked then
+  if not ok or not dapui.elements.watches or type(dapui.elements.watches.add) ~= 'function' or dapui.elements.watches.pc_hooked then
     return
   end
   local watches = dapui.elements.watches

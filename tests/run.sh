@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Tests of this config on small Java / Python / C projects (tests/fixtures), in a fresh scratch
 # directory. Run before committing:
-#   tests/run.sh               regression: startup of each language (servers, keys, no errors)
-#                              and the debugger stopping at a breakpoint in each
+#   tests/run.sh               regression: startup of each language (servers, keys, no errors),
+#                              the plugin internals the config builds on, and the debugger
+#                              stopping at a breakpoint in each
 #   tests/run.sh scenario [N]  a work session in a real nvim inside a private tmux server
 #                              (-L nvimtest): tests from the context, a debug session, an "LLM
 #                              agent" editing files behind the editor, Recent Changes, Rename,
@@ -61,6 +62,8 @@ regression() {
     local out; out=$(headless "$WORK/$1" "$2" startup.lua SERVERS="$3" WAIT="$4")
     echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   done
+  out=$(headless "$WORK/java" "" hooks.lua)
+  echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   echo "== debugger"
   local out
   out=$(headless "$WORK/java" src/test/java/example/shop/OrderServiceTest.java debug.lua WAIT=40000 BP_FILE=src/main/java/example/shop/OrderService.java BP_LINE=15 START="require('jdtls').test_class()")
@@ -105,6 +108,12 @@ scenario() {
   # tests again: the agent fixed the threshold, all pass
   editor; ex 'e src/test/java/example/shop/OrderServiceTest.java'; ex 9; esc "$RUN_CTX"; sleep 20; check rerun
   expect "tests window: 3 of 3 passed" "$(screen | grep -c 'OrderServiceTest  3/3 passed')" 1
+  # the terminal types at once; restored by Hide All it leaves the editor in Normal mode
+  editor; k M-t; sleep 1.5
+  expect "Alt+T: the terminal takes typing" "$(q 'mode()')" t
+  k M-t; sleep 0.5; editor; k M-t; sleep 1; k C-k; sleep 0.3; editor
+  esc "$HIDE_ALL"; sleep 0.8; esc "$HIDE_ALL"; sleep 1
+  expect "Hide All twice: the editor stays in Normal mode" "$(q 'mode()')" n
   hammer "$STEPS"
   stop
 }

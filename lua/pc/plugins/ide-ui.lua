@@ -159,27 +159,33 @@ return {
       direction = 'horizontal',
       -- always back in the shell prompt, also after leaving it with an IDE shortcut
       persist_mode = false,
-      start_in_insert = true,
+      -- toggleterm's own start_in_insert switches the mode a moment later in whatever window
+      -- has the focus by then: a terminal reopened by Hide All left the editor typing (and
+      -- Alt+T there = Esc + t, waiting for a character). Typing mode only in the terminal itself:
+      start_in_insert = false,
+      on_open = function(term)
+        vim.schedule(function()
+          if vim.api.nvim_get_current_win() == term.window then
+            vim.cmd 'startinsert'
+          end
+        end)
+      end,
     },
     config = function(_, opts)
       require('toggleterm').setup(opts)
-      -- toggleterm switches the mode (startinsert) a moment after a terminal window was entered,
-      -- whatever window has the focus by then: a terminal reopened by Hide All left the editor
-      -- typing (and Alt+T there = Esc + t, waiting for a character). Only in the terminal itself.
-      local Terminal = require('toggleterm.terminal').Terminal
-      local modes = require('toggleterm.terminal').mode
-      function Terminal:set_mode(m)
-        vim.schedule(function()
-          if vim.api.nvim_get_current_win() ~= self.window then
+      vim.api.nvim_create_autocmd('BufEnter', {
+        group = vim.api.nvim_create_augroup('pc-toggleterm-insert', { clear = true }),
+        callback = function(event)
+          if vim.bo[event.buf].filetype ~= 'toggleterm' then
             return
           end
-          if m == modes.INSERT or (m == modes.UNSUPPORTED and opts.start_in_insert) then
-            vim.cmd 'startinsert'
-          elseif m == modes.NORMAL then
-            vim.cmd 'stopinsert'
-          end
-        end)
-      end
+          vim.schedule(function()
+            if vim.api.nvim_get_current_buf() == event.buf then
+              vim.cmd 'startinsert'
+            end
+          end)
+        end,
+      })
     end,
   },
 }
