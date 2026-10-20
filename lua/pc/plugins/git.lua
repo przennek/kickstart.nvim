@@ -187,7 +187,14 @@ return {
     dependencies = { 'nvim-lua/plenary.nvim', 'sindrets/diffview.nvim', 'nvim-telescope/telescope.nvim' },
     cmd = 'Neogit',
     keys = {
-      { '<M-0>', commit_window_toggle, desc = 'VCS: Commit window (toggle)' },
+      {
+        '<M-0>',
+        function()
+          local tw = require 'pc.tool_window'
+          tw.activate(tw.filetypes 'NeogitStatus', commit_window_toggle)()
+        end,
+        desc = 'VCS: Commit window',
+      },
       { '<leader>vv', '<cmd>Neogit<CR>', desc = 'VCS: Status / commit window' },
       { '<leader>vc', '<cmd>Neogit commit<CR>', desc = 'VCS: [C]ommit' },
       { '<leader>vC', commit_and_push, desc = 'VCS: [C]ommit and Push' },

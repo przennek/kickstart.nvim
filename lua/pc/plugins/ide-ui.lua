@@ -30,20 +30,33 @@ return {
     'folke/trouble.nvim',
     cmd = 'Trouble',
     keys = {
-      { '<M-3>', find_toggle, desc = 'Find window (toggle)' },
+      {
+        '<M-3>',
+        function()
+          local tw = require 'pc.tool_window'
+          tw.activate(tw.trouble 'quickfix', find_toggle)()
+        end,
+        desc = 'Find window',
+      },
       { '<leader>s[', find_history 'colder', desc = 'Previous search results' },
       { '<leader>s]', find_history 'cnewer', desc = 'Next search results' },
       {
         '<M-6>',
         function()
-          require('trouble').toggle 'diagnostics'
+          local tw = require 'pc.tool_window'
+          tw.activate(tw.trouble 'diagnostics', function()
+            require('trouble').toggle 'diagnostics'
+          end)()
         end,
-        desc = 'Problems window (toggle)',
+        desc = 'Problems window',
       },
       -- ]q / [q (Neovim defaults: :cnext / :cprev) walk the results without opening the window
     },
     opts = {
       focus = true, -- jump into the window, like IDEA's tool windows
+      -- the Find / Problems window opens also when empty, as in IDEA
+      open_no_results = true,
+      warn_no_results = false,
       auto_preview = true,
       follow = false, -- don't move the selection along with the editor cursor
       keys = { ['<F4>'] = 'jump' }, -- Jump to Source
@@ -56,7 +69,16 @@ return {
     dependencies = { 'nvim-treesitter/nvim-treesitter', 'nvim-tree/nvim-web-devicons' },
     cmd = { 'AerialToggle', 'AerialNavToggle' },
     keys = {
-      { '<M-7>', '<cmd>AerialToggle! right<CR>', desc = 'Structure' },
+      {
+        '<M-7>',
+        function()
+          local tw = require 'pc.tool_window'
+          tw.activate(tw.filetypes 'aerial', function()
+            vim.cmd 'AerialToggle! right'
+          end)()
+        end,
+        desc = 'Structure',
+      },
       { '<leader>k', file_structure, desc = 'File structure' },
       -- File Structure popup is Cmd+F12 in the macOS keymap (F60 inside tmux)
       { '<M-F12>', file_structure, desc = 'File structure' },
@@ -111,8 +133,7 @@ return {
       }
     end,
   },
-  -- Terminal tool window: Alt+T (Cmd+T in your macOS keymap). Like IDEA's tool windows: a
-  -- visible terminal you are not in gets the focus, the key in the terminal hides it.
+  -- Terminal tool window: Alt+T (Cmd+T in your macOS keymap), see pc.tool_window
   {
     'akinsho/toggleterm.nvim',
     version = '*',
@@ -120,14 +141,12 @@ return {
       {
         '<M-t>',
         function()
-          for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-            local buf = vim.api.nvim_win_get_buf(win)
-            if vim.bo[buf].filetype == 'toggleterm' and win ~= vim.api.nvim_get_current_win() then
-              vim.api.nvim_set_current_win(win)
-              return vim.cmd 'startinsert'
-            end
-          end
-          vim.cmd 'ToggleTerm'
+          local tw = require 'pc.tool_window'
+          tw.activate(tw.filetypes 'toggleterm', function()
+            vim.cmd 'ToggleTerm'
+          end, function()
+            vim.cmd 'startinsert'
+          end)()
         end,
         mode = { 'n', 't' },
         desc = 'Terminal',

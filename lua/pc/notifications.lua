@@ -230,7 +230,10 @@ vim.api.nvim_create_autocmd('LspProgress', {
 })
 
 vim.notify = M.notify
-vim.keymap.set('n', '<leader>tn', M.toggle, { desc = '[T]oggle [n]otifications window' })
+vim.keymap.set('n', '<leader>tn', function()
+  local tw = require 'pc.tool_window'
+  tw.activate(tw.filetypes 'pcnotifications', M.toggle)()
+end, { desc = '[T]oggle [n]otifications window' })
 vim.api.nvim_create_user_command('Notifications', M.toggle, { desc = 'Notifications window' })
 
 return M

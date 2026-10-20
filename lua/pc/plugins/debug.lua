@@ -140,23 +140,33 @@ return {
       { '<C-F5>', dap 'restart', desc = 'Debug: Rerun' },
       { '<F29>', dap 'restart', desc = 'Debug: Rerun' },
       -- Debug tool window (Alt+5)
-      { '<M-5>', toggle_ui, desc = 'Debug: Toggle UI' },
+      {
+        '<M-5>',
+        function()
+          local tw = require 'pc.tool_window'
+          tw.activate(tw.filetypes('dapui_*', 'dap-repl'), toggle_ui)()
+        end,
+        desc = 'Debug window',
+      },
       -- Run tool window (Cmd+4): the Run window used last — the program output of Python / C /
       -- Maven runs (run.lua) or the debugger's console for Java runs
       {
         '<M-4>',
         function()
-          require('pc.run').toggle_run_window(function()
-            for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-              local ft = vim.bo[vim.api.nvim_win_get_buf(win)].filetype
-              if ft == 'dapui_console' or ft == 'dap-repl' then
-                return require('dapui').close { layout = 2 }
+          local tw = require 'pc.tool_window'
+          tw.activate(tw.filetypes('pcrun', 'dapui_console'), function()
+            require('pc.run').toggle_run_window(function()
+              for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+                local ft = vim.bo[vim.api.nvim_win_get_buf(win)].filetype
+                if ft == 'dapui_console' or ft == 'dap-repl' then
+                  return require('dapui').close { layout = 2 }
+                end
               end
-            end
-            require('dapui').open { layout = 2 }
-          end)
+              require('dapui').open { layout = 2 }
+            end)
+          end)()
         end,
-        desc = 'Run window (toggle)',
+        desc = 'Run window',
       },
 
       { '<leader>b', dap 'toggle_breakpoint', desc = 'Debug: Toggle Breakpoint' },

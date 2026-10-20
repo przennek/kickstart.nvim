@@ -14,7 +14,16 @@ return {
   },
   cmd = { 'DBUI', 'DBUIToggle', 'DBUIAddConnection', 'DBUIFindBuffer' },
   keys = {
-    { '<leader>S', '<cmd>DBUIToggle<CR>', desc = 'Database window' },
+    {
+      '<leader>S',
+      function()
+        local tw = require 'pc.tool_window'
+        tw.activate(tw.filetypes 'dbui', function()
+          vim.cmd 'DBUIToggle'
+        end)()
+      end,
+      desc = 'Database window',
+    },
   },
   init = function()
     -- dadbod's own ftdetect is not read when it is loaded lazily (:DB); the result grid needs it
