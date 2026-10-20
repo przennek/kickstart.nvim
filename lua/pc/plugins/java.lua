@@ -80,6 +80,12 @@ local function start_jdtls()
     -- settings go in init_options too: jdtls reads some of them only during initialize
     init_options = { bundles = bundles, settings = settings },
     settings = settings,
+    -- "Starting…" / "ServiceReady" go to the Notifications window, not the command line
+    handlers = {
+      ['language/status'] = function(_, result)
+        vim.notify(result.message, vim.log.levels.DEBUG, { title = 'jdtls' })
+      end,
+    },
     on_attach = function(_, bufnr)
       -- Hot code replace on every change, same as RunHotswapAlways in your IDEA debugger settings
       jdtls.setup_dap { hotcodereplace = 'auto' }

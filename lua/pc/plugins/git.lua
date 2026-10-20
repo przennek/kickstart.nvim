@@ -200,7 +200,21 @@ return {
     opts = {
       integrations = { diffview = true, telescope = true },
       graph_style = 'unicode',
+      -- Commit window (Alt+0) slides in at the bottom like an IDEA tool window, not a full tab
+      kind = 'split_below_all',
     },
+    init = function()
+      vim.api.nvim_create_autocmd('FileType', {
+        pattern = 'NeogitStatus',
+        group = vim.api.nvim_create_augroup('pc-neogit-height', { clear = true }),
+        callback = function()
+          if #vim.api.nvim_tabpage_list_wins(0) > 1 then
+            vim.api.nvim_win_set_height(0, math.max(12, math.floor(vim.o.lines * 0.4)))
+            vim.wo.winfixheight = true
+          end
+        end,
+      })
+    end,
   },
   -- Diffs and history
   {

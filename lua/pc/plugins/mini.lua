@@ -41,7 +41,10 @@ return { -- Collection of various small independent plugins/modules
     statusline.section_fileinfo = function(args)
       local aws = package.loaded['pc.aws'] and require('pc.aws').status() or ''
       local info = section_fileinfo(args)
-      return aws ~= '' and (aws .. '  ' .. info) or info
+      info = aws ~= '' and (aws .. '  ' .. info) or info
+      -- background tasks, the last message and unread notifications (<leader>tn)
+      local notes = require('pc.notifications').status()
+      return notes ~= '' and (notes .. '  ' .. info) or info
     end
 
     -- ... and there is more!

@@ -1,6 +1,6 @@
 # Alacritty on macOS for this Neovim config: Cmd+<key> works like in IntelliJ on the Mac.
 # Cmd+<key> is sent as Alt+<key> (the Linux keymap of this config), for every key Neovim maps;
-# Cmd+C / Cmd+V / Cmd+Q / Cmd+H / Cmd+M / Cmd+Tab stay macOS. Option works as Alt too.
+# Cmd+C / Cmd+V / Cmd+Q / Cmd+M / Cmd+Tab stay macOS (Cmd+H/J/K/L = splits). Option works as Alt too.
 # Install: cp extras/alacritty/macos.toml ~/.config/alacritty/alacritty.toml
 
 [terminal]
@@ -44,7 +44,11 @@ bindings = [
   { key = "T", mods = "Command", chars = "\u001bt" },
   { key = "U", mods = "Command", chars = "\u001bu" },
   { key = "W", mods = "Command", chars = "\u001bw" },
-  { key = "L", mods = "Command", chars = "\u001bl" },  # Cmd+L
+  # Cmd+H/J/K/L move between splits (and tmux panes), like Ctrl+H/J/K/L
+  { key = "H", mods = "Command", chars = "\u0008" },
+  { key = "J", mods = "Command", chars = "\n" },
+  { key = "K", mods = "Command", chars = "\u000b" },
+  { key = "L", mods = "Command", chars = "\u000c" },
   { key = "A", mods = "Command|Shift", chars = "\u001bA" },
   { key = "C", mods = "Command|Shift", chars = "\u001bC" },
   { key = "E", mods = "Command|Shift", chars = "\u001bE" },

@@ -1,4 +1,8 @@
+-- <leader> first: the modules below map <leader> keys as they load (see pc.config)
+vim.g.mapleader = ' '
+vim.g.maplocalleader = ' '
 require 'pc.actions' -- first: records the keymaps defined below for Find Action
+require 'pc.notifications' -- early: plugin messages go to the Notifications window
 require 'pc.proxy' -- early: the saved proxy goes to the environment before anything is spawned
 require 'pc.config'
 require 'pc.remap'
