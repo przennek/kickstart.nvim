@@ -167,6 +167,8 @@ return {
       { '<leader>xe', dapui 'eval', mode = { 'n', 'v' }, desc = 'Debug: Evaluate Expression' },
       { '<leader>xc', dap 'clear_breakpoints', desc = 'Debug: Clear All Breakpoints' },
       { '<leader>xC', dap 'run_to_cursor', desc = 'Debug: Run to Cursor' },
+      -- Drop Frame (IDEA's Reset Frame): back to the start of the current method, its caller calls it again
+      { '<leader>xd', dap 'restart_frame', desc = 'Debug: [D]rop frame' },
       { '<leader>xr', dap 'restart', desc = 'Debug: Restart' },
       { '<leader>xl', dap 'run_last', desc = 'Debug: Run Last' },
       { '<leader>xs', dap 'terminate', desc = 'Debug: Stop' },
