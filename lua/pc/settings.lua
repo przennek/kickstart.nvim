@@ -1,6 +1,6 @@
 -- Settings like IDEA's (Ctrl+Alt+S): one place for every settings dialog (pc.form).
---   Ctrl+Alt+S / <leader>, / :Settings   Editor, Appearance, HTTP Proxy, Data Sources, Maven,
---                                        Run/Debug Configurations
+--   Ctrl+Alt+S / <leader>, / :Settings   Editor, Appearance, HTTP Proxy, Data Sources, Project
+--                                        Structure, Maven, Run/Debug Configurations
 -- Editor holds what IDEA keeps under Editor → General / Appearance (whitespace, soft wraps, line
 -- numbers, caret line, inlay hints, breadcrumbs, indentation, format on save, inline blame); it is
 -- saved in stdpath('data')/pc_settings.json and applied at startup.
@@ -147,6 +147,9 @@ local PAGES = {
   end },
   { label = 'Database → Data Sources', open = function()
     require('pc.db_connections').manage()
+  end },
+  { label = 'Project Structure (SDK)', open = function()
+    require('pc.project_structure').open()
   end },
   { label = 'Build Tools → Maven', open = function()
     require('pc.maven').settings()

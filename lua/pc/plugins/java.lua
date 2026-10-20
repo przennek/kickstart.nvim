@@ -10,15 +10,18 @@ local function jdk_home()
   return vim.env.JAVA_HOME
 end
 
--- Every SDKMAN JDK is offered to jdtls, like IDEA's SDK table
-local function jdk_runtimes()
-  local runtimes = {}
-  local dir = vim.fs.joinpath(vim.env.HOME, '.sdkman', 'candidates', 'java')
-  for name, type in vim.fs.dir(dir) do
-    local major = name:match '^(%d+)'
-    if type == 'directory' and major then
-      local version = tonumber(major) <= 8 and ('JavaSE-1.' .. major) or ('JavaSE-' .. major)
-      table.insert(runtimes, { name = version, path = vim.fs.joinpath(dir, name), default = vim.fs.joinpath(dir, name) == jdk_home() })
+-- Every installed JDK is offered to jdtls, like IDEA's SDK table; the default one is the
+-- project's SDK from Project Structure (pc.project_structure), else SDKMAN's current
+local function jdk_runtimes(root)
+  local structure = require 'pc.project_structure'
+  local default = structure.sdk(root) or jdk_home()
+  local runtimes, seen = {}, {}
+  for _, home in ipairs(structure.jdks()) do
+    local major = structure.java_version(home)
+    if major and not seen[major] then
+      seen[major] = true
+      local name = tonumber(major) <= 8 and ('JavaSE-1.' .. major) or ('JavaSE-' .. major)
+      table.insert(runtimes, { name = name, path = home, default = vim.uv.fs_realpath(home) == vim.uv.fs_realpath(default) })
     end
   end
   return runtimes
@@ -41,7 +44,7 @@ local function start_jdtls()
 
   local settings = {
     java = {
-      configuration = { runtimes = jdk_runtimes() },
+      configuration = { runtimes = jdk_runtimes(root_dir) },
       eclipse = { downloadSources = true },
       maven = { downloadSources = true },
       references = { includeDecompiledSources = true },
