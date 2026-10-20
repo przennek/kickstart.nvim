@@ -3,7 +3,8 @@
 --   Shift+F10   rerun the last configuration
 --   Ctrl+Shift+F10  run the test under the cursor (or pick, outside tests)
 -- Configurations are built from the current file: Java main classes and tests (jdtls),
--- Maven/Gradle goals, Python files and tests, C files and Makefiles.
+-- Maven/Gradle goals, Python files and tests, C files and Makefiles, plus your own saved ones
+-- (pc.run_configs: "Edit Configurations…" at the end of the list, or :EditConfigurations).
 -- Programs that don't run in the debugger (Python, C, Maven…) print into the Run window at
 -- the bottom (Alt+4), which stays open after they finish. pytest results are shown like
 -- jdtls shows JUnit ones: ✓ / ✗ next to the test functions, failures in the Find window.
@@ -599,6 +600,9 @@ local providers = {
 }
 
 local function execute(item)
+  if item.no_history then
+    return item.run()
+  end
   for i, entry in ipairs(history) do
     if entry.label == item.label then
       table.remove(history, i)
@@ -619,18 +623,17 @@ function M.pick()
     cb {}
   end
   provider(function(items)
-    -- Recently run first, then the configurations for the current file
+    -- Recently run first, then your saved configurations, then the ones for the current file
+    local configs = require 'pc.run_configs'
     local seen, list = {}, {}
-    for _, item in ipairs(vim.list_extend(vim.list_slice(history), items)) do
+    local all = vim.list_extend(vim.list_slice(history), configs.items(RUN, DEBUG))
+    for _, item in ipairs(vim.list_extend(all, items)) do
       if not seen[item.label] then
         seen[item.label] = true
         table.insert(list, item)
       end
     end
-    if #list == 0 then
-      vim.notify('No run configurations for this file', vim.log.levels.WARN)
-      return
-    end
+    table.insert(list, { label = TASK .. 'Edit Configurations…', run = configs.edit, no_history = true })
     vim.ui.select(list, {
       prompt = 'Run / Debug Configurations',
       format_item = function(item)
