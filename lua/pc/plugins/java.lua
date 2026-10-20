@@ -92,6 +92,8 @@ local function start_jdtls()
       -- Hot code replace on every change, same as RunHotswapAlways in your IDEA debugger settings
       jdtls.setup_dap { hotcodereplace = 'auto' }
       require('jdtls.dap').setup_dap_main_class_configs()
+      -- test results in the Test Runner window (pc.test_runner) instead of the REPL
+      require('pc.test_runner').setup()
 
       local map = function(mode, keys, func, desc)
         vim.keymap.set(mode, keys, func, { buffer = bufnr, desc = desc })

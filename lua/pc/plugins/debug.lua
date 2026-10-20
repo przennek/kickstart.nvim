@@ -154,7 +154,7 @@ return {
         '<M-4>',
         function()
           local tw = require 'pc.tool_window'
-          tw.activate(tw.filetypes('pcrun', 'dapui_console'), function()
+          tw.activate(tw.filetypes('pcrun', 'dapui_console', 'pctestrunner', 'pctestdetails'), function()
             require('pc.run').toggle_run_window(function()
               for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
                 local ft = vim.bo[vim.api.nvim_win_get_buf(win)].filetype
@@ -286,7 +286,10 @@ return {
     -- console stays with its output and only the debug panels (layout 1) close. Alt+5 hides it.
     -- Hooked on the launch / attach response: in noDebug mode the Java adapter sends no `initialized` event
     local function on_start(session)
-      if session.config.noDebug then
+      local tests = package.loaded['pc.test_runner'] and require('pc.test_runner').is_test_session(session)
+      if session.config.noDebug and tests then
+        return -- Run of tests: the Test Runner window instead of the console
+      elseif session.config.noDebug then
         dapui.open { layout = 2 }
       else
         dapui.open()

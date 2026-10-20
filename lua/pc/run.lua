@@ -22,7 +22,7 @@ local RUN, DEBUG, TASK = '▶ ', '🐞 ', '⚙ '
 ---------------------------------------------------------------------------
 
 local console = { win = nil, buf = nil }
-local last_run = 'console' -- which Run window Alt+4 toggles: 'console' or 'dap'
+local last_run = 'console' -- which Run window Alt+4 toggles: 'console', 'dap' or 'tests'
 
 local function console_open()
   return console.win and vim.api.nvim_win_is_valid(console.win)
@@ -74,6 +74,9 @@ end
 
 --- Alt+4: the Run window that was used last (console, or the debugger's console for Java)
 function M.toggle_run_window(dap_toggle)
+  if last_run == 'tests' and package.loaded['pc.test_runner'] and require('pc.test_runner').has_run() then
+    return require('pc.test_runner').toggle()
+  end
   if last_run == 'console' and console.buf and vim.api.nvim_buf_is_valid(console.buf) then
     if console_open() then
       vim.api.nvim_win_close(console.win, true)
@@ -100,6 +103,10 @@ M.show_console = show_console
 
 function M.note_dap_run()
   last_run = 'dap'
+end
+
+function M.note_test_run()
+  last_run = 'tests'
 end
 
 -- Run a shell command in the Run window
