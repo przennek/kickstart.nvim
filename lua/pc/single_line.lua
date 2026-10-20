@@ -28,7 +28,7 @@ local function delete_text(buf)
   vim.api.nvim_win_set_cursor(0, { 1, from })
 end
 
-local function select_all()
+function M.select_all()
   local buf = vim.api.nvim_get_current_buf()
   local line = vim.api.nvim_get_current_line()
   local from = text_start(buf)
@@ -86,7 +86,7 @@ function M.attach(buf)
     return
   end
   attached[buf] = true
-  vim.keymap.set('i', '<M-a>', select_all, { buffer = buf, desc = 'Select all' })
+  vim.keymap.set('i', '<M-a>', M.select_all, { buffer = buf, desc = 'Select all' })
   vim.api.nvim_create_autocmd('BufWipeout', {
     buffer = buf,
     once = true,

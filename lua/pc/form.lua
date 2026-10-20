@@ -19,6 +19,7 @@
 --   },
 --   buttons = { { label = 'OK', key = '<C-s>', run = function(values, form) … form:close() end } },
 --   on_change = function(values, key) end,   -- after a field changed (e.g. default port per type)
+--   focus = 'name',                          -- start editing this field, its text selected
 -- }
 
 local M = {}
@@ -330,10 +331,14 @@ function M.open(spec)
       b.run(self.values, self)
     end, b.label)
   end
-  -- start on the first field
+  -- start on the first field, or edit spec.focus with its text selected (typing replaces it)
   for row = 1, vim.api.nvim_buf_line_count(self.buf) do
-    if self.rows[row] then
+    if self.rows[row] and (not spec.focus or self.rows[row].key == spec.focus) then
       vim.api.nvim_win_set_cursor(self.win, { row, LABEL_WIDTH + 4 })
+      if spec.focus then
+        self:inline(self.rows[row])
+        vim.schedule(require('pc.single_line').select_all)
+      end
       break
     end
   end

@@ -115,7 +115,18 @@ return {
     -- IntelliJ IDEA (Default for XWin) debugger keys. Inside tmux modified F-keys arrive
     -- as F13+ (Shift +12, Ctrl +24, Ctrl+Shift +36, Alt +48), so both forms are mapped.
     return {
-      { '<F5>', dap 'continue', desc = 'Debug: Start/Continue' },
+      -- F5 is Copy in IDEA (lua/pc/copy_class.lua); while debugging it still continues
+      {
+        '<F5>',
+        function()
+          if require('dap').session() then
+            require('dap').continue()
+          else
+            require('pc.copy_class').copy()
+          end
+        end,
+        desc = 'Copy Class / Debug: Continue',
+      },
       { '<S-F9>', dap 'continue', desc = 'Debug: Start/Continue' },
       { '<F21>', dap 'continue', desc = 'Debug: Start/Continue' },
       { '<F9>', dap 'continue', desc = 'Debug: Resume' },

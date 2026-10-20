@@ -74,6 +74,14 @@ return {
             require('pc.new_element').menu(dir)
           end,
           ['<F4>'] = 'open',
+          -- Copy (F5): the file under the cursor, as Copy Class / Copy File
+          ['<F5>'] = function(state)
+            local node = state.tree:get_node()
+            if node.type == 'file' then
+              vim.cmd 'wincmd p'
+              require('pc.copy_class').copy(node.path)
+            end
+          end,
           -- Run / Debug context (Ctrl+Shift+F10 / F9, as F46 / F45): on a directory all its
           -- tests (IDEA's Run 'All Tests'), on a file what the editor would run
           ['<C-S-F10>'] = function(state)
