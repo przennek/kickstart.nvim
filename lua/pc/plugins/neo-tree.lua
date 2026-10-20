@@ -47,7 +47,17 @@ return {
         mappings = {
           ['<A-1>'] = 'close_window',
           -- New… (Ctrl+Enter, sent as F40 by Alacritty) and Jump to Source (F4)
-          ['<F40>'] = 'add',
+          ['<F40>'] = function(state)
+            -- New… menu (Java Class, Python File / Package, File, Directory) in the node's directory
+            local node = state.tree:get_node()
+            local dir = node.type == 'directory' and node.path or vim.fs.dirname(node.path)
+            require('pc.new_element').menu(dir)
+          end,
+          ['<C-CR>'] = function(state)
+            local node = state.tree:get_node()
+            local dir = node.type == 'directory' and node.path or vim.fs.dirname(node.path)
+            require('pc.new_element').menu(dir)
+          end,
           ['<F4>'] = 'open',
           ['<space>'] = {
             'toggle_node',
