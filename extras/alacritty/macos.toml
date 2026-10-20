@@ -99,4 +99,15 @@ bindings = [
   { key = "F12", mods = "Command", chars = "\u001b[24;3~" },
   { key = "F12", mods = "Command|Shift", chars = "\u001b[24;6~" },  # Hide All Windows
   { key = "M", mods = "Command|Alt", chars = "\u001b[18;6~" },  # Extract Method
+  # Other Cmd+Option shortcuts arrive in Neovim as Ctrl+Alt+F1…F7 (lua/pc/idea_keys.lua)
+  { key = "V", mods = "Command|Alt", chars = "\u001b[1;7P" },  # Introduce Variable
+  { key = "C", mods = "Command|Alt", chars = "\u001b[1;7Q" },  # Introduce Constant
+  { key = "Z", mods = "Command|Alt", chars = "\u001b[1;7R" },  # Rollback
+  { key = "K", mods = "Command|Alt", chars = "\u001b[1;7S" },  # Commit and Push
+  { key = "I", mods = "Command|Alt", chars = "\u001b[15;7~" },  # Auto-Indent Lines
+  { key = "E", mods = "Command|Alt", chars = "\u001b[17;7~" },  # Database: query history
+  { key = "C", mods = "Command|Alt|Shift", chars = "\u001b[18;7~" },  # Copy Reference
+  # Back / Forward also on Ctrl+Cmd+P / Ctrl+Cmd+N, as in the IDEA keymap
+  { key = "P", mods = "Control|Command", chars = "\u001bh" },
+  { key = "N", mods = "Control|Command", chars = "\u001bl" },
 ]

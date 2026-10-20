@@ -92,6 +92,21 @@ map('n', '<M-->', 'zc', { desc = 'Collapse' })
 map('n', '<M-=>', 'zo', { desc = 'Expand' })
 map('x', '<M-.>', 'zf', { desc = 'Collapse selection' })
 
+-- Cmd+Option shortcuts (macOS Alacritty sends them as Ctrl+Alt+F1…F7; on Linux Ctrl+Alt
+-- belongs to the window manager). Each runs the existing <leader> mapping.
+local cmd_option = {
+  { '<C-M-F1>', '<leader>ev', 'Introduce Variable (Cmd+Option+V)', { 'n', 'x' } },
+  { '<C-M-F2>', '<leader>ec', 'Introduce Constant (Cmd+Option+C)', { 'n', 'x' } },
+  { '<C-M-F3>', '<leader>vr', 'Rollback (Cmd+Option+Z)', { 'n', 'x' } },
+  { '<C-M-F4>', '<leader>vC', 'Commit and Push (Cmd+Option+K)' },
+  { '<C-M-F5>', '<leader>i', 'Auto-Indent Lines (Cmd+Option+I)', { 'n', 'x' } },
+  { '<C-M-F6>', '<leader>Qh', 'Database: query history (Cmd+Option+E)' },
+  { '<C-M-F7>', '<leader>yr', 'Copy Reference (Cmd+Option+Shift+C)' },
+}
+for _, k in ipairs(cmd_option) do
+  map(k[4] or 'n', k[1], k[2], { remap = true, desc = k[3] })
+end
+
 -- Tab after an auto-inserted closing bracket / quote jumps over it (BraceOrQuoteOut);
 -- completion and snippets come first (autocomplete.lua)
 return {

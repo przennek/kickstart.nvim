@@ -1,6 +1,5 @@
 -- Project windows, like the FrameSwitcher plugin: every project is a tmux session
 -- (same naming as ~/.local/bin/tmux-sessionizer).
---   gt / gT        next / previous project window (tmux session), as in .ideavimrc
 --   Alt+F2, <leader>P   pick a project: open sessions first, then directories
 --                       from ~/Projects, ~/IdeaProjects and ~/.config
 
@@ -32,15 +31,6 @@ local function sessions()
     return a.time > b.time
   end)
   return list
-end
-
-local function cycle(dir)
-  return function()
-    if not in_tmux() then
-      return vim.notify('Project windows are tmux sessions: start Neovim inside tmux', vim.log.levels.WARN)
-    end
-    tmux { 'switch-client', dir == 'next' and '-n' or '-p' }
-  end
 end
 
 local function open(dir)
@@ -86,8 +76,6 @@ function M.pick()
   end)
 end
 
-vim.keymap.set('n', 'gt', cycle 'next', { desc = 'Next project window' })
-vim.keymap.set('n', 'gT', cycle 'prev', { desc = 'Previous project window' })
 -- Alt+F2 arrives as F50 inside tmux
 vim.keymap.set('n', '<M-F2>', M.pick, { desc = 'Switch Project' })
 vim.keymap.set('n', '<F50>', M.pick, { desc = 'Switch Project' })

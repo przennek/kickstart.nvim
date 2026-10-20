@@ -94,20 +94,22 @@ local function start_jdtls()
       map('n', '<leader>xp', jdtls.pick_test, 'Pick test')
       -- Refactor > Extract: <leader>e + v(ariable) / c(onstant) / m(ethod)
       -- (Cmd+Alt+V/C/M in IDEA; <leader>c alone is Go to Class)
-      map({ 'n', 'x' }, '<leader>ev', function()
-        jdtls.extract_variable(vim.fn.mode() ~= 'n')
-      end, 'Extract variable')
-      map({ 'n', 'x' }, '<leader>ec', function()
-        jdtls.extract_constant(vim.fn.mode() ~= 'n')
-      end, 'Extract constant')
-      map('x', '<leader>em', function()
-        jdtls.extract_method(true)
-      end, 'Extract method')
+      -- jdtls reads the selection from the '< '> marks, which are only set once Visual mode ends
+      local function extract(fn)
+        return function()
+          local visual = vim.fn.mode():match '^[vV\22]' ~= nil
+          if visual then
+            vim.api.nvim_feedkeys(vim.keycode '<Esc>', 'nx', false)
+          end
+          fn(visual)
+        end
+      end
+      map({ 'n', 'x' }, '<leader>ev', extract(jdtls.extract_variable), 'Extract variable')
+      map({ 'n', 'x' }, '<leader>ec', extract(jdtls.extract_constant), 'Extract constant')
+      map('x', '<leader>em', extract(jdtls.extract_method), 'Extract method')
       -- Ctrl+Alt+M is Extract Method in your IDEA keymap too (Alacritty sends it as F43:
       -- a terminal can't tell Ctrl+Alt+M from Alt+Enter)
-      map('x', '<F43>', function()
-        jdtls.extract_method(true)
-      end, 'Extract method')
+      map('x', '<F43>', extract(jdtls.extract_method), 'Extract method')
       map({ 'n', 'x' }, '<leader>ei', function()
         vim.lsp.buf.code_action { context = { only = { 'refactor.inline' }, diagnostics = {} } }
       end, 'Inline')
