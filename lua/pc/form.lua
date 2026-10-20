@@ -1,6 +1,8 @@
 -- Settings dialogs like IDEA's: a floating form with labelled fields and buttons.
 --   j / k, Tab / Shift+Tab   move between fields
---   Enter / i               edit the field (text, password, choice), toggle a checkbox
+--   Enter / i / a           edit the field in place (c: start empty), choose, toggle a checkbox;
+--                           while editing: Tab / Shift+Tab next / previous field, Enter or Esc
+--                           keeps the text, Ctrl+C restores it, the buttons' keys work too
 --   Space                   toggle a checkbox / next choice
 --   the buttons' keys (shown at the bottom, e.g. Ctrl+S OK, Ctrl+T Test), q / Esc cancels
 --
@@ -45,7 +47,7 @@ end
 
 function Form:render()
   local lines, hl = {}, {}
-  self.rows = {}
+  self.rows, self.value_cols = {}, {}
   for _, field in ipairs(self.spec.fields) do
     if shown(field, self.values) then
       if field.header then
@@ -59,6 +61,7 @@ function Form:render()
         local text = '   ' .. label .. string.rep('·', math.max(1, LABEL_WIDTH - vim.fn.strdisplaywidth(label))) .. ' '
         table.insert(lines, text .. self:value_text(field))
         self.rows[#lines] = field
+        self.value_cols[#lines] = vim.fn.strdisplaywidth(text)
         if field.readonly then
           table.insert(hl, { #lines - 1, 'Comment' })
         end
@@ -108,7 +111,11 @@ function Form:say(text, level)
   self:render()
 end
 
-function Form:edit(field)
+local function editable(field)
+  return field and not (field.readonly or field.value or field.check or field.choices)
+end
+
+function Form:edit(field, clear)
   field = field or self:field_at_cursor()
   if not field or field.readonly or field.value then
     return
@@ -123,15 +130,109 @@ function Form:edit(field)
       end
     end)
   end
-  local args = { field.label .. ': ', field.secret and '' or tostring(self.values[field.key] or '') }
-  if field.complete and not field.secret then
-    table.insert(args, field.complete)
+  self:inline(field, clear)
+end
+
+--- Text field edited in place: a one-line input box over the field's value, like a GUI dialog
+function Form:inline(field, clear)
+  local row = vim.api.nvim_win_get_cursor(self.win)[1]
+  local col = self.value_cols[row] or (LABEL_WIDTH + 4)
+  local old = self.values[field.key]
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.bo[buf].bufhidden = 'wipe'
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { clear and '' or tostring(old or '') })
+  local win = vim.api.nvim_open_win(buf, true, {
+    relative = 'win',
+    win = self.win,
+    row = row - 1,
+    col = col,
+    width = math.max(10, vim.api.nvim_win_get_width(self.win) - col - 1),
+    height = 1,
+    style = 'minimal',
+    zindex = 60,
+  })
+  vim.wo[win].winhighlight = 'Normal:PmenuSel'
+  -- a password shows as dots while typed
+  local mask_ns = vim.api.nvim_create_namespace 'pc-form-mask'
+  local function mask()
+    if field.secret and vim.api.nvim_buf_is_valid(buf) then
+      vim.api.nvim_buf_clear_namespace(buf, mask_ns, 0, -1)
+      local n = vim.fn.strchars(vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] or '')
+      if n > 0 then
+        vim.api.nvim_buf_set_extmark(buf, mask_ns, 0, 0, { virt_text = { { string.rep('•', n), 'PmenuSel' } }, virt_text_pos = 'overlay' })
+      end
+    end
   end
-  -- Ctrl+C cancels the edit
-  local ok, value = pcall(field.secret and vim.fn.inputsecret or vim.fn.input, unpack(args))
-  if ok then
-    self:set(field.key, value)
+  mask()
+  local done = false
+  local function finish(keep, after)
+    if done then
+      return
+    end
+    done = true
+    local text = vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] or ''
+    vim.cmd 'stopinsert'
+    if vim.api.nvim_win_is_valid(win) then
+      vim.api.nvim_win_close(win, true)
+    end
+    if vim.api.nvim_win_is_valid(self.win) then
+      vim.api.nvim_set_current_win(self.win)
+      vim.api.nvim_win_set_cursor(self.win, { row, col })
+    end
+    if keep and text ~= tostring(old or '') then
+      self:set(field.key, text)
+    end
+    if after then
+      vim.schedule(after)
+    end
   end
+  local function move(dir)
+    return function()
+      finish(true, function()
+        self:jump(dir)
+        local next = self:field_at_cursor()
+        if editable(next) then
+          self:inline(next)
+        end
+      end)
+    end
+  end
+  local function map(lhs, fn)
+    vim.keymap.set({ 'i', 'n' }, lhs, fn, { buffer = buf, nowait = true })
+  end
+  map('<CR>', function()
+    finish(true)
+  end)
+  map('<Tab>', move(1))
+  map('<S-Tab>', move(-1))
+  map('<C-c>', function()
+    finish(false)
+  end)
+  vim.keymap.set('n', '<Esc>', function()
+    finish(true)
+  end, { buffer = buf, nowait = true })
+  vim.keymap.set('i', '<Esc>', function()
+    finish(true)
+  end, { buffer = buf, nowait = true })
+  for _, b in ipairs(self.spec.buttons or {}) do
+    map(b.key, function()
+      finish(true, function()
+        b.run(self.values, self)
+      end)
+    end)
+  end
+  vim.api.nvim_create_autocmd({ 'TextChanged', 'TextChangedI' }, { buffer = buf, callback = mask })
+  -- clicking elsewhere keeps what was typed
+  vim.api.nvim_create_autocmd('WinLeave', {
+    buffer = buf,
+    once = true,
+    callback = function()
+      vim.schedule(function()
+        finish(true)
+      end)
+    end,
+  })
+  vim.cmd 'startinsert!'
 end
 
 function Form:toggle()
@@ -202,6 +303,12 @@ function M.open(spec)
   map('i', function()
     self:edit()
   end, 'Edit field')
+  map('a', function()
+    self:edit()
+  end, 'Edit field')
+  map('c', function()
+    self:edit(nil, true)
+  end, 'Edit field (empty)')
   map('<Space>', function()
     self:toggle()
   end, 'Toggle')

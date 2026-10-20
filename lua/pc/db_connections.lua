@@ -343,8 +343,21 @@ vim.api.nvim_create_autocmd('FileType', {
   pattern = 'dbui',
   group = vim.api.nvim_create_augroup('pc-db-connections', { clear = true }),
   callback = function(event)
-    vim.keymap.set('n', 'a', M.add, { buffer = event.buf, desc = 'New data source' })
-    vim.keymap.set('n', '<M-Insert>', M.add, { buffer = event.buf, desc = 'New data source' })
+    -- every "add connection" of the Database window opens the Data Source dialog (dadbod-ui's
+    -- own A asks for a URL in the command line); Cmd+N is New in IDEA's Database window
+    for _, lhs in ipairs { 'a', 'A', '<M-Insert>', '<M-n>' } do
+      vim.keymap.set('n', lhs, M.add, { buffer = event.buf, nowait = true, desc = 'New data source' })
+    end
+    vim.api.nvim_create_user_command('DBUIAddConnection', M.add, { force = true, desc = 'New data source' })
+    -- the "Add connection" line too; on other lines Enter does what it did
+    for _, lhs in ipairs { '<CR>', 'o', '<2-LeftMouse>' } do
+      vim.keymap.set('n', lhs, function()
+        if vim.api.nvim_get_current_line():match 'Add connection%s*$' then
+          return M.add()
+        end
+        vim.api.nvim_feedkeys(vim.keycode '<Plug>(DBUI_SelectLine)', 'm', false)
+      end, { buffer = event.buf, desc = 'Open / New data source' })
+    end
     vim.keymap.set('n', 'E', M.manage, { buffer = event.buf, desc = 'Edit data sources' })
     vim.keymap.set('n', 'X', M.disconnect, { buffer = event.buf, desc = 'Disconnect' })
     -- tunnels of the listed connections, so expanding one just works
