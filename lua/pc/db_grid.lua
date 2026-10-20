@@ -14,6 +14,8 @@
 --                     (a table without a primary key matches on the whole row), checked to hit
 --                     exactly one row each, after confirming, in one transaction
 --   u / U             revert the changes of this row / all of them
+--   table data (F4 on a table name, "select * from t … limit N"): f filter (WHERE), O order by
+--                     the current column on the server (asc → desc → off), ]p / [p pages, F5 reload
 -- dadbod-ui's own keys keep working (yic, yh, Ctrl+] foreign key, <leader>R layout).
 
 local M = {}
@@ -177,6 +179,8 @@ local function refresh_in_window(buf)
   local count = g.last - g.first + 1
   local sorted = g.sort and ('  sorted by ' .. g.cols[g.sort.col].name .. (g.sort.desc and ' ↓' or ' ↑')) or ''
   local changes = M.pending_count and M.pending_count(buf) or 0
+  local label = M.view_label and M.view_label(buf) or ''
+  sorted = sorted .. (label ~= '' and ('  ' .. label:gsub('%%', '%%%%')) or '')
   local waiting = changes > 0 and ('%#DiagnosticWarn#  ● ' .. changes .. ' pending (Ctrl+S submit, U revert)') or ''
   vim.wo[win].winbar = table.concat(parts) .. '%=%#Comment#' .. count .. (count == 1 and ' row' or ' rows') .. sorted .. waiting .. ' %*'
 end
@@ -828,6 +832,137 @@ local function submit(buf)
   vim.notify(('Submitted %d change%s to %s'):format(#statements, #statements == 1 and '' or 's', tbl))
 end
 
+-- Table view like IDEA's table editor, for results of "select * from <table> [where …]
+-- [order by …] limit N [offset K]" (what F4 opens): f filter (WHERE), O order by the current
+-- column on the server (asc → desc → off), ]p / [p next / previous page, F5 reload
+local function table_view(buf)
+  local src = source(buf)
+  if not src then
+    return nil
+  end
+  local q = vim.trim(src.query:gsub(';%s*$', ''))
+  local tbl, rest = q:match '^[Ss][Ee][Ll][Ee][Cc][Tt]%s+%*%s+[Ff][Rr][Oo][Mm]%s+([%w_."`]+)(.*)$'
+  if not tbl then
+    return nil
+  end
+  local view = { url = src.url, table = tbl, limit = 200, offset = 0 }
+  rest = ' ' .. rest
+  local lower = rest:lower()
+  local function clause(name, stops)
+    local from = lower:find(' ' .. name .. ' ', 1, true)
+    if not from then
+      return nil
+    end
+    local value_start = from + #name + 2
+    local value_end = #rest
+    for _, stop in ipairs(stops) do
+      local at = lower:find(' ' .. stop .. ' ', value_start, true)
+      if at and at - 1 < value_end then
+        value_end = at - 1
+      end
+    end
+    return vim.trim(rest:sub(value_start, value_end))
+  end
+  view.where = clause('where', { 'order by', 'limit', 'offset' })
+  view.order = clause('order by', { 'limit', 'offset' })
+  view.limit = tonumber(clause('limit', { 'offset' }) or '') or (lower:find ' limit ' and 200 or nil)
+  view.offset = tonumber(clause('offset', {}) or '') or 0
+  if not lower:find ' limit ' then
+    view.limit = nil
+  end
+  return view
+end
+
+local function run_view(view)
+  local q = 'select * from ' .. view.table
+  if view.where and view.where ~= '' then
+    q = q .. ' where ' .. view.where
+  end
+  if view.order and view.order ~= '' then
+    q = q .. ' order by ' .. view.order
+  end
+  if view.limit then
+    q = q .. ' limit ' .. view.limit
+    if view.offset > 0 then
+      q = q .. ' offset ' .. view.offset
+    end
+  end
+  vim.cmd(('DB %s %s'):format(view.url, q))
+end
+
+local function with_view(fn)
+  return function(buf)
+    local view = table_view(buf)
+    if not view then
+      return vim.notify('Table view: works on "select * from <table> …" results (F4 on a table name)', vim.log.levels.INFO)
+    end
+    fn(buf, view)
+  end
+end
+
+local view_filter = with_view(function(_, view)
+  vim.ui.input({ prompt = 'WHERE ', default = view.where or '' }, function(where)
+    if where then
+      view.where, view.offset = vim.trim(where), 0
+      run_view(view)
+    end
+  end)
+end)
+
+local view_order = with_view(function(buf, view)
+  local g, _, index = current(buf)
+  if not g then
+    return
+  end
+  local name = g.cols[index].name
+  if view.order == name then
+    view.order = name .. ' desc'
+  elseif view.order == name .. ' desc' then
+    view.order = nil
+  else
+    view.order = name
+  end
+  view.offset = 0
+  run_view(view)
+end)
+
+local function view_page(dir)
+  return with_view(function(buf, view)
+    if not view.limit then
+      return vim.notify('All rows are shown (no limit)', vim.log.levels.INFO)
+    end
+    local g = grids[buf]
+    if dir > 0 and g and (g.last - g.first + 1) < view.limit then
+      return vim.notify('Last page', vim.log.levels.INFO)
+    end
+    view.offset = math.max(0, view.offset + dir * view.limit)
+    run_view(view)
+  end)
+end
+
+local view_reload = with_view(function(_, view)
+  run_view(view)
+end)
+
+-- "WHERE … · ORDER BY … · rows 201–400" for the winbar
+function M.view_label(buf)
+  local view = table_view(buf)
+  if not view then
+    return ''
+  end
+  local parts = {}
+  if view.where and view.where ~= '' then
+    table.insert(parts, 'WHERE ' .. view.where)
+  end
+  if view.order and view.order ~= '' then
+    table.insert(parts, 'ORDER BY ' .. view.order)
+  end
+  if view.limit and view.offset > 0 then
+    table.insert(parts, ('from row %d'):format(view.offset + 1))
+  end
+  return table.concat(parts, ' · ')
+end
+
 M.pending_count = pending_count
 M.reset_pending = function(buf)
   pending[buf] = nil
@@ -872,6 +1007,11 @@ function M.attach(buf)
   map('E', export, 'Export data')
   map('i', edit_cell, 'Edit cell (pending until Submit)')
   map('dd', delete_row, 'Mark row for deletion (pending until Submit)')
+  map('f', view_filter, 'Filter (WHERE)')
+  map('O', view_order, 'Order by this column (server)')
+  map(']p', view_page(1), 'Next page')
+  map('[p', view_page(-1), 'Previous page')
+  map('<F5>', view_reload, 'Reload')
   map('<C-s>', submit, 'Submit changes')
   map('<C-CR>', submit, 'Submit changes')
   map('<F40>', submit, 'Submit changes')
