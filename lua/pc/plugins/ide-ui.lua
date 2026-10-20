@@ -103,7 +103,9 @@ return {
       return {
         bar = {
           enable = function(buf, win, info)
-            return vim.w[win].pc_navbar == true and default_enable(buf, win, info)
+            -- always with Settings → Editor → Breadcrumbs, else on demand
+            local wanted = vim.w[win].pc_navbar == true or (vim.g.pc_breadcrumbs and vim.w[win].pc_navbar ~= false)
+            return wanted and default_enable(buf, win, info)
           end,
         },
       }

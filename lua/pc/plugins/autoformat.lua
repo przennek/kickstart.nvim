@@ -1,6 +1,7 @@
 return { -- Autoformat
   'stevearc/conform.nvim',
   cmd = { 'ConformInfo' },
+  event = 'BufWritePre',
   keys = {
     {
       -- Reformat Code (Cmd+Shift+L in IDEA; <leader>f is Find Usages)
@@ -14,7 +15,13 @@ return { -- Autoformat
   },
   opts = {
     notify_on_error = false,
-    -- No format on save: like in IDEA, code is reformatted on demand with Alt+Shift+L,
+    -- off by default; Settings → Editor → "Reformat code on save" turns it on
+    format_on_save = function()
+      if vim.g.pc_format_on_save then
+        return { timeout_ms = 1500, lsp_format = 'fallback' }
+      end
+    end,
+    -- Normally no format on save: like in IDEA, code is reformatted on demand with Alt+Shift+L,
     -- so saving never rewrites whole files in shared repositories
     formatters_by_ft = {
       lua = { 'stylua' },
