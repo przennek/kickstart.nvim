@@ -59,6 +59,10 @@ return {
             require('pc.new_element').menu(dir)
           end,
           ['<F4>'] = 'open',
+          -- Compare Two Files: = on one file, then = on another
+          ['='] = function(state)
+            require('pc.compare_files').mark(state.tree:get_node().path)
+          end,
           ['<space>'] = {
             'toggle_node',
             nowait = false, -- disable `nowait` if you have existing combos starting with this char that you want to use

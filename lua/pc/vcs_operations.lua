@@ -21,6 +21,7 @@ local ITEMS = {
   { 'Compare file with Branch…', '<leader>vw' },
   { 'Compare project with Branch…', '<leader>vW' },
   { 'Compare with Clipboard', '<leader>vy' },
+  { 'Compare file with another file…', '<leader>v=' },
   { 'Changed Files…', '<leader>vf' },
   { 'Rollback change (hunk)', '<leader>vr' },
   { 'Rollback file', '<leader>vR' },
