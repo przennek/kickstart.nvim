@@ -12,7 +12,7 @@ return {
     { 'tpope/vim-dadbod', lazy = true, cmd = 'DB' },
     { 'kristijanhusak/vim-dadbod-completion', ft = { 'sql', 'mysql', 'plsql' }, lazy = true },
   },
-  cmd = { 'DBUI', 'DBUIToggle', 'DBUIAddConnection', 'DBUIFindBuffer' },
+  cmd = { 'DBUI', 'DBUIToggle', 'DBUIFindBuffer' },
   keys = {
     {
       '<leader>S',

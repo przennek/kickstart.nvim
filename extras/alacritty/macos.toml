@@ -32,6 +32,7 @@ bindings = [
   { key = "B", mods = "Control|Shift", chars = "\u001b[17;6~" },     # Go to Type Declaration
   { key = "M", mods = "Control|Alt", chars = "\u001b[18;6~" },       # Extract Method
   # Cmd+<key> = Alt+<key>
+  { key = "A", mods = "Command", chars = "\u001ba" },
   { key = "B", mods = "Command", chars = "\u001bb" },
   { key = "D", mods = "Command", chars = "\u001bd" },
   { key = "E", mods = "Command", chars = "\u001be" },

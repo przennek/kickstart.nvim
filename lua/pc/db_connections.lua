@@ -334,6 +334,20 @@ function M.ensure_tunnel(name)
 end
 
 vim.api.nvim_create_user_command('DBAddConnection', M.add, { desc = 'New data source' })
+-- dadbod-ui's own :DBUIAddConnection asks for a URL in the command line; it is defined again
+-- when the plugin loads, so it is replaced then too
+local function replace_dbui_add()
+  vim.api.nvim_create_user_command('DBUIAddConnection', M.add, { force = true, desc = 'New data source' })
+end
+replace_dbui_add()
+vim.api.nvim_create_autocmd('User', {
+  pattern = 'LazyLoad',
+  callback = function(event)
+    if event.data == 'vim-dadbod-ui' then
+      replace_dbui_add()
+    end
+  end,
+})
 vim.api.nvim_create_user_command('DBDataSources', M.manage, { desc = 'Data sources' })
 vim.keymap.set('n', '<leader>Qd', M.manage, { desc = 'Data sources (edit / new)' })
 vim.keymap.set('n', '<leader>Qx', M.disconnect, { desc = 'Disconnect data source' })
@@ -348,7 +362,6 @@ vim.api.nvim_create_autocmd('FileType', {
     for _, lhs in ipairs { 'a', 'A', '<M-Insert>', '<M-n>' } do
       vim.keymap.set('n', lhs, M.add, { buffer = event.buf, nowait = true, desc = 'New data source' })
     end
-    vim.api.nvim_create_user_command('DBUIAddConnection', M.add, { force = true, desc = 'New data source' })
     -- the "Add connection" line too; on other lines Enter does what it did
     for _, lhs in ipairs { '<CR>', 'o', '<2-LeftMouse>' } do
       vim.keymap.set('n', lhs, function()

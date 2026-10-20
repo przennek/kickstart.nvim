@@ -22,8 +22,13 @@ map('n', '<F15>', 'N', { desc = 'Find Previous' })
 map('n', '<M-F3>', '*', { desc = 'Find word at caret' })
 map('n', '<F51>', '*', { desc = 'Find word at caret' })
 
+-- Select All (Cmd+A); in one-line inputs (pickers, dialog fields) see lua/pc/single_line.lua
+map('n', '<M-a>', 'ggVG', { desc = 'Select All' })
+
 -- Find in Path (Ctrl+Shift+F)
-map('n', '<F39>', tb 'live_grep', { desc = 'Find in Path' })
+map('n', '<F39>', function()
+  require('pc.find_in_path').open()
+end, { desc = 'Find in Path' })
 
 -- Replace in Path (Ctrl+Shift+R): matches go to the Find window, then confirm to replace all
 local function replace_in_path()

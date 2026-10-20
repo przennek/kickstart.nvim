@@ -94,8 +94,8 @@ end
 
 local function open(scope, default_text)
   if scope == 'Text' then
-    return require('telescope.builtin').live_grep {
-      prompt_title = 'Search Everywhere · Text · Tab: next tab',
+    return require('pc.find_in_path').open {
+      prompt_title = 'Search Everywhere · Tab: next tab',
       default_text = default_text,
       attach_mappings = function(prompt_bufnr, map)
         local function switch(step)
