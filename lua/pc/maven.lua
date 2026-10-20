@@ -5,6 +5,9 @@
 --   <leader>Mr   Reimport (jdtls reloads pom.xml of all projects)
 --   <leader>Mu   Update folders: mvn generate-sources, then reimport
 --   <leader>Mg   Execute Maven goal… (like Ctrl Ctrl in IDEA), with the same profiles / offline / skip tests
+--   <leader>Ms   Maven settings of this project (S in the window), like IDEA's Build Tools → Maven:
+--                Maven executable, settings.xml, local repository, JDK, threads, extra options and
+--                the default offline / skip tests / profiles
 -- Plugin goals come from the effective POM and the plugins' descriptors in ~/.m2, loaded in the
 -- background the first time the window opens for a module.
 
@@ -13,7 +16,7 @@ local M = {}
 local LIFECYCLE = { 'clean', 'validate', 'compile', 'test', 'package', 'verify', 'install', 'site', 'deploy' }
 
 -- Per root pom: chosen profiles; offline / skip tests are global like IDEA's toolbar toggles
-local state = { profiles = {}, offline = false, skip_tests = false }
+local state = { profiles = {}, offline = false, skip_tests = false, defaults = {} }
 local plugin_cache = {} -- module pom path → { mtime, plugins = { { prefix, goals } } }
 local win = { win = nil, buf = nil, pom = nil }
 
@@ -60,9 +63,60 @@ local function profiles_of(p)
   return ids
 end
 
-local function command(p, goal)
-  local build = vim.uv.fs_stat(p.root .. '/mvnw') and './mvnw' or 'mvn'
+---------------------------------------------------------------------------
+-- Settings per project (stdpath('data')/pc_maven.json)
+---------------------------------------------------------------------------
+
+local SETTINGS_FILE = vim.fn.stdpath 'data' .. '/pc_maven.json'
+
+local function all_settings()
+  local ok, all = pcall(vim.json.decode, read(SETTINGS_FILE))
+  return ok and type(all) == 'table' and all or {}
+end
+
+local function settings(p)
+  return all_settings()[p.root] or {}
+end
+
+-- The executable and the options every Maven call of the project gets
+local function base_command(p, absolute)
+  local s = settings(p)
+  local build = (s.executable or '') ~= '' and s.executable ~= 'Wrapper (mvnw) if present' and vim.fn.expand(s.executable) or nil
+  if not build then
+    local wrapper = vim.uv.fs_stat(p.root .. '/mvnw')
+    build = wrapper and (absolute and p.root .. '/mvnw' or './mvnw') or 'mvn'
+  end
   local args = { build }
+  if (s.settings_file or '') ~= '' then
+    vim.list_extend(args, { '-s', vim.fn.expand(s.settings_file) })
+  end
+  if (s.local_repo or '') ~= '' then
+    table.insert(args, '-Dmaven.repo.local=' .. vim.fn.expand(s.local_repo))
+  end
+  if (s.threads or '') ~= '' then
+    vim.list_extend(args, { '-T', s.threads })
+  end
+  vim.list_extend(args, vim.split(s.options or '', '%s+', { trimempty = true }))
+  local env = (s.jdk or '') ~= '' and s.jdk ~= 'Default (JAVA_HOME)' and { JAVA_HOME = vim.fn.expand(s.jdk) } or nil
+  return args, env
+end
+
+local function jdks()
+  local list = { 'Default (JAVA_HOME)' }
+  for _, dir in ipairs(vim.fn.glob(vim.env.HOME .. '/.sdkman/candidates/java/*', false, true)) do
+    if not dir:match '/current$' then
+      table.insert(list, dir)
+    end
+  end
+  vim.list_extend(list, vim.fn.glob('/usr/lib/jvm/*', false, true))
+  return list
+end
+
+local function command(p, goal)
+  local args, env = base_command(p)
+  if env then
+    table.insert(args, 1, 'env JAVA_HOME=' .. vim.fn.shellescape(env.JAVA_HOME))
+  end
   if p.pom ~= p.root .. '/pom.xml' then
     vim.list_extend(args, { '-f', vim.fs.relpath(p.root, p.pom) })
   end
@@ -139,8 +193,9 @@ local function load_plugins(p, done)
     return done(cached.plugins)
   end
   local out = vim.fn.tempname()
-  local build = vim.uv.fs_stat(p.root .. '/mvnw') and p.root .. '/mvnw' or 'mvn'
-  vim.system({ build, '-q', '-N', '-f', p.pom, 'help:effective-pom', '-Doutput=' .. out }, { text = true }, function(result)
+  local cmd, env = base_command(p, true)
+  vim.list_extend(cmd, { '-q', '-N', '-f', p.pom, 'help:effective-pom', '-Doutput=' .. out })
+  vim.system(cmd, { text = true, env = env }, function(result)
     vim.schedule(function()
       local plugins = result.code == 0 and parse_plugins(read(out)) or nil
       os.remove(out)
@@ -324,6 +379,69 @@ function _G.pc_maven_complete(lead)
   )
 end
 
+function M.settings()
+  local p = current_project()
+  if not p then
+    return
+  end
+  require('pc.form').open {
+    title = 'Maven: ' .. vim.fs.basename(p.root),
+    values = settings(p),
+    fields = {
+      { header = 'Build Tools → Maven' },
+      { key = 'executable', label = 'Maven executable', choices = { 'Wrapper (mvnw) if present', 'mvn', '~/.sdkman/candidates/maven/current/bin/mvn' }, default = 'Wrapper (mvnw) if present' },
+      { key = 'settings_file', label = 'User settings file', default = '', complete = 'file' },
+      { key = 'local_repo', label = 'Local repository', default = '', complete = 'dir' },
+      { key = 'jdk', label = 'JDK for Maven', choices = jdks(), default = 'Default (JAVA_HOME)' },
+      { key = 'threads', label = 'Threads (-T)', default = '' },
+      { key = 'options', label = 'Extra options', default = '' },
+      { header = 'Defaults of the Maven window' },
+      { key = 'offline', label = 'Work offline', check = true, default = false },
+      { key = 'skip_tests', label = 'Skip tests', check = true, default = false },
+      { key = 'profiles', label = 'Active profiles (a,b)', default = '' },
+      { key = 'command', label = 'Command', readonly = true, value = function(v)
+        -- the values in the form, not saved yet
+        local exe = v.executable or ''
+        local args = { exe:match '^Wrapper' and (vim.uv.fs_stat(p.root .. '/mvnw') and './mvnw' or 'mvn') or exe }
+        if (v.settings_file or '') ~= '' then
+          vim.list_extend(args, { '-s', v.settings_file })
+        end
+        if (v.local_repo or '') ~= '' then
+          table.insert(args, '-Dmaven.repo.local=' .. v.local_repo)
+        end
+        if (v.threads or '') ~= '' then
+          vim.list_extend(args, { '-T', v.threads })
+        end
+        if (v.options or '') ~= '' then
+          table.insert(args, v.options)
+        end
+        return table.concat(args, ' ') .. ' <goal>'
+      end },
+    },
+    buttons = {
+      {
+        label = 'OK',
+        key = '<C-s>',
+        run = function(values, form)
+          local all = all_settings()
+          all[p.root] = values
+          local f = assert(io.open(SETTINGS_FILE, 'w'))
+          f:write(vim.json.encode(all))
+          f:close()
+          state.offline, state.skip_tests = values.offline, values.skip_tests
+          state.profiles[p.root] = vim.split(values.profiles or '', '%s*,%s*', { trimempty = true })
+          plugin_cache[p.pom] = nil
+          form:close()
+          if window_open() then
+            M.refresh()
+          end
+          vim.notify 'Maven settings saved'
+        end,
+      },
+    },
+  }
+end
+
 function M.toggle()
   if window_open() then
     vim.api.nvim_win_close(win.win, true)
@@ -334,6 +452,17 @@ function M.toggle()
     return vim.notify('Maven: no pom.xml here', vim.log.levels.WARN)
   end
   win.project, win.pom = p, p.pom
+  -- the defaults from Maven settings, once per project and session
+  if not state.defaults[p.root] then
+    state.defaults[p.root] = true
+    local s = settings(p)
+    if s.offline ~= nil then
+      state.offline, state.skip_tests = s.offline, s.skip_tests
+    end
+    if (s.profiles or '') ~= '' and not state.profiles[p.root] then
+      state.profiles[p.root] = vim.split(s.profiles, '%s*,%s*', { trimempty = true })
+    end
+  end
   win.buf = vim.api.nvim_create_buf(false, true)
   vim.bo[win.buf].filetype = 'pcmaven'
   vim.bo[win.buf].bufhidden = 'wipe'
@@ -366,6 +495,7 @@ function M.toggle()
   map('r', M.reimport, 'Reimport')
   map('u', M.update_folders, 'Update folders')
   map('g', M.execute_goal, 'Execute goal…')
+  map('S', M.settings, 'Maven settings')
   map('R', function()
     plugin_cache[p.pom] = nil
     M.refresh()
@@ -379,5 +509,6 @@ vim.keymap.set('n', '<leader>MM', M.toggle, { desc = '[M]aven window (toggle)' }
 vim.keymap.set('n', '<leader>Mr', M.reimport, { desc = 'Maven: [r]eimport' })
 vim.keymap.set('n', '<leader>Mu', M.update_folders, { desc = 'Maven: [u]pdate folders' })
 vim.keymap.set('n', '<leader>Mg', M.execute_goal, { desc = 'Maven: execute [g]oal…' })
+vim.keymap.set('n', '<leader>Ms', M.settings, { desc = 'Maven: [s]ettings' })
 
 return M
