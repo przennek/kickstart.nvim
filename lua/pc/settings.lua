@@ -154,6 +154,9 @@ local PAGES = {
   { label = 'Build Tools → Maven', open = function()
     require('pc.maven').settings()
   end },
+  { label = 'Invalidate Caches…', open = function()
+    require('pc.invalidate_caches').open()
+  end },
   { label = 'Run/Debug Configurations', open = function()
     require('pc.run_configs').edit()
   end },

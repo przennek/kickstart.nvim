@@ -71,7 +71,7 @@ local function language_level(root)
 end
 
 -- jdtls reads the runtimes when it starts: stop it and start it again for every Java buffer
-local function restart_jdtls()
+function M.restart_jdtls()
   local buffers = {}
   for _, client in ipairs(vim.lsp.get_clients { name = 'jdtls' }) do
     for buf in pairs(client.attached_buffers) do
@@ -120,7 +120,7 @@ function M.open()
           f:write(vim.json.encode(all))
           f:close()
           form:close()
-          vim.notify('Project SDK: ' .. values.sdk .. (restart_jdtls() and ' (restarting jdtls)' or ''))
+          vim.notify('Project SDK: ' .. values.sdk .. (M.restart_jdtls() and ' (restarting jdtls)' or ''))
         end,
       },
     },
