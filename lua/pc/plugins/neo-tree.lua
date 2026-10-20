@@ -23,6 +23,21 @@ local function project_tree()
   command.execute { action = 'focus', source = 'filesystem', dir = dir, reveal_file = file }
 end
 
+local function run_context_in_tree(state, debug)
+  local node = state.tree:get_node()
+  if node.type == 'directory' then
+    return require('pc.test_runner').run_tests(node.path, debug)
+  end
+  vim.cmd 'wincmd p'
+  vim.cmd.edit(vim.fn.fnameescape(node.path))
+  local run = require 'pc.run'
+  if debug then
+    run.debug_context()
+  else
+    run.run_context()
+  end
+end
+
 return {
   'nvim-neo-tree/neo-tree.nvim',
   version = '*',
@@ -59,6 +74,20 @@ return {
             require('pc.new_element').menu(dir)
           end,
           ['<F4>'] = 'open',
+          -- Run / Debug context (Ctrl+Shift+F10 / F9, as F46 / F45): on a directory all its
+          -- tests (IDEA's Run 'All Tests'), on a file what the editor would run
+          ['<C-S-F10>'] = function(state)
+            run_context_in_tree(state, false)
+          end,
+          ['<F46>'] = function(state)
+            run_context_in_tree(state, false)
+          end,
+          ['<C-S-F9>'] = function(state)
+            run_context_in_tree(state, true)
+          end,
+          ['<F45>'] = function(state)
+            run_context_in_tree(state, true)
+          end,
           -- Compare Two Files: = on one file, then = on another
           ['='] = function(state)
             require('pc.compare_files').mark(state.tree:get_node().path)

@@ -1,4 +1,6 @@
 -- Test Runner tool window like IDEA's, for Java tests run by jdtls (JUnit 4/5/6, no Maven):
+-- a method, a class (F10, <leader>xt / xT) or a scope: <leader>xA / :RunTests (project),
+-- :RunTests package, Ctrl+Shift+F10 on a directory in the project tree (:DebugTests to debug).
 -- the tree of the run on the left (class → tests, ✓ / ✗ / ◌ live as they run, times),
 -- details of the selected test on the right (expected / actual, stack trace; the process
 -- output on the root).
@@ -36,6 +38,7 @@ local ui = {} -- tree / details windows and buffers
 local hide_passed = false
 local last = {} -- what to rerun: { lens, bufnr, debug }
 local continuing -- the next run adds to the current tree (rerun of failed tests): its queue
+local scope -- the next run is a scope (project / package / directory): { title, queue }
 
 -- "id,name,isSuite,…" with "\," inside values
 local function split_fields(s)
@@ -528,11 +531,15 @@ local function start(bufnr)
     return
   end
   continuing = nil
+  local s = scope
+  scope = nil
   run = {
     seq = 1,
     idmap = {},
     by_key = {},
-    title = vim.fn.fnamemodify(file, ':t:r'),
+    custom = s ~= nil,
+    queue = s and s.queue,
+    title = s and s.title or vim.fn.fnamemodify(file, ':t:r'),
     root = vim.fs.root(bufnr, { 'pom.xml', 'build.gradle', 'build.gradle.kts', '.git' }),
     bufnr = bufnr,
     nodes = {},
@@ -604,8 +611,11 @@ local function mk_test_results(bufnr)
         end
       end
       last.bufnr = bufnr
-      if not run.rerunning then
+      if not run.rerunning and not run.custom then
         last.lens = lens
+        last.rerun = function()
+          M.run_lens(lens, last.debug)
+        end
       end
       -- tests that never started (the run was stopped) stay pending
       local items, tests = {}, {}
@@ -613,12 +623,13 @@ local function mk_test_results(bufnr)
         if not n.suite then
           local method, class = split_name(n.name)
           table.insert(tests, { fq_class = class, method = method, failed = n.status == 'failed', traces = n.trace })
-          if n.status == 'failed' then
+          local file = n.status == 'failed' and class and class_file(class)
+          if file then
             local lnum
             for _, t in ipairs(n.trace) do
-              lnum = lnum or t:match('%(' .. vim.pesc(vim.fn.fnamemodify(vim.api.nvim_buf_get_name(bufnr), ':t')) .. ':(%d+)%)')
+              lnum = lnum or t:match('%(' .. vim.pesc(vim.fs.basename(file)) .. ':(%d+)%)')
             end
-            table.insert(items, { bufnr = bufnr, lnum = tonumber(lnum) or 1, text = n.display .. ' ' .. (n.trace[1] or '') })
+            table.insert(items, { filename = file, lnum = tonumber(lnum) or method and method_line(file, method) or 1, text = n.display .. ' ' .. (n.trace[1] or '') })
           end
         end
       end
@@ -629,12 +640,16 @@ local function mk_test_results(bufnr)
       render()
       local c = counts()
       vim.notify(('%s: %d passed, %d failed'):format(run.title, c.passed, c.failed), c.failed > 0 and vim.log.levels.WARN or vim.log.levels.INFO, { title = 'Tests' })
-      -- after a rerun of the failed tests, the next one
+      -- the next class / package of a rerun of failed tests or of a scope
       if run.queue and #run.queue > 0 then
-        local next_lens = table.remove(run.queue, 1)
+        local next_item = table.remove(run.queue, 1)
         local queue = run.queue
         vim.schedule(function()
-          M.run_lens(next_lens, last.debug, queue)
+          if next_item.group then
+            M.run_group(next_item.group, last.debug, queue)
+          else
+            M.run_lens(next_item, last.debug, queue)
+          end
         end)
       else
         run.rerunning = nil
@@ -665,15 +680,34 @@ function M.run_lens(lens, debug, queue)
 end
 
 function M.rerun()
-  if not last.lens then
+  if not last.rerun then
     return vim.notify('Tests: nothing to rerun yet', vim.log.levels.INFO)
   end
-  M.run_lens(last.lens, last.debug)
+  last.rerun()
 end
 
 function M.rerun_failed()
-  if not (run and last.lens) then
+  if not (run and last.rerun) then
     return vim.notify('Tests: nothing to rerun yet', vim.log.levels.INFO)
+  end
+  if run.custom then
+    -- a scope run: the classes with failures
+    local classes, lenses = {}, {}
+    for _, n in pairs(run.nodes) do
+      local _, class = split_name(n.name)
+      if not n.suite and n.status == 'failed' then
+        classes[class] = true
+      end
+    end
+    for _, lens in ipairs(last.classes or {}) do
+      if classes[lens.fullName] then
+        table.insert(lenses, lens)
+      end
+    end
+    if #lenses == 0 then
+      return vim.notify('Tests: no failed tests', vim.log.levels.INFO)
+    end
+    return M.run_group(lenses, last.debug, {})
   end
   local failed = {}
   for _, n in pairs(run.nodes) do
@@ -683,7 +717,7 @@ function M.rerun_failed()
     end
   end
   local lenses = {}
-  for _, child in ipairs(last.lens.children or {}) do
+  for _, child in ipairs(last.lens and last.lens.children or {}) do
     local name = (child.fullName or ''):match '#([^(]+)'
     if name and failed[name] then
       table.insert(lenses, child)
@@ -698,6 +732,153 @@ function M.rerun_failed()
   end
   local first = table.remove(lenses, 1)
   M.run_lens(first, last.debug, lenses)
+end
+
+---------------------------------------------------------------------------
+-- Scopes: all tests of the project, a package, a directory (IDEA's Run 'All Tests')
+---------------------------------------------------------------------------
+
+local function jdtls_client(bufnr)
+  return vim.lsp.get_clients({ name = 'jdtls', bufnr = bufnr })[1] or vim.lsp.get_clients({ name = 'jdtls' })[1]
+end
+
+local function command(client, name, args, callback)
+  client:request('workspace/executeCommand', { command = name, arguments = args }, function(err, result)
+    vim.schedule(function()
+      if err then
+        return vim.notify('Tests: ' .. (err.message or tostring(err)), vim.log.levels.ERROR)
+      end
+      callback(result or {})
+    end)
+  end)
+end
+
+-- a loaded Java buffer of the project (the run's context: diagnostics, marks)
+local function java_buffer(path)
+  local cur = vim.api.nvim_get_current_buf()
+  if vim.bo[cur].filetype == 'java' then
+    return cur
+  end
+  for _, b in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_loaded(b) and vim.bo[b].filetype == 'java' and vim.startswith(vim.api.nvim_buf_get_name(b), path) then
+      return b
+    end
+  end
+end
+
+--- Runs the tests of `what`: 'project', 'package' (of the current file) or a directory path
+function M.run_tests(what, debug)
+  local path = what ~= 'project' and what ~= 'package' and vim.fs.normalize(what) or vim.api.nvim_buf_get_name(0)
+  local bufnr = java_buffer(vim.fs.root(path, { 'pom.xml', 'build.gradle', 'build.gradle.kts', '.git' }) or path)
+  local client = jdtls_client(bufnr)
+  if not (bufnr and client) then
+    return vim.notify('Tests: open a Java file of the project first (jdtls)', vim.log.levels.WARN)
+  end
+  command(client, 'vscode.java.test.findJavaProjects', { vim.uri_from_fname(vim.fn.getcwd()) }, function(projects)
+    -- the project the path is in (the deepest one, for multi-module builds)
+    local project
+    for _, p in ipairs(projects) do
+      local dir = vim.uri_to_fname(p.uri)
+      if (path == dir or vim.startswith(path, dir .. '/')) and (not project or #dir > #vim.uri_to_fname(project.uri)) then
+        project = p
+      end
+    end
+    project = project or (#projects == 1 and projects[1])
+    if not project then
+      return vim.notify('Tests: no Java project for ' .. vim.fn.fnamemodify(path, ':~:.'), vim.log.levels.WARN)
+    end
+    command(client, 'vscode.java.test.findTestPackagesAndTypes', { project.jdtHandler }, function(packages)
+      local classes = {}
+      for _, pkg in ipairs(packages) do
+        vim.list_extend(classes, pkg.children or {})
+      end
+      if #classes == 0 then
+        return vim.notify('Tests: no tests in ' .. project.label, vim.log.levels.INFO)
+      end
+      local title, picked
+      if what == 'project' then
+        title, picked = 'All tests in ' .. project.label, classes
+      else
+        local dir = what == 'package' and vim.fs.dirname(path) or path
+        picked = vim.tbl_filter(function(c)
+          local cdir = vim.fs.dirname(vim.uri_to_fname(c.uri))
+          return cdir == dir or (what ~= 'package' and vim.startswith(cdir, dir .. '/'))
+        end, classes)
+        if #picked == 0 then
+          return vim.notify('Tests: no tests in ' .. vim.fn.fnamemodify(dir, ':~:.'), vim.log.levels.INFO)
+        end
+        local rel = vim.fs.relpath(vim.uri_to_fname(project.uri), dir) or dir
+        title = 'Tests in ' .. (rel:match 'src/%w+/java/(.*)' or rel):gsub('/', '.')
+      end
+      -- one run per test kind (JUnit 4 next to 5 / 6): the first now, the others queued
+      local groups, order = {}, {}
+      for _, c in ipairs(picked) do
+        local key = c.projectName .. '/' .. tostring(c.testKind)
+        if not groups[key] then
+          groups[key] = {}
+          table.insert(order, key)
+        end
+        table.insert(groups[key], c)
+      end
+      last.bufnr, last.classes, last.lens = bufnr, classes, nil
+      last.rerun = function()
+        M.run_tests(what, last.debug)
+      end
+      local queue = {}
+      for i = 2, #order do
+        table.insert(queue, { group = groups[order[i]] })
+      end
+      scope = { title = title, queue = queue }
+      M.run_group(groups[order[1]], debug)
+    end)
+  end)
+end
+
+--- Runs test classes of one project and test kind in one JVM (what VS Code does for a folder)
+function M.run_group(classes, debug, queue)
+  local bufnr = last.bufnr
+  local client = jdtls_client(bufnr)
+  if not (client and bufnr and vim.api.nvim_buf_is_valid(bufnr)) then
+    return vim.notify('Tests: jdtls is not running', vim.log.levels.WARN)
+  end
+  local first = classes[1]
+  local request = {
+    projectName = first.projectName,
+    testLevel = 5,
+    testKind = first.testKind,
+    testNames = vim.tbl_map(function(c)
+      return c.fullName
+    end, classes),
+  }
+  command(client, 'vscode.java.test.junit.argument', { vim.fn.json_encode(request) }, function(args)
+    args = args.body or args
+    if args.errorMessage then
+      return vim.notify('Tests: ' .. args.errorMessage, vim.log.levels.WARN)
+    end
+    -- the test classpath too, as nvim-jdtls does (the launch arguments can miss classes)
+    command(client, 'java.project.getClasspaths', { vim.uri_from_bufnr(bufnr), vim.fn.json_encode { scope = 'test' } }, function(resp)
+      local seen = {}
+      for _, p in ipairs(args.classpath or {}) do
+        seen[p] = true
+      end
+      for _, p in ipairs(resp.classpaths or {}) do
+        if not seen[p] then
+          table.insert(args.classpath, p)
+          seen[p] = true
+        end
+      end
+      local jdtls_dap = require('jdtls.dap').experimental
+      local lens = { fullName = #classes == 1 and first.fullName or (first.projectName .. ' tests'), testKind = first.testKind, testLevel = 5, projectName = first.projectName }
+      local config = jdtls_dap.make_config(lens, args, debug and {} or { noDebug = true })
+      if queue then
+        continuing = queue
+        if run then
+          run.rerunning = true
+        end
+      end
+      jdtls_dap.run(lens, config, jdtls_dap.make_context(bufnr), {})
+    end)
+  end)
 end
 
 function M.setup()
@@ -719,6 +900,20 @@ function M.setup()
     end
   end
 end
+
+vim.keymap.set('n', '<leader>xA', function()
+  M.run_tests 'project'
+end, { desc = 'Run all tests of the project' })
+vim.api.nvim_create_user_command('RunTests', function(o)
+  M.run_tests(o.args ~= '' and o.args or 'project')
+end, { nargs = '?', complete = function()
+  return { 'project', 'package' }
+end, desc = 'Run tests: project (default), package or a directory' })
+vim.api.nvim_create_user_command('DebugTests', function(o)
+  M.run_tests(o.args ~= '' and o.args or 'project', true)
+end, { nargs = '?', complete = function()
+  return { 'project', 'package' }
+end, desc = 'Debug tests: project (default), package or a directory' })
 
 --- Is this dap session a test run (the runner window replaces the console)?
 function M.is_test_session(session)
