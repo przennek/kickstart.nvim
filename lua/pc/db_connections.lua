@@ -1,8 +1,8 @@
--- "New Data Source" for the Database window (<leader>S), like IDEA's data source dialog:
--- pick the database type, fill host / port / database / user / password, the connection is
--- tested (Test Connection) and saved to the Database window's list.
---   in the Database window: a or Alt+Insert = new data source, R = refresh
---   :DBAddConnection = the same from anywhere
+-- Data Sources dialog like IDEA's (a form, see pc.form): type, host, port, database, user,
+-- password, plus an SSH tunnel and / or a SOCKS5 / HTTP proxy (pc.db_tunnels); Test Connection
+-- (Ctrl+T) and OK (Ctrl+S) save it to the Database window's list.
+--   in the Database window: a or Alt+Insert = new data source, E = edit data sources, R = refresh
+--   <leader>Qd / :DBDataSources = pick a data source to edit (or + New), :DBAddConnection = new
 -- PostgreSQL passwords go to ~/.pgpass (mode 600), not into the saved connection list.
 
 local M = {}
@@ -34,19 +34,13 @@ local function read_connections()
   return ok and type(list) == 'table' and list or {}
 end
 
-local function save_connection(name, url)
-  local list = read_connections()
-  for _, c in ipairs(list) do
-    if c.name == name then
-      vim.notify('A connection named "' .. name .. '" already exists', vim.log.levels.ERROR)
-      return false
-    end
-  end
-  table.insert(list, { name = name, url = url })
+local function write_connections(list)
   vim.fn.mkdir(vim.fs.dirname(connections_file()), 'p')
   local f = assert(io.open(connections_file(), 'w'))
   f:write(vim.json.encode(list))
   f:close()
+  -- proxy passwords may be in it
+  vim.uv.fs_chmod(connections_file(), tonumber('600', 8))
   -- refresh an open Database window
   for _, win in ipairs(vim.api.nvim_list_wins()) do
     if vim.bo[vim.api.nvim_win_get_buf(win)].filetype == 'dbui' then
@@ -55,6 +49,21 @@ local function save_connection(name, url)
       end)
     end
   end
+end
+
+-- Adds a connection, or replaces the one called `replaces` (editing)
+local function save_connection(entry, replaces)
+  local list = read_connections()
+  for i = #list, 1, -1 do
+    if list[i].name == replaces then
+      table.remove(list, i)
+    elseif list[i].name == entry.name then
+      vim.notify('A connection named "' .. entry.name .. '" already exists', vim.log.levels.ERROR)
+      return false
+    end
+  end
+  table.insert(list, entry)
+  write_connections(list)
   return true
 end
 
@@ -98,65 +107,211 @@ local function test_connection(t, url)
   return result.code == 0, vim.trim((result.stderr ~= '' and result.stderr) or result.stdout or '')
 end
 
-local function ask(prompt, default, secret)
-  local ok, value = pcall(secret and vim.fn.inputsecret or vim.fn.input, prompt, default or '')
-  return ok and value or nil
+local function type_by_label(label)
+  for _, t in ipairs(TYPES) do
+    if t.label == label then
+      return t
+    end
+  end
+  return TYPES[1]
+end
+
+local function decode(s)
+  return (s:gsub('%%(%x%x)', function(h)
+    return string.char(tonumber(h, 16))
+  end))
+end
+
+-- Form values of a saved connection: its own settings, or parsed from the URL
+local function values_of(entry)
+  if entry.pc then
+    return vim.tbl_extend('force', vim.deepcopy(entry.pc), { name = entry.name, password = '' })
+  end
+  local scheme, rest = entry.url:match '^(%w+):(.*)$'
+  local v = { name = entry.name }
+  for _, t in ipairs(TYPES) do
+    if scheme and (t.scheme == scheme or (t.scheme == 'postgresql' and scheme == 'postgres')) then
+      v.type = t.label
+    end
+  end
+  if scheme == 'sqlite' then
+    v.file = rest
+    return v
+  end
+  local auth, host, port, db = (rest or ''):match '^//([^@/]*@?)([^:/?]*):?(%d*)/?([^?]*)'
+  local user = auth and auth:match '^([^:@]*)'
+  v.host, v.port, v.database, v.user = host, port ~= '' and port or nil, db, user and decode(user)
+  return v
+end
+
+-- URL and saved settings of the form's values
+local function build(values, local_port)
+  local t = type_by_label(values.type)
+  if t.scheme == 'sqlite' then
+    return 'sqlite:' .. vim.fn.fnamemodify(values.file or '', ':p'), nil
+  end
+  local tunnel = values.ssh or values.proxy
+  local host = tunnel and '127.0.0.1' or values.host
+  local port = tunnel and tostring(local_port) or values.port
+  local auth = values.user ~= '' and encode(values.user or '') or ''
+  if values.password ~= '' and t.scheme ~= 'postgresql' then
+    auth = auth .. ':' .. encode(values.password)
+  end
+  local url = ('%s://%s%s:%s/%s'):format(t.scheme, auth ~= '' and (auth .. '@') or '', host, port, values.database or '')
+  local pc = vim.deepcopy(values)
+  pc.name, pc.password, pc.local_port = nil, nil, tunnel and local_port or nil
+  return url, pc
+end
+
+local function form_fields()
+  local function server(v)
+    return type_by_label(v.type).scheme ~= 'sqlite'
+  end
+  local function ssh(v)
+    return server(v) and v.ssh
+  end
+  local function proxy(v)
+    return server(v) and v.proxy
+  end
+  local labels = vim.tbl_map(function(t)
+    return t.label
+  end, TYPES)
+  return {
+    { header = 'General' },
+    { key = 'name', label = 'Name' },
+    { key = 'type', label = 'Type', choices = labels, default = TYPES[1].label },
+    { key = 'file', label = 'Database file', complete = 'file', visible = function(v)
+      return not server(v)
+    end },
+    { key = 'host', label = 'Host', default = 'localhost', visible = server },
+    { key = 'port', label = 'Port', default = TYPES[1].port, visible = server },
+    { key = 'database', label = 'Database', default = '', visible = server },
+    { key = 'user', label = 'User', default = vim.env.USER, visible = server },
+    { key = 'password', label = 'Password', secret = true, default = '', visible = server },
+    { header = 'SSH tunnel' },
+    { key = 'ssh', label = 'Use SSH tunnel', check = true, default = false, visible = server },
+    { key = 'ssh_host', label = 'SSH host', default = '', visible = ssh },
+    { key = 'ssh_port', label = 'SSH port', default = '22', visible = ssh },
+    { key = 'ssh_user', label = 'SSH user', default = vim.env.USER, visible = ssh },
+    { key = 'ssh_key', label = 'Private key (empty = agent)', default = '', complete = 'file', visible = ssh },
+    { header = 'Proxy' },
+    { key = 'proxy', label = 'Use proxy', check = true, default = false, visible = server },
+    { key = 'proxy_type', label = 'Proxy type', choices = { 'SOCKS5', 'HTTP' }, default = 'SOCKS5', visible = proxy },
+    { key = 'proxy_host', label = 'Proxy host', default = '', visible = proxy },
+    { key = 'proxy_port', label = 'Proxy port', default = '1080', visible = proxy },
+    { key = 'proxy_user', label = 'Proxy user', default = '', visible = function(v)
+      return proxy(v) and not v.ssh
+    end },
+    { key = 'proxy_password', label = 'Proxy password', secret = true, default = '', visible = function(v)
+      return proxy(v) and not v.ssh
+    end },
+    { key = 'url', label = 'URL', readonly = true, value = function(v)
+      local url = build(v, '<local port>')
+      return (url:gsub(':[^:@/]*@', ':••••@'))
+    end },
+  }
+end
+
+--- The Data Source dialog; entry = a saved connection to edit, nil for a new one
+function M.open(entry)
+  local tunnels = require 'pc.db_tunnels'
+  local old_port = entry and entry.pc and entry.pc.local_port
+  local function local_port(values)
+    if not (values.ssh or values.proxy) then
+      return nil
+    end
+    if not old_port then
+      local taken = {}
+      for _, c in ipairs(read_connections()) do
+        if c.pc and c.pc.local_port then
+          taken[c.pc.local_port] = true
+        end
+      end
+      old_port = tunnels.free_port(taken)
+    end
+    return old_port
+  end
+  local function check(values, form)
+    local t = type_by_label(values.type)
+    local url, pc = build(values, local_port(values))
+    if t.scheme ~= 'sqlite' and values.password ~= '' and t.scheme == 'postgresql' then
+      store_pgpass(pc.local_port and '127.0.0.1' or values.host, pc.local_port and tostring(pc.local_port) or values.port, values.database ~= '' and values.database or '*', values.user, values.password)
+    end
+    local ok, err = tunnels.ensure({ name = values.name or 'new', url = url, pc = pc }, true)
+    if ok then
+      ok, err = test_connection(t, url)
+    end
+    form:say(ok and 'Test Connection: succeeded' or ('Test Connection failed: ' .. err), ok and vim.log.levels.INFO or vim.log.levels.ERROR)
+    return ok, url, pc
+  end
+  require('pc.form').open {
+    title = entry and ('Data Source: ' .. entry.name) or 'New Data Source',
+    fields = form_fields(),
+    values = entry and values_of(entry) or nil,
+    on_change = function(values, key)
+      if key == 'type' then
+        values.port = type_by_label(values.type).port
+      end
+    end,
+    buttons = {
+      { label = 'Test Connection', key = '<C-t>', run = check },
+      {
+        label = 'OK',
+        key = '<C-s>',
+        run = function(values, form)
+          if not values.name or values.name == '' then
+            values.name = type_by_label(values.type).scheme == 'sqlite' and vim.fn.fnamemodify(values.file or 'db', ':t:r') or ((values.database ~= '' and values.database or 'db') .. '@' .. (values.host or ''))
+          end
+          local ok, url, pc = check(values, form)
+          if not ok and vim.fn.confirm('Test Connection failed. Save anyway?', '&Yes\n&No', 2) ~= 1 then
+            return
+          end
+          if save_connection({ name = values.name, url = url, pc = pc }, entry and entry.name) then
+            form:close()
+            vim.notify(('Data source "%s" saved (Database window: <leader>S)'):format(values.name))
+          end
+        end,
+      },
+    },
+  }
 end
 
 function M.add()
-  vim.ui.select(TYPES, {
-    prompt = 'New Data Source',
-    format_item = function(t)
-      return t.label
-    end,
-  }, function(t)
-    if not t then
-      return
-    end
-    local url, name
-    if t.scheme == 'sqlite' then
-      local file = ask('Database file: ', vim.fn.getcwd() .. '/')
-      if not file or file == '' then
-        return
-      end
-      url = 'sqlite:' .. vim.fn.fnamemodify(file, ':p')
-      name = vim.fn.fnamemodify(file, ':t:r')
-    else
-      local host = ask('Host: ', 'localhost')
-      local port = host and ask('Port: ', t.port)
-      local db = port and ask('Database: ', '')
-      local user = db and ask('User: ', vim.env.USER)
-      local password = user and ask('Password (empty = none): ', '', true)
-      if not password then
-        return
-      end
-      local auth = user ~= '' and encode(user) or ''
-      if password ~= '' and t.scheme == 'postgresql' then
-        store_pgpass(host, port, db ~= '' and db or '*', user, password)
-      elseif password ~= '' then
-        auth = auth .. ':' .. encode(password)
-      end
-      url = ('%s://%s%s:%s/%s'):format(t.scheme, auth ~= '' and (auth .. '@') or '', host, port, db)
-      name = (db ~= '' and db or t.scheme) .. '@' .. host
-    end
+  M.open(nil)
+end
 
-    local ok, err = test_connection(t, url)
-    if ok then
-      vim.notify('Test Connection: succeeded')
-    else
-      vim.notify('Test Connection failed:\n' .. err, vim.log.levels.WARN)
-      if vim.fn.confirm('Save the connection anyway?', '&Yes\n&No', 2) ~= 1 then
-        return
-      end
-    end
-    name = ask('Name: ', name)
-    if name and name ~= '' and save_connection(name, url) then
-      vim.notify(('Data source "%s" added (Database window: <leader>S)'):format(name))
+--- Data Sources: pick one to edit, or + New
+function M.manage()
+  local items = vim.list_extend({ { name = '+ New data source…' } }, read_connections())
+  vim.ui.select(items, {
+    prompt = 'Data Sources',
+    format_item = function(c)
+      return c.name .. (c.pc and (c.pc.ssh and '  (SSH)' or c.pc.proxy and '  (proxy)') or '')
+    end,
+  }, function(c, i)
+    if c then
+      M.open(i > 1 and c or nil)
     end
   end)
 end
 
+--- Starts the tunnel of a saved connection by name (consoles, Database window)
+function M.ensure_tunnel(name)
+  for _, c in ipairs(read_connections()) do
+    if c.name == name then
+      local ok, err = require('pc.db_tunnels').ensure(c)
+      if not ok then
+        vim.notify(err, vim.log.levels.ERROR)
+      end
+      return ok
+    end
+  end
+  return true
+end
+
 vim.api.nvim_create_user_command('DBAddConnection', M.add, { desc = 'New data source' })
+vim.api.nvim_create_user_command('DBDataSources', M.manage, { desc = 'Data sources' })
+vim.keymap.set('n', '<leader>Qd', M.manage, { desc = 'Data sources (edit / new)' })
 
 vim.api.nvim_create_autocmd('FileType', {
   pattern = 'dbui',
@@ -164,6 +319,15 @@ vim.api.nvim_create_autocmd('FileType', {
   callback = function(event)
     vim.keymap.set('n', 'a', M.add, { buffer = event.buf, desc = 'New data source' })
     vim.keymap.set('n', '<M-Insert>', M.add, { buffer = event.buf, desc = 'New data source' })
+    vim.keymap.set('n', 'E', M.manage, { buffer = event.buf, desc = 'Edit data sources' })
+    -- tunnels of the listed connections, so expanding one just works
+    vim.schedule(function()
+      for _, c in ipairs(read_connections()) do
+        if c.pc and c.pc.local_port then
+          M.ensure_tunnel(c.name)
+        end
+      end
+    end)
   end,
 })
 

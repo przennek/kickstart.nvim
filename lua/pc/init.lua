@@ -1,4 +1,5 @@
 require 'pc.actions' -- first: records the keymaps defined below for Find Action
+require 'pc.proxy' -- early: the saved proxy goes to the environment before anything is spawned
 require 'pc.config'
 require 'pc.remap'
 require 'pc.autocmds'

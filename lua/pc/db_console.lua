@@ -41,6 +41,8 @@ end
 local function connection_url(name)
   for _, c in ipairs(connections()) do
     if c.name == name then
+      -- SSH tunnel / proxy of the data source (db_connections)
+      require('pc.db_connections').ensure_tunnel(name)
       return c.url
     end
   end
