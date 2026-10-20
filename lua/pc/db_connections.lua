@@ -295,6 +295,30 @@ function M.manage()
   end)
 end
 
+--- Disconnect (IDEA's Database → Disconnect): cancels running queries and closes the data
+--- source's SSH tunnel / proxy; the next query connects again
+function M.disconnect()
+  local tunnels = require 'pc.db_tunnels'
+  local list = read_connections()
+  if #list == 0 then
+    return vim.notify('No data sources', vim.log.levels.INFO)
+  end
+  vim.ui.select(list, {
+    prompt = 'Disconnect',
+    format_item = function(c)
+      local up = c.pc and c.pc.local_port and tunnels.running(c.pc.local_port)
+      return (up and '● ' or '  ') .. c.name
+    end,
+  }, function(c)
+    if not c then
+      return
+    end
+    local canceled = package.loaded['pc.db_console'] and require('pc.db_console').cancel(true)
+    local closed = c.pc and c.pc.local_port and tunnels.stop(c.pc.local_port)
+    vim.notify(('Disconnected %s%s%s'):format(c.name, closed and ' (tunnel closed)' or '', canceled and ', queries canceled' or ''))
+  end)
+end
+
 --- Starts the tunnel of a saved connection by name (consoles, Database window)
 function M.ensure_tunnel(name)
   for _, c in ipairs(read_connections()) do
@@ -312,6 +336,8 @@ end
 vim.api.nvim_create_user_command('DBAddConnection', M.add, { desc = 'New data source' })
 vim.api.nvim_create_user_command('DBDataSources', M.manage, { desc = 'Data sources' })
 vim.keymap.set('n', '<leader>Qd', M.manage, { desc = 'Data sources (edit / new)' })
+vim.keymap.set('n', '<leader>Qx', M.disconnect, { desc = 'Disconnect data source' })
+vim.api.nvim_create_user_command('DBDisconnect', M.disconnect, { desc = 'Disconnect a data source' })
 
 vim.api.nvim_create_autocmd('FileType', {
   pattern = 'dbui',
@@ -320,6 +346,7 @@ vim.api.nvim_create_autocmd('FileType', {
     vim.keymap.set('n', 'a', M.add, { buffer = event.buf, desc = 'New data source' })
     vim.keymap.set('n', '<M-Insert>', M.add, { buffer = event.buf, desc = 'New data source' })
     vim.keymap.set('n', 'E', M.manage, { buffer = event.buf, desc = 'Edit data sources' })
+    vim.keymap.set('n', 'X', M.disconnect, { buffer = event.buf, desc = 'Disconnect' })
     -- tunnels of the listed connections, so expanding one just works
     vim.schedule(function()
       for _, c in ipairs(read_connections()) do

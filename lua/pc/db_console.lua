@@ -346,7 +346,8 @@ local function cancel_on_server()
   end
 end
 
-function M.cancel()
+--- Cancels the running queries; quiet = no message when there are none (Disconnect)
+function M.cancel(quiet)
   local any = false
   for output in pairs(running) do
     local buf = vim.fn.bufnr(output)
@@ -359,13 +360,18 @@ function M.cancel()
   if any then
     cancel_on_server()
   end
-  vim.notify(any and 'Query canceled' or 'No query is running')
+  if any or not quiet then
+    vim.notify(any and 'Query canceled' or 'No query is running')
+  end
+  return any
 end
 
 vim.keymap.set('n', '<leader>Qq', M.open, { desc = 'Open query console' })
 vim.keymap.set('n', '<leader>Qs', M.choose_schema, { desc = 'Choose schema' })
 vim.keymap.set('n', '<leader>Qh', M.history, { desc = 'Query history' })
-vim.keymap.set('n', '<leader>Qc', M.cancel, { desc = 'Cancel query' })
+vim.keymap.set('n', '<leader>Qc', function()
+  M.cancel()
+end, { desc = 'Cancel query' })
 
 local group = vim.api.nvim_create_augroup('pc-db-console', { clear = true })
 

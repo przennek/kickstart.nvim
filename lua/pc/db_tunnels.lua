@@ -109,6 +109,21 @@ function M.ensure(entry, restart)
   return true
 end
 
+--- Is the tunnel of this local port running (started by this Neovim)?
+function M.running(port)
+  return jobs[port] ~= nil
+end
+
+--- Stops the tunnel of a local port; true when one was running
+function M.stop(port)
+  if not jobs[port] then
+    return false
+  end
+  pcall(vim.fn.jobstop, jobs[port])
+  jobs[port] = nil
+  return true
+end
+
 function M.stop_all()
   for _, job in pairs(jobs) do
     pcall(vim.fn.jobstop, job)
