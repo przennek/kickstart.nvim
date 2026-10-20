@@ -367,6 +367,10 @@ vim.api.nvim_create_autocmd('FileType', {
     for _, lhs in ipairs { 'a', 'A', '<M-Insert>', '<M-n>' } do
       vim.keymap.set('n', lhs, M.add, { buffer = event.buf, nowait = true, desc = 'New data source' })
     end
+    -- Ctrl+J / Ctrl+K move between splits here too (dadbod-ui: first / last sibling; J / K stay)
+    for _, lhs in ipairs { '<C-j>', '<C-k>' } do
+      pcall(vim.keymap.del, 'n', lhs, { buffer = event.buf })
+    end
     -- the "Add connection" line too; on other lines Enter does what it did
     for _, lhs in ipairs { '<CR>', 'o', '<2-LeftMouse>' } do
       vim.keymap.set('n', lhs, function()

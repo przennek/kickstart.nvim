@@ -88,6 +88,8 @@ return {
       backends = { 'lsp', 'treesitter', 'markdown', 'man' },
       layout = { min_width = 30 },
       show_guides = true,
+      -- Ctrl+J / Ctrl+K move between splits (and tmux panes) here too, as everywhere else
+      keymaps = { ['<C-j>'] = false, ['<C-k>'] = false },
     },
     config = function(_, opts)
       require('aerial').setup(opts)
