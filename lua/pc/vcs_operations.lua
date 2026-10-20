@@ -69,6 +69,38 @@ function M.open()
   end)
 end
 
+--- Update Project (<leader>vp) like IDEA's: pull the current branch with a merge (IDEA's default),
+--- local changes put aside and back (autostash); the result as a notification, open files reload
+--- by themselves (pc.autoreload). Conflicts: <leader>vm resolves them.
+function M.update_project()
+  local file = vim.api.nvim_buf_get_name(0)
+  local dir = file ~= '' and vim.fs.dirname(file) or vim.fn.getcwd()
+  local root = vim.fs.root(dir, '.git')
+  if not root then
+    return vim.notify('Update Project: not in a git repository', vim.log.levels.WARN)
+  end
+  local before = vim.trim(vim.system({ 'git', '-C', root, 'rev-parse', 'HEAD' }, { text = true }):wait().stdout or '')
+  vim.notify 'Update Project: pulling…'
+  vim.system({ 'git', '-C', root, 'pull', '--no-rebase', '--autostash', '--no-edit' }, { text = true }, function(r)
+    vim.schedule(function()
+      local out = vim.trim((r.stdout or '') .. '\n' .. (r.stderr or ''))
+      if r.code ~= 0 then
+        local conflict = out:match 'CONFLICT' or out:match 'Merge conflict'
+        vim.notify('Update Project failed' .. (conflict and ' — conflicts: <leader>vm resolves them' or '') .. '\n' .. out, vim.log.levels.ERROR)
+      else
+        local count = vim.trim(vim.system({ 'git', '-C', root, 'rev-list', '--count', before .. '..HEAD' }, { text = true }):wait().stdout or '0')
+        vim.notify(count == '0' and 'Update Project: already up to date' or ('Update Project: %s new commit(s)'):format(count))
+      end
+      vim.cmd 'silent! checktime'
+      if package.loaded.neogit then
+        pcall(function()
+          require('neogit').dispatch_refresh()
+        end)
+      end
+    end)
+  end)
+end
+
 --- Copy Revision Number: hash of the commit that last changed the current line
 function M.copy_revision()
   local file = vim.api.nvim_buf_get_name(0)

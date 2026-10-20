@@ -164,6 +164,24 @@ local function commit_and_push()
   commit_action 'commit'
 end
 
+-- Annotate (blame) like IDEA's: the same key shows and hides it; q in the blame window closes it
+local function annotate_toggle()
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    if vim.bo[vim.api.nvim_win_get_buf(win)].filetype == 'fugitiveblame' then
+      return vim.api.nvim_win_close(win, false)
+    end
+  end
+  vim.cmd 'Git blame'
+end
+
+vim.api.nvim_create_autocmd('FileType', {
+  group = vim.api.nvim_create_augroup('pc-annotate', { clear = true }),
+  pattern = 'fugitiveblame',
+  callback = function(event)
+    vim.keymap.set('n', 'q', '<cmd>close<CR>', { buffer = event.buf, nowait = true, desc = 'Close Annotate' })
+  end,
+})
+
 local function commit_window_toggle()
   local status = require 'neogit.buffers.status'
   if status.is_open() then
@@ -178,7 +196,7 @@ return {
   {
     'tpope/vim-fugitive',
     keys = {
-      { '<leader>va', '<cmd>Git blame<CR>', desc = 'VCS: [A]nnotate (blame)' },
+      { '<leader>va', annotate_toggle, desc = 'VCS: [A]nnotate (blame)' },
     },
   },
   -- Commit window, branches, push / pull
@@ -199,7 +217,8 @@ return {
       { '<leader>vc', '<cmd>Neogit commit<CR>', desc = 'VCS: [C]ommit' },
       { '<leader>vC', commit_and_push, desc = 'VCS: [C]ommit and Push' },
       { '<leader>vA', function() commit_action 'amend' end, desc = 'VCS: [A]mend last commit' },
-      { '<leader>vp', '<cmd>Neogit pull<CR>', desc = 'VCS: [p]ull' },
+      -- Update Project: merge pull with autostash (Neogit's pull popup: p in the Alt+0 window)
+      { '<leader>vp', function() require('pc.vcs_operations').update_project() end, desc = 'VCS: Update Project (pull)' },
       { '<leader>vP', '<cmd>Neogit push<CR>', desc = 'VCS: [P]ush' },
       { '<leader>vB', '<cmd>Telescope git_branches<CR>', desc = 'VCS: [B]ranches' },
       { '<leader>vf', '<cmd>Telescope git_status<CR>', desc = 'VCS: Changed [f]iles' },
