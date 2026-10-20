@@ -64,6 +64,8 @@ regression() {
   done
   out=$(headless "$WORK/java" "" hooks.lua)
   echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
+  out=$(headless "$WORK/java" src/main/java/example/shop/OrderService.java editing.lua)
+  echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   echo "== debugger"
   local out
   out=$(headless "$WORK/java" src/test/java/example/shop/OrderServiceTest.java debug.lua WAIT=40000 BP_FILE=src/main/java/example/shop/OrderService.java BP_LINE=15 START="require('jdtls').test_class()")
