@@ -239,8 +239,18 @@ function M.toggle_file_diff()
     return M.close()
   end
   local file = vim.api.nvim_buf_get_name(0)
-  if file == '' then
-    return
+  -- a file shown by Diffview (diffview://<repo>/.git/<rev>/<path>) is that file of the repo
+  local repo, rel = file:match '^diffview://(.-)/%.git/[^/]+/(.+)$'
+  if repo then
+    file = repo .. '/' .. rel
+  end
+  if file == '' or file:match '^%a+://' or not vim.uv.fs_stat(file) then
+    return vim.notify('Show Diff: this buffer is not a file of the project', vim.log.levels.INFO)
+  end
+  if repo then
+    -- leave the Diffview tab, the diff opens next to the file in the editor
+    vim.cmd 'DiffviewClose'
+    vim.cmd.edit(vim.fn.fnameescape(file))
   end
   M.open('HEAD', file)
 end

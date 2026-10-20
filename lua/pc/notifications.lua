@@ -101,8 +101,11 @@ local function add(msg, level, opts)
   unread_error = unread_error or name == 'ERROR'
   local first = vim.split(vim.trim(msg), '\n')[1] or ''
   if name == 'ERROR' and setting('notify_echo_errors', true) then
-    local more = msg:find '\n' and '  (more: <leader>tn)' or ''
-    vim.api.nvim_echo({ { first .. more, 'ErrorMsg' } }, true, {})
+    -- one screen line at most: a longer message would stop everything at "Press ENTER"
+    local more = '  (<leader>tn)'
+    local room = math.max(10, vim.v.echospace - #more - 1)
+    local text = vim.fn.strdisplaywidth(first) > room and (vim.fn.strcharpart(first, 0, room - 1) .. '…') or first
+    vim.api.nvim_echo({ { text, 'ErrorMsg' }, { more, 'Comment' } }, true, {})
   end
   if setting('notify_status_bar', true) then
     last = { text = first, level = name }
@@ -125,6 +128,11 @@ function M.notify(msg, level, opts)
     end)
   end
   add(msg, level, opts)
+end
+
+--- Logged notifications, oldest first: { time, level, title, msg }
+function M.entries()
+  return vim.deepcopy(log)
 end
 
 --- Status bar part: spinner + running task, the last message, unread count

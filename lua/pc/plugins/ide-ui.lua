@@ -111,16 +111,34 @@ return {
       }
     end,
   },
-  -- Terminal tool window: Alt+T (Cmd+T in your macOS keymap)
+  -- Terminal tool window: Alt+T (Cmd+T in your macOS keymap). Like IDEA's tool windows: a
+  -- visible terminal you are not in gets the focus, the key in the terminal hides it.
   {
     'akinsho/toggleterm.nvim',
     version = '*',
     keys = {
-      { '<M-t>', '<cmd>ToggleTerm<CR>', mode = { 'n', 't' }, desc = 'Terminal' },
+      {
+        '<M-t>',
+        function()
+          for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+            local buf = vim.api.nvim_win_get_buf(win)
+            if vim.bo[buf].filetype == 'toggleterm' and win ~= vim.api.nvim_get_current_win() then
+              vim.api.nvim_set_current_win(win)
+              return vim.cmd 'startinsert'
+            end
+          end
+          vim.cmd 'ToggleTerm'
+        end,
+        mode = { 'n', 't' },
+        desc = 'Terminal',
+      },
     },
     opts = {
       size = 15,
       direction = 'horizontal',
+      -- always back in the shell prompt, also after leaving it with an IDE shortcut
+      persist_mode = false,
+      start_in_insert = true,
     },
   },
 }

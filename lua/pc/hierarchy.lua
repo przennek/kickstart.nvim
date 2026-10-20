@@ -511,6 +511,13 @@ function M.open()
   end)
 end
 
+--- Shows the window again with what it showed (Hide All Windows restoring it)
+function M.show()
+  if view.buf and vim.api.nvim_buf_is_valid(view.buf) then
+    open_window()
+  end
+end
+
 --- Alt+8: the Hierarchy tool window, again closes it
 function M.toggle()
   if window_open() then

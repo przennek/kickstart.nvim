@@ -92,6 +92,40 @@ map('n', '<M-->', 'zc', { desc = 'Collapse' })
 map('n', '<M-=>', 'zo', { desc = 'Expand' })
 map('x', '<M-.>', 'zf', { desc = 'Collapse selection' })
 
+-- IDE shortcuts work in the terminal too, as in IDEA's Terminal tool window: the key leaves
+-- the terminal for the last editor window and runs there (a picked file opens in the editor,
+-- not over the terminal). Shell word keys (Alt+B/F/D/.) stay with the shell.
+local function last_editor_window()
+  local prev = vim.fn.win_getid(vim.fn.winnr '#')
+  local function editor(win)
+    return win ~= 0 and vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_config(win).relative == '' and vim.bo[vim.api.nvim_win_get_buf(win)].buftype == ''
+  end
+  if editor(prev) then
+    return prev
+  end
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    if editor(win) then
+      return win
+    end
+  end
+end
+local IDE_KEYS = {
+  '<A-1>', '<M-2>', '<M-3>', '<M-4>', '<M-5>', '<M-6>', '<M-7>', '<M-8>', '<M-9>', '<M-0>',
+  '<M-n>', '<M-N>', '<M-e>', '<M-E>', '<M-F12>', '<F60>', '<M-F2>', '<F50>', '<F37>', '<F39>', '<F41>',
+}
+for _, lhs in ipairs(IDE_KEYS) do
+  map('t', lhs, function()
+    vim.cmd 'stopinsert'
+    vim.schedule(function()
+      local win = last_editor_window()
+      if win then
+        vim.api.nvim_set_current_win(win)
+      end
+      vim.api.nvim_feedkeys(vim.keycode(lhs), 'm', false)
+    end)
+  end, { desc = 'IDE shortcut from the terminal' })
+end
+
 -- Cmd+Option shortcuts (macOS Alacritty sends them as Ctrl+Alt+F1…F7; on Linux Ctrl+Alt
 -- belongs to the window manager). Each runs the existing <leader> mapping.
 local cmd_option = {

@@ -71,4 +71,23 @@ return {
       },
     },
   },
+  config = function(_, opts)
+    require('neo-tree').setup(opts)
+    -- Following the current file: a Diffview buffer (Git log, branch diff) is its file in the
+    -- repo; other non-file buffers (jdt://, fugitive://…) are skipped instead of being joined
+    -- to the cwd as a path that doesn't exist
+    local manager = require 'neo-tree.sources.manager'
+    local path_to_reveal = manager.get_path_to_reveal
+    manager.get_path_to_reveal = function(include_terminals)
+      local name = vim.api.nvim_buf_get_name(0)
+      local repo, rel = name:match '^diffview://(.-)/%.git/[^/]+/(.+)$'
+      if repo then
+        return repo .. '/' .. rel
+      end
+      if name:match '^%a[%w+.-]*://' and not (include_terminals and name:match '^term://') then
+        return nil
+      end
+      return path_to_reveal(include_terminals)
+    end
+  end,
 }
