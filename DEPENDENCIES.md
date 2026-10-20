@@ -43,23 +43,13 @@ Skróty w stylu IntelliJ, których terminal sam nie wyśle (`Ctrl+Tab`, `Ctrl+Sh
 
 - **Linux**: Alacritty — `extras/alacritty/linux.toml` → `~/.config/alacritty/alacritty.toml`
   (zakłada też tmux jako powłokę startową).
-- **macOS**: iTerm2 — profil `extras/iterm2/nvim-idea.json`. Zamknij iTerm2 (`Cmd+Q`) i z
-  Terminal.app uruchom:
-
-  ```sh
-  extras/iterm2/install.sh
-  ```
-
-  Skrypt podpina profil „Neovim (IntelliJ keys)” i ustawia go jako domyślny oraz zwalnia
-  `Cmd+1…9`: iTerm2 domyślnie przełącza nimi karty *zanim* zadziała mapowanie z profilu, więc
-  `Cmd+1` nic nie robiło, a drzewo otwierało tylko `Option+1`. Ręcznie to samo: *Settings → Keys
-  → Navigation Shortcuts → Shortcut to choose a tab: No shortcut* oraz *Settings → Profiles →
-  „Neovim (IntelliJ keys)” → Other Actions → Set as Default*. Karty iTerm2 przełączysz z menu
-  *Window* (profil i tak startuje tmux, więc zwykle wystarcza jedna karta).
-  Profil dziedziczy po „Default”, uruchamia tmux i wysyła `Cmd+<klawisz>` jako `Alt+<klawisz>` —
-  wciskasz to samo co w IntelliJ na Macu. Option działa jako Esc+, więc `Option+<klawisz>` daje
-  to samo co `Cmd+<klawisz>` (nie przeszkadza, ale nie trzeba go używać).
-  `Cmd+C` / `Cmd+V` / `Cmd+Q` / `Cmd+Tab` zostają skrótami macOS.
+- **macOS**: Alacritty — `extras/alacritty/macos.toml` → `~/.config/alacritty/alacritty.toml`
+  (`brew install --cask alacritty`, jest w Brewfile). Wysyła `Cmd+<klawisz>` jako `Alt+<klawisz>`
+  dla wszystkich skrótów, których używa ten config, więc wciskasz to samo co w IntelliJ na Macu
+  (`Cmd+1` drzewo, `Cmd+E` ostatnie pliki, `Cmd+,` Settings…); te same tłumaczenia `Ctrl+Shift+…`
+  co na Linuksie; Option też działa jako Alt; tmux na starcie. `Cmd+C` / `Cmd+V` / `Cmd+Q` /
+  `Cmd+H` / `Cmd+M` / `Cmd+Tab` zostają skrótami macOS. Przy pierwszym uruchomieniu macOS może
+  zapytać o zgodę na otwarcie aplikacji spoza App Store (*System Settings → Privacy & Security*).
 
 Czcionka: JetBrains Mono Nerd Font (ikony w drzewie, na pasku statusu, w debuggerze).
 

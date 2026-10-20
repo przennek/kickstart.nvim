@@ -25,5 +25,5 @@ brew "awscli"
 brew "hashicorp/tap/terraform"
 
 # Terminal and font
-cask "iterm2"
+cask "alacritty"
 cask "font-jetbrains-mono-nerd-font"
