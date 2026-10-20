@@ -8,7 +8,8 @@
 return {
   'kristijanhusak/vim-dadbod-ui',
   dependencies = {
-    { 'tpope/vim-dadbod', lazy = true },
+    -- :DB url query works before the Database window was ever opened
+    { 'tpope/vim-dadbod', lazy = true, cmd = 'DB' },
     { 'kristijanhusak/vim-dadbod-completion', ft = { 'sql', 'mysql', 'plsql' }, lazy = true },
   },
   cmd = { 'DBUI', 'DBUIToggle', 'DBUIAddConnection', 'DBUIFindBuffer' },
@@ -16,6 +17,8 @@ return {
     { '<leader>S', '<cmd>DBUIToggle<CR>', desc = 'Database window' },
   },
   init = function()
+    -- dadbod's own ftdetect is not read when it is loaded lazily (:DB); the result grid needs it
+    vim.filetype.add { extension = { dbout = 'dbout' } }
     vim.g.db_ui_use_nerd_fonts = 1
     vim.g.db_ui_show_database_icon = 1
     vim.g.db_ui_execute_on_save = 0

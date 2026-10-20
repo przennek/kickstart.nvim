@@ -8,9 +8,12 @@
 --   yc / yr / yC      copy cell / row (tab-separated) / whole column
 --   s / S             sort by the current column (again: descending) / original order
 --   E                 export: CSV / TSV / JSON / SQL INSERT / Markdown, to the clipboard or a file
---   i                 edit the cell: runs UPDATE … WHERE <primary key> after confirming
---                     (NULL = null; a table without a primary key matches on the whole row)
---   dd                delete the row (DELETE, after confirming)
+--   i                 edit the cell (NULL = null), dd marks the row for deletion (again: unmark);
+--                     like IDEA the changes wait in the grid, highlighted, until
+--   Ctrl+S / Ctrl+Enter   Submit: UPDATE / DELETE … WHERE <primary key> for every changed row
+--                     (a table without a primary key matches on the whole row), checked to hit
+--                     exactly one row each, after confirming, in one transaction
+--   u / U             revert the changes of this row / all of them
 -- dadbod-ui's own keys keep working (yic, yh, Ctrl+] foreign key, <leader>R layout).
 
 local M = {}
@@ -173,7 +176,9 @@ local function refresh_in_window(buf)
   end
   local count = g.last - g.first + 1
   local sorted = g.sort and ('  sorted by ' .. g.cols[g.sort.col].name .. (g.sort.desc and ' ↓' or ' ↑')) or ''
-  vim.wo[win].winbar = table.concat(parts) .. '%=%#Comment#' .. count .. (count == 1 and ' row' or ' rows') .. sorted .. ' %*'
+  local changes = M.pending_count and M.pending_count(buf) or 0
+  local waiting = changes > 0 and ('%#DiagnosticWarn#  ● ' .. changes .. ' pending (Ctrl+S submit, U revert)') or ''
+  vim.wo[win].winbar = table.concat(parts) .. '%=%#Comment#' .. count .. (count == 1 and ' row' or ' rows') .. sorted .. waiting .. ' %*'
 end
 
 -- the result buffer usually sits in a preview window while the cursor is in the query
@@ -319,6 +324,9 @@ local function sort(buf, reset)
   local g, lnum, index = current(buf)
   if not g then
     return
+  end
+  if M.pending_count and M.pending_count(buf) > 0 then
+    return vim.notify('Submit (Ctrl+S) or revert (U) the pending changes first', vim.log.levels.WARN)
   end
   if reset then
     g.sort = nil
@@ -642,12 +650,125 @@ local function where_clause(g, values, pk)
   return table.concat(conds, ' and ')
 end
 
--- Runs a statement on the row under the cursor, after checking that its WHERE matches
--- exactly one row and confirming; then on_done(g, lnum, index, value) updates the grid
-local function modify_row(buf, build, on_done)
+-- Pending changes like IDEA's table editor: edits and deletions are kept in the grid
+-- (changed cells / deleted rows highlighted) until Submit runs them in one transaction
+local pending = {} -- buf → { rows = { { orig, cur, changed = { [col] = 'NULL' | value }, deleted } } }
+local pending_ns = vim.api.nvim_create_namespace 'pc-db-grid-pending'
+vim.api.nvim_set_hl(0, 'PcDbChanged', { link = 'DiffChange', default = true })
+vim.api.nvim_set_hl(0, 'PcDbDeleted', { link = 'DiffDelete', default = true })
+
+local function pending_count(buf)
+  local n = 0
+  for _, r in ipairs((pending[buf] or {}).rows or {}) do
+    if r.deleted or next(r.changed) then
+      n = n + 1
+    end
+  end
+  return n
+end
+
+local function model(buf, g)
+  if not pending[buf] then
+    pending[buf] = {
+      rows = vim.tbl_map(function(values)
+        return { orig = vim.deepcopy(values), cur = vim.deepcopy(values), changed = {} }
+      end, all_rows(buf, g)),
+    }
+  end
+  return pending[buf].rows
+end
+
+-- Highlights of the pending changes (cells changed, rows deleted)
+local function decorate(buf)
+  vim.api.nvim_buf_clear_namespace(buf, pending_ns, 0, -1)
+  local g, p = grids[buf], pending[buf]
+  local win = vim.fn.bufwinid(buf)
+  if not (g and p) or win == -1 then
+    return
+  end
+  for i, r in ipairs(p.rows) do
+    local lnum = g.first + i - 1
+    if r.deleted then
+      vim.api.nvim_buf_set_extmark(buf, pending_ns, lnum - 1, 0, { line_hl_group = 'PcDbDeleted', virt_text = { { ' ✗ delete', 'DiagnosticError' } } })
+    end
+    for col in pairs(r.changed) do
+      local c = g.cols[col]
+      local from = vim.fn.virtcol2col(win, lnum, c.from)
+      local to = vim.fn.virtcol2col(win, lnum, c.to)
+      if from > 0 and to > 0 then
+        vim.api.nvim_buf_set_extmark(buf, pending_ns, lnum - 1, from - 1, { end_col = to, hl_group = 'PcDbChanged', priority = 150 })
+      end
+    end
+  end
+end
+
+-- Redraws the grid from the model, keeping the cursor on (lnum, index)
+local function redraw(buf, lnum, index)
+  local g = grids[buf]
+  render(buf, g, vim.tbl_map(function(r)
+    return r.cur
+  end, pending[buf].rows))
+  M.attach(buf)
+  if grids[buf] then
+    goto_cell(grids[buf], math.min(lnum, grids[buf].last), index)
+  end
+  decorate(buf)
+end
+
+local function edit_cell(buf)
   local g, lnum, index = current(buf)
   if not g or lnum < g.first or lnum > g.last then
     return
+  end
+  local row = model(buf, g)[lnum - g.first + 1]
+  vim.ui.input({ prompt = g.cols[index].name .. ' = ', default = row.cur[index] }, function(value)
+    if value == nil or value == row.cur[index] then
+      return
+    end
+    row.cur[index] = value == 'NULL' and '' or value
+    row.changed[index] = value
+    if value == row.orig[index] then
+      row.changed[index] = nil
+    end
+    redraw(buf, lnum, index)
+  end)
+end
+
+local function delete_row(buf)
+  local g, lnum, index = current(buf)
+  if not g or lnum < g.first or lnum > g.last then
+    return
+  end
+  local row = model(buf, g)[lnum - g.first + 1]
+  row.deleted = not row.deleted -- dd again on a row marked for deletion keeps it
+  redraw(buf, lnum, index)
+end
+
+local function revert(buf, all)
+  local g, lnum, index = current(buf)
+  local p = pending[buf]
+  if not (g and p) then
+    return
+  end
+  for i, r in ipairs(p.rows) do
+    if all or i == lnum - g.first + 1 then
+      r.cur, r.changed, r.deleted = vim.deepcopy(r.orig), {}, false
+    end
+  end
+  redraw(buf, lnum, index)
+  if pending_count(buf) == 0 then
+    pending[buf] = nil
+    decorate(buf)
+  end
+end
+
+-- Submit: one UPDATE per changed row, DELETE per deleted row, each matched on the primary key
+-- (or all columns) and checked to hit exactly one row, run together in a transaction
+local function submit(buf)
+  local g, lnum, index = current(buf)
+  local p = pending[buf]
+  if not (g and p) or pending_count(buf) == 0 then
+    return vim.notify('No pending changes', vim.log.levels.INFO)
   end
   local src = source(buf)
   local tbl = src and source_table(src.query)
@@ -659,63 +780,57 @@ local function modify_row(buf, build, on_done)
   if not pk then
     return vim.notify(tbl .. ': ' .. err, vim.log.levels.ERROR)
   end
-  local values = row_values(buf, g, lnum)
-  local where
-  where, err = where_clause(g, values, pk)
-  if not where then
-    return vim.notify(err, vim.log.levels.WARN)
-  end
-  build(tbl, where, g, index, values, function(statement, value)
-    local count
-    count, err = db_table.scalar(src.url, ('select count(*) from %s where %s'):format(tbl, where))
-    if not count then
-      return vim.notify(err, vim.log.levels.ERROR)
-    elseif count ~= '1' then
-      return vim.notify(('Not changed: the row matches %s rows in %s'):format(count, tbl), vim.log.levels.WARN)
-    end
-    local prompt = statement .. (#pk == 0 and '\n(no primary key: the row is matched on all columns)' or '')
-    if vim.fn.confirm(prompt, '&Execute\n&Cancel', 2) ~= 1 then
-      return
-    end
-    local ok
-    ok, err = db_table.run(src.url, statement .. ';\n')
-    if not ok then
-      return vim.notify(err, vim.log.levels.ERROR)
-    end
-    on_done(g, lnum, index, value)
-  end)
-end
-
-local function edit_cell(buf)
-  modify_row(buf, function(tbl, where, g, index, values, run)
-    vim.ui.input({ prompt = g.cols[index].name .. ' = ', default = values[index] }, function(value)
-      if value == nil or value == values[index] then
-        return
+  local statements = {}
+  for _, r in ipairs(p.rows) do
+    if r.deleted or next(r.changed) then
+      local where
+      where, err = where_clause(g, r.orig, pk)
+      if not where then
+        return vim.notify(err, vim.log.levels.WARN)
       end
-      local literal = value == 'NULL' and 'NULL' or quote_sql(value)
-      run(('UPDATE %s SET %s = %s WHERE %s'):format(tbl, g.cols[index].name, literal, where), value == 'NULL' and '' or value)
-    end)
-  end, function(g, lnum, index, value)
-    local rows = all_rows(buf, g)
-    rows[lnum - g.first + 1][index] = value
-    render(buf, g, rows)
-    M.attach(buf)
-    goto_cell(grids[buf], lnum, index)
-  end)
+      local count = db_table.scalar(src.url, ('select count(*) from %s where %s'):format(tbl, where))
+      if count ~= '1' then
+        return vim.notify(('Not submitted: a row matches %s rows in %s (%s)'):format(count or '?', tbl, where), vim.log.levels.WARN)
+      end
+      if r.deleted then
+        table.insert(statements, ('DELETE FROM %s WHERE %s'):format(tbl, where))
+      else
+        local sets = {}
+        for col, value in pairs(r.changed) do
+          table.insert(sets, ('%s = %s'):format(g.cols[col].name, value == 'NULL' and 'NULL' or quote_sql(value)))
+        end
+        table.sort(sets)
+        table.insert(statements, ('UPDATE %s SET %s WHERE %s'):format(tbl, table.concat(sets, ', '), where))
+      end
+    end
+  end
+  local prompt = table.concat(statements, ';\n') .. ';' .. (#pk == 0 and '\n(no primary key: rows are matched on all columns)' or '')
+  if vim.fn.confirm(prompt, '&Submit\n&Cancel', 2) ~= 1 then
+    return
+  end
+  local scheme = src.url:match '^(%w+):' or ''
+  local begin = scheme:match '^mysql' and 'START TRANSACTION' or 'BEGIN'
+  local sql = (scheme:match '^sqlite' and '.bail on\n' or '') .. begin .. ';\n' .. table.concat(statements, ';\n') .. ';\nCOMMIT;\n'
+  local ok
+  ok, err = db_table.run(src.url, sql)
+  if not ok then
+    return vim.notify('Submit failed, nothing changed:\n' .. err, vim.log.levels.ERROR)
+  end
+  p.rows = vim.tbl_filter(function(r)
+    return not r.deleted
+  end, p.rows)
+  for _, r in ipairs(p.rows) do
+    r.orig, r.changed = vim.deepcopy(r.cur), {}
+  end
+  redraw(buf, lnum, index)
+  pending[buf] = nil
+  decorate(buf)
+  vim.notify(('Submitted %d change%s to %s'):format(#statements, #statements == 1 and '' or 's', tbl))
 end
 
-local function delete_row(buf)
-  modify_row(buf, function(tbl, where, _, _, _, run)
-    run(('DELETE FROM %s WHERE %s'):format(tbl, where))
-  end, function(g, lnum, index)
-    local rows = all_rows(buf, g)
-    table.remove(rows, lnum - g.first + 1)
-    render(buf, g, rows)
-    M.attach(buf)
-    if #rows > 0 then
-      goto_cell(grids[buf], math.min(lnum, grids[buf].last), index)
-    end
-  end)
+M.pending_count = pending_count
+M.reset_pending = function(buf)
+  pending[buf] = nil
 end
 
 ---------------------------------------------------------------------------
@@ -755,8 +870,17 @@ function M.attach(buf)
     sort(b, true)
   end, 'Original order')
   map('E', export, 'Export data')
-  map('i', edit_cell, 'Edit cell (UPDATE)')
-  map('dd', delete_row, 'Delete row (DELETE)')
+  map('i', edit_cell, 'Edit cell (pending until Submit)')
+  map('dd', delete_row, 'Mark row for deletion (pending until Submit)')
+  map('<C-s>', submit, 'Submit changes')
+  map('<C-CR>', submit, 'Submit changes')
+  map('<F40>', submit, 'Submit changes')
+  map('u', function(b)
+    revert(b, false)
+  end, 'Revert changes of this row')
+  map('U', function(b)
+    revert(b, true)
+  end, 'Revert all changes')
   local group = vim.api.nvim_create_augroup('pc-db-grid-' .. buf, { clear = true })
   vim.api.nvim_create_autocmd({ 'CursorMoved', 'WinScrolled', 'BufWinEnter' }, {
     group = group,
@@ -781,6 +905,7 @@ vim.api.nvim_create_autocmd('FileType', {
     -- dadbod fills the buffer before setting the filetype; wait for dadbod-ui's own setup
     vim.schedule(function()
       if vim.api.nvim_buf_is_valid(event.buf) then
+        M.reset_pending(event.buf)
         M.attach(event.buf)
       end
     end)
