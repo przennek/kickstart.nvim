@@ -32,32 +32,49 @@ end, { desc = 'Find in Path' })
 
 -- Replace in Path (Ctrl+Shift+R): matches go to the Find window, then confirm to replace all
 local function replace_in_path()
-  local search = vim.fn.input('Replace in Path: ', vim.fn.expand '<cword>')
-  if search == '' then
-    return
-  end
-  local replacement = vim.fn.input('Replace "' .. search .. '" with: ')
-  local out = vim.system({ 'rg', '--vimgrep', '--fixed-strings', '--', search }, { text = true, cwd = vim.fn.getcwd() }):wait()
-  local lines = vim.split(out.stdout or '', '\n', { trimempty = true })
-  if #lines == 0 then
-    return vim.notify('No occurrences of ' .. search)
-  end
-  vim.fn.setqflist({}, ' ', { title = ('Replace %s → %s'):format(search, replacement), lines = lines, efm = '%f:%l:%c:%m' })
-  require('trouble').open 'quickfix'
-  -- ask once the Find window has opened (it takes the focus asynchronously)
-  vim.defer_fn(function()
-    vim.ui.select({ ('Replace all %d occurrences'):format(#lines), 'Cancel' }, { prompt = 'Replace in Path' }, function(choice)
-      if choice and choice:match '^Replace' then
-        -- gdefault is on, so no g flag: every match in a line is replaced
-        vim.cmd(('silent cfdo %%s/\\V%s/%s/e | update'):format(vim.fn.escape(search, '/\\'), vim.fn.escape(replacement, '/\\&~')))
-        local files = {}
-        for _, line in ipairs(lines) do
-          files[line:match '^[^:]+'] = true
-        end
-        vim.notify(('Replaced %d occurrences in %d files'):format(#lines, vim.tbl_count(files)))
+  vim.ui.input({ prompt = 'Replace in Path', default = vim.fn.expand '<cword>' }, function(search)
+    if not search or search == '' then
+      return
+    end
+    vim.ui.input({ prompt = 'Replace "' .. search .. '" with', history = 'Replace with' }, function(replacement)
+      if not replacement then
+        return
       end
+      local out = vim.system({ 'rg', '--vimgrep', '--fixed-strings', '--', search }, { text = true, cwd = vim.fn.getcwd() }):wait()
+      local lines = vim.split(out.stdout or '', '\n', { trimempty = true })
+      if #lines == 0 then
+        return vim.notify('No occurrences of ' .. search)
+      end
+      vim.fn.setqflist({}, ' ', { title = ('Replace %s → %s'):format(search, replacement), lines = lines, efm = '%f:%l:%c:%m' })
+      require('trouble').open 'quickfix'
+      -- ask once the Find window has opened (it takes the focus asynchronously)
+      vim.defer_fn(function()
+        vim.ui.select({ ('Replace all %d occurrences'):format(#lines), 'Cancel' }, { prompt = 'Replace in Path' }, function(choice)
+          if choice and choice:match '^Replace' then
+            -- exactly what was found and listed: case-sensitive like rg (not 'ignorecase'), and
+            -- gdefault is on, so no g flag: every match in a line is replaced. In an editor
+            -- window: the Find window (focused now) cannot show other buffers ('winfixbuf')
+            local cmd = ('silent cfdo %%s/\\V\\C%s/%s/e | update'):format(vim.fn.escape(search, '/\\'), vim.fn.escape(replacement, '/\\&~'))
+            local editor = vim.api.nvim_get_current_win()
+            for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+              if vim.api.nvim_win_get_config(win).relative == '' and vim.bo[vim.api.nvim_win_get_buf(win)].buftype == '' then
+                editor = win
+                break
+              end
+            end
+            vim.api.nvim_win_call(editor, function()
+              vim.cmd(cmd)
+            end)
+            local files = {}
+            for _, line in ipairs(lines) do
+              files[line:match '^[^:]+'] = true
+            end
+            vim.notify(('Replaced %d occurrences in %d files'):format(#lines, vim.tbl_count(files)))
+          end
+        end)
+      end, 200)
     end)
-  end, 200)
+  end)
 end
 map('n', '<F41>', replace_in_path, { desc = 'Replace in Path' })
 map('n', '<leader>sR', replace_in_path, { desc = 'Replace in Path' })

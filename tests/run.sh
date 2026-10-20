@@ -105,6 +105,11 @@ scenario() {
   esc "$SF6"; sleep 1.5; lit countUnpaid; k Enter; sleep 5; check rename
   expect "rename saved in the service" "$(grep -c 'countUnpaid' "$dir/src/main/java/example/shop/OrderService.java")" 1
   expect "rename saved in the test" "$(grep -c 'countUnpaid' "$dir/src/test/java/example/shop/OrderServiceTest.java")" 1
+  # Replace in Path: exactly the (case-sensitive) matches it lists, in every file
+  editor; q "execute('call search(\"\\\"PAID\") | normal! l')" >/dev/null
+  k ' sR'; sleep 1; k Enter; sleep 0.8; lit SETTLED; k Enter; sleep 2; k Enter; sleep 2; check replace
+  expect "Replace in Path: 3 files" "$(grep -rl '"SETTLED"' "$dir/src" | wc -l)" 3
+  expect "Replace in Path: lower-case 'paid' in a comment left alone" "$(grep -c 'in paid orders' "$dir/src/main/java/example/shop/OrderService.java")" 1
   # tests again: the agent fixed the threshold, all pass
   editor; ex 'e src/test/java/example/shop/OrderServiceTest.java'; ex 9; esc "$RUN_CTX"; sleep 20; check rerun
   expect "tests window: 3 of 3 passed" "$(screen | grep -c 'OrderServiceTest  3/3 passed')" 1
