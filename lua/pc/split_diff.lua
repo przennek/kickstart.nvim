@@ -94,15 +94,39 @@ local function render_list(s)
   end
 end
 
+-- q closes the diff from either side, like the list, Tests or Neogit windows (Esc as well)
+local function map_q(s, on)
+  for _, buf in ipairs { s.bufnr, s.refbuf } do
+    if buf and vim.api.nvim_buf_is_valid(buf) then
+      if on then
+        vim.keymap.set('n', 'q', M.close, { buffer = buf, desc = 'Close the diff' })
+      else
+        pcall(vim.keymap.del, 'n', 'q', { buffer = buf })
+      end
+    end
+  end
+end
+
 --- Show file number `idx`, landing on its first change (or its last one with `from_end`)
 local function show(s, idx, from_end)
+  map_q(s, false)
   close_ref(s)
   s.idx = idx
   render_list(s)
   local rel = s.files[idx]
   vim.api.nvim_set_current_win(s.win)
   s.showing = true
-  vim.cmd.edit(vim.fn.fnameescape(s.root .. '/' .. rel))
+  local path = vim.fs.normalize(s.root .. '/' .. rel)
+  -- the file already shown here stays as it is (:edit would reload it, or refuse when it has
+  -- unsaved changes): the diff shows the text being edited, like IDEA
+  if vim.fs.normalize(vim.api.nvim_buf_get_name(0)) ~= path then
+    local buf = vim.fn.bufnr(path)
+    if buf ~= -1 and vim.api.nvim_buf_is_loaded(buf) then
+      vim.api.nvim_win_set_buf(0, buf)
+    else
+      vim.cmd.edit(vim.fn.fnameescape(path))
+    end
+  end
   s.showing = false
   s.bufnr = vim.api.nvim_get_current_buf()
   require('lazy').load { plugins = { 'vim-fugitive' } }
@@ -110,7 +134,9 @@ local function show(s, idx, from_end)
   local ok = pcall(vim.cmd, 'leftabove Gvdiffsplit ' .. s.ref)
   if ok and vim.api.nvim_get_current_win() ~= s.win then
     s.refwin = vim.api.nvim_get_current_win()
+    s.refbuf = vim.api.nvim_get_current_buf()
   end
+  map_q(s, true)
   vim.api.nvim_set_current_win(s.win)
   local edge = from_end and vim.fn.line '$' or 1
   vim.api.nvim_win_set_cursor(0, { edge, 0 })
@@ -223,6 +249,7 @@ function M.close()
     return false
   end
   sessions[tab] = nil
+  map_q(s, false)
   close_ref(s)
   close_list(s)
   if vim.api.nvim_win_is_valid(s.win) and vim.api.nvim_buf_is_valid(s.prev_buf) then

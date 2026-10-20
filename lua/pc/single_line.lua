@@ -50,18 +50,24 @@ vim.on_key(function(key, typed)
   if not selected then
     return
   end
+  local k = vim.fn.keytrans(typed ~= '' and typed or key)
+  -- what plugins and the UI send without a key being typed: the selection stays
+  if k == '' or k:match '^<Cmd>' or k:match '^<Ignore>' or k:match '^<Plug>' or k:match '^<SNR>' or k:match 'Focus' or k:match 'Mouse' or k:match 'ScrollWheel' then
+    return
+  end
   local buf = selected
   unselect()
   if vim.api.nvim_get_current_buf() ~= buf or vim.fn.mode() ~= 'i' then
     return
   end
-  local k = vim.fn.keytrans(typed ~= '' and typed or key)
-  if KEEP[k] then
-    return
-  end
-  delete_text(buf)
   if DELETE[k] then
+    delete_text(buf)
     return ''
+  end
+  -- a character typed replaces the text; any other key (arrows, Tab…) only drops the selection
+  local printable = vim.fn.strchars(k) == 1 or k == '<Space>' or k == '<lt>' or k == '<Bslash>' or k == '<Bar>'
+  if printable and not KEEP[k] then
+    delete_text(buf)
   end
 end, vim.api.nvim_create_namespace 'pc-single-line-keys')
 

@@ -161,5 +161,25 @@ return {
       persist_mode = false,
       start_in_insert = true,
     },
+    config = function(_, opts)
+      require('toggleterm').setup(opts)
+      -- toggleterm switches the mode (startinsert) a moment after a terminal window was entered,
+      -- whatever window has the focus by then: a terminal reopened by Hide All left the editor
+      -- typing (and Alt+T there = Esc + t, waiting for a character). Only in the terminal itself.
+      local Terminal = require('toggleterm.terminal').Terminal
+      local modes = require('toggleterm.terminal').mode
+      function Terminal:set_mode(m)
+        vim.schedule(function()
+          if vim.api.nvim_get_current_win() ~= self.window then
+            return
+          end
+          if m == modes.INSERT or (m == modes.UNSUPPORTED and opts.start_in_insert) then
+            vim.cmd 'startinsert'
+          elseif m == modes.NORMAL then
+            vim.cmd 'stopinsert'
+          end
+        end)
+      end
+    end,
   },
 }

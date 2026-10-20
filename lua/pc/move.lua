@@ -59,20 +59,6 @@ local function prompt_file()
   end)
 end
 
--- jdtls applies the Move's edits to buffers; save them afterwards like IDEA does
-local save_after_edit = 0
-local apply_workspace_edit = vim.lsp.util.apply_workspace_edit
-vim.lsp.util.apply_workspace_edit = function(...)
-  local result = apply_workspace_edit(...)
-  if vim.uv.now() < save_after_edit then
-    save_after_edit = 0
-    vim.schedule(function()
-      vim.cmd 'silent! wall'
-    end)
-  end
-  return result
-end
-
 function M.move()
   local java = vim.lsp.get_clients({ bufnr = 0, name = 'jdtls' })[1]
   if not java then
@@ -86,8 +72,7 @@ function M.move()
   java:request('textDocument/codeAction', params, function(_, actions)
     vim.schedule(function()
       if vim.iter(actions or {}):any(is_move) then
-        -- the package / class prompt can take a while
-        save_after_edit = vim.uv.now() + 120000
+        -- the files it changes are saved by pc.refactor_save
         vim.lsp.buf.code_action { filter = is_move, apply = true }
       else
         -- nothing to move under the cursor: the file itself (jdtls updates package and imports)

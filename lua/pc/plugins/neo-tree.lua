@@ -58,6 +58,8 @@ return {
       bind_to_cwd = false,
       -- Autoscroll from source (on in your IDEA project view): the tree follows the open file
       follow_current_file = { enabled = true },
+      -- files added / removed outside nvim (an agent, git, the terminal) show up at once
+      use_libuv_file_watcher = true,
       window = {
         mappings = {
           ['<A-1>'] = 'close_window',

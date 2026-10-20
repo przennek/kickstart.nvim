@@ -185,7 +185,14 @@ return {
 
       -- <leader>x: Run / Debug (<leader>d closes the file, like CloseContent in .ideavimrc)
       { '<leader>xu', toggle_ui, desc = 'Debug: Toggle UI' },
-      { '<leader>xe', dapui 'eval', mode = { 'n', 'v' }, desc = 'Debug: Evaluate Expression' },
+      {
+        '<leader>xe',
+        function()
+          require('pc.evaluate').open()
+        end,
+        mode = { 'n', 'v' },
+        desc = 'Debug: Evaluate Expression',
+      },
       { '<leader>xc', dap 'clear_breakpoints', desc = 'Debug: Clear All Breakpoints' },
       { '<leader>xC', dap 'run_to_cursor', desc = 'Debug: Run to Cursor' },
       -- Drop Frame (IDEA's Reset Frame): back to the start of the current method, its caller calls it again

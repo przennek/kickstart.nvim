@@ -282,20 +282,22 @@ local function java_items(callback)
       table.insert(items, {
         label = RUN .. name,
         dap = true,
+        context = true,
         run = at_cursor(function()
           jdtls.test_nearest_method { config_overrides = { noDebug = true } }
         end),
       })
-      table.insert(items, { label = DEBUG .. name, run = at_cursor(jdtls.test_nearest_method) })
+      table.insert(items, { label = DEBUG .. name, context = true, run = at_cursor(jdtls.test_nearest_method) })
     end
     table.insert(items, {
       label = RUN .. file .. ' (all tests)',
       dap = true,
+      context = true,
       run = at_cursor(function()
         jdtls.test_class { config_overrides = { noDebug = true } }
       end),
     })
-    table.insert(items, { label = DEBUG .. file .. ' (all tests)', run = at_cursor(jdtls.test_class) })
+    table.insert(items, { label = DEBUG .. file .. ' (all tests)', context = true, run = at_cursor(jdtls.test_class) })
   end
 
   local build
@@ -312,26 +314,32 @@ local function java_items(callback)
   end
 
   -- Main classes are discovered asynchronously by jdtls
+  -- The current file's main class is its context (first); other main classes of the project
+  -- come after the tests and build tasks
   local ok = pcall(require('jdtls.dap').fetch_main_configs, nil, function(configs)
-    local mains = {}
+    local own, others = {}, {}
     for _, config in ipairs(configs) do
       local name = config.mainClass:match '[^.]+$'
-      table.insert(mains, {
+      local mine = name == file
+      local list = mine and own or others
+      table.insert(list, {
         label = RUN .. name,
         dap = true,
+        context = mine,
         run = function()
           require('dap').run(vim.tbl_extend('force', config, { noDebug = true }))
         end,
       })
-      table.insert(mains, {
+      table.insert(list, {
         label = DEBUG .. name,
+        context = mine,
         run = function()
           require('dap').run(config)
         end,
       })
     end
     vim.schedule(function()
-      callback(vim.list_extend(mains, items))
+      callback(vim.list_extend(vim.list_extend(own, items), others))
     end)
   end)
   if not ok then
@@ -696,8 +704,9 @@ local function context(prefix)
       return M.pick()
     end
     provider(function(items)
+      -- the first Run / Debug item of this file (not another class's main); none: the list
       for _, item in ipairs(items) do
-        if item.label:sub(1, #prefix) == prefix then
+        if item.label:sub(1, #prefix) == prefix and item.context ~= false then
           return execute(item)
         end
       end

@@ -95,7 +95,11 @@ local function start_jdtls()
     },
     cmd_env = java_home and { JAVA_HOME = java_home, PATH = java_home .. '/bin:' .. vim.env.PATH } or nil,
     root_dir = root_dir,
-    capabilities = require('cmp_nvim_lsp').default_capabilities(),
+    -- files changed outside nvim (an LLM agent, git, the terminal) reach jdtls' index too;
+    -- Neovim leaves file watching off on Linux by default
+    capabilities = vim.tbl_deep_extend('force', require('cmp_nvim_lsp').default_capabilities(), {
+      workspace = { didChangeWatchedFiles = { dynamicRegistration = true } },
+    }),
     -- settings go in init_options too: jdtls reads some of them only during initialize
     init_options = { bundles = bundles, settings = settings },
     settings = settings,

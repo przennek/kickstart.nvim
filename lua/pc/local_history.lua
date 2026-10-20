@@ -53,13 +53,13 @@ local function tracked(buf)
   return vim.bo[buf].buftype == '' and path ~= '' and not path:find '^%w+://' and path or nil
 end
 
--- Saves the file's text on disk as a new version, unless it is the same as the last one
-local function snapshot(path)
+-- Saves the file's text on disk (or `text`) as a new version, unless it is the same as the last one
+local function snapshot(path, text)
   local stat = vim.uv.fs_stat(path)
   if not stat or stat.type ~= 'file' or stat.size > MAX_SIZE then
     return
   end
-  local text = read(path)
+  text = text or read(path)
   local last = versions(path)[1]
   if not text or (last and read(last.file) == text) then
     return
@@ -209,6 +209,16 @@ function M.show(buf)
       end,
     })
     :find()
+end
+
+--- Keeps the text of an unchanged buffer before it is reloaded with a version changed outside
+--- nvim (pc.autoreload), so the change made outside shows up as a change here
+function M.keep_buffer(buf)
+  local path = tracked(buf)
+  if path and not vim.bo[buf].modified then
+    local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+    snapshot(path, table.concat(lines, '\n') .. (vim.bo[buf].eol and '\n' or ''))
+  end
 end
 
 --- Recent Changes: the saves of all files of this project, newest first

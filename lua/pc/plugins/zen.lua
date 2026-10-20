@@ -13,7 +13,24 @@ return {
     {
       '<leader>z',
       function()
-        require('zen-mode').toggle()
+        local view = require 'zen-mode.view'
+        -- like IDEA: the editor is presented, also when the key is pressed in a tool window
+        if not view.is_open() and vim.bo.buftype ~= '' then
+          for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+            local buf = vim.api.nvim_win_get_buf(win)
+            if vim.api.nvim_win_get_config(win).relative == '' and vim.bo[buf].buftype == '' and vim.api.nvim_buf_get_name(buf) ~= '' then
+              vim.api.nvim_set_current_win(win)
+              break
+            end
+          end
+          if vim.bo.buftype ~= '' then
+            return vim.notify('Presentation Mode: no editor window', vim.log.levels.INFO)
+          end
+        end
+        local ok, err = pcall(require('zen-mode').toggle)
+        if not ok then
+          vim.notify('Presentation Mode: ' .. tostring(err), vim.log.levels.WARN)
+        end
       end,
       desc = 'Toggle Presentation Mode',
     },
