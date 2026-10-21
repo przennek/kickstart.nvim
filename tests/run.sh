@@ -78,6 +78,16 @@ regression() {
   out=$(headless "$WORK" "" db_connect.lua SILENT_PORT=55991 PASSWORD_PORT=55992 FREE_PORT=55993 PGPASSFILE=/dev/null)
   kill $silent $password 2>/dev/null; wait $silent $password 2>/dev/null
   echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
+  # console switch needs a PostgreSQL server (PG_URL=postgresql://user@host:port/db) and a data
+  # directory of its own: consoles are written there; the plugins are linked in
+  if [ -n "${PG_URL:-}" ]; then
+    mkdir -p "$WORK/data/nvim"
+    for f in "${XDG_DATA_HOME:-$HOME/.local/share}"/nvim/*; do [ "$(basename "$f")" = dadbod ] || ln -sfn "$f" "$WORK/data/nvim/"; done
+    out=$(headless "$WORK" "" db_switch.lua XDG_DATA_HOME="$WORK/data" PG_URL="$PG_URL")
+    echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
+  else
+    echo "skip console switch (no PG_URL)"
+  fi
   echo "== debugger"
   local out
   out=$(headless "$WORK/java" src/test/java/example/shop/OrderServiceTest.java debug.lua WAIT=40000 BP_FILE=src/main/java/example/shop/OrderService.java BP_LINE=15 START="require('jdtls').test_class()")

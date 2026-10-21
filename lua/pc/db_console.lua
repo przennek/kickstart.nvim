@@ -1,12 +1,13 @@
 -- Query consoles, like IDEA's database consoles: several named consoles per connection, a
 -- schema per console, query history and Cancel.
 --   <leader>Qq   open a console (or "New console…": pick the connection, name it)
---   <leader>Qs   choose the schema of this console (PostgreSQL: search_path, MySQL: database)
+--   <leader>Qs   switch this console: schema, database of the server (PostgreSQL) or another
+--                data source, in one list (the console toolbar of IDEA); the text stays
 --   <leader>Qh   query history (all connections): Enter puts the query into the console
 --   Ctrl+F2 / <leader>Qc   cancel the running query (also Ctrl+C in the results)
 --   Alt+Enter    execute the statement under the cursor / the selection (plugins/database.lua)
 -- Consoles are plain .sql files outside the projects (stdpath data /dadbod/consoles), so they
--- keep their text between sessions. The window shows "connection › schema" on top.
+-- keep their text between sessions. The window shows "connection › database › schema" on top.
 
 local M = {}
 
@@ -69,14 +70,19 @@ local function with_schema(url, schema)
   return url
 end
 
---- Console of a buffer: { conn = name, schema = name? } or nil
+-- another database of the same server: the path of the URL
+local function with_database(url, database)
+  return (url:gsub('^([^:]+://[^/?]*)/?[^?]*', '%1/' .. database, 1))
+end
+
+--- Console of a buffer: { conn = name, database = name?, schema = name? } or nil
 local function console_of(buf)
   local name = vim.api.nvim_buf_get_name(buf)
   return vim.startswith(name, consoles_dir .. '/') and read_json(meta_file, {})[name] or nil
 end
 
 local function label(c)
-  return '󰆼 ' .. c.conn .. (c.schema and (' › ' .. c.schema) or '')
+  return '󰆼 ' .. c.conn .. (c.database and (' › ' .. c.database) or '') .. (c.schema and (' › ' .. c.schema) or '')
 end
 
 --- The URL Alt+Enter runs on in this buffer, or nil to use dadbod-ui / b:db
@@ -84,6 +90,9 @@ function M.url(buf)
   local c = console_of(buf or 0)
   if c then
     local url = connection_url(c.conn)
+    if url and c.database then
+      url = with_database(url, c.database)
+    end
     return url and with_schema(url, c.schema)
   end
   return vim.b[buf or 0].pc_db_url
@@ -179,7 +188,9 @@ function M.open()
   end)
 end
 
-local function list_schemas(url)
+-- { schemas, databases } of a connection; databases only for PostgreSQL (one round trip: the
+-- server may be far away)
+local function list_targets(url)
   if url:match '^postgres' then
     local result = vim
       .system({
@@ -189,44 +200,86 @@ local function list_schemas(url)
         '-At',
         url,
         '-c',
-        "select schema_name from information_schema.schemata where schema_name !~ '^(pg_|information_schema$)' order by 1",
-      }, { text = true, timeout = 10000 })
+        "select 's', schema_name from information_schema.schemata where schema_name !~ '^(pg_|information_schema$)'"
+          .. " union all select 'd', datname from pg_database where datallowconn and not datistemplate order by 1, 2",
+      }, { text = true, timeout = 15000 })
       :wait()
     if result.code ~= 0 then
-      return nil, vim.trim(result.stderr or '')
+      return nil, vim.trim(result.stderr ~= '' and result.stderr or 'no answer within 15 s')
     end
-    return vim.split(vim.trim(result.stdout), '\n', { trimempty = true })
+    local schemas, databases = {}, {}
+    for _, line in ipairs(vim.split(vim.trim(result.stdout), '\n', { trimempty = true })) do
+      local kind, name = line:match '^(%a)|(.*)$'
+      table.insert(kind == 's' and schemas or databases, name)
+    end
+    return schemas, databases
   elseif url:match '^mysql' or url:match '^mariadb' then
-    return vim.fn['db#adapter#call'](url, 'complete_database', { url }, {})
+    return vim.fn['db#adapter#call'](url, 'complete_database', { url }, {}), {}
   end
-  return nil, 'this database has no schemas to choose'
+  return {}, {}
 end
 
+local function update_console(buf, change)
+  local meta = read_json(meta_file, {})
+  local path = vim.api.nvim_buf_get_name(buf)
+  meta[path] = vim.tbl_extend('force', meta[path] or {}, change)
+  for k, v in pairs(change) do
+    if v == vim.NIL then
+      meta[path][k] = nil
+    end
+  end
+  write_json(meta_file, meta)
+  for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+    show_label(win)
+  end
+end
+
+--- The console's schema, database or data source, from one list
 function M.choose_schema()
   local buf = vim.api.nvim_get_current_buf()
   local c = console_of(buf)
   if not c then
-    return vim.notify('Choose schema works in a query console (<leader>Qq)', vim.log.levels.WARN)
+    return vim.notify('Switch works in a query console (<leader>Qq)', vim.log.levels.WARN)
   end
+  local items = {}
   local url = connection_url(c.conn)
-  if not url then
-    return vim.notify('Connection "' .. c.conn .. '" no longer exists', vim.log.levels.ERROR)
+  if url then
+    local schemas, databases = list_targets(c.database and with_database(url, c.database) or url)
+    if not schemas then
+      vim.notify('Switch: ' .. databases .. ' (other data sources still listed)', vim.log.levels.WARN)
+    else
+      local current_db = c.database or url:match '^[^:]+://[^/?]*/([^?]*)'
+      table.insert(items, { kind = 'schema', label = 'schema    (default)', current = not c.schema })
+      for _, name in ipairs(schemas) do
+        table.insert(items, { kind = 'schema', name = name, label = 'schema    ' .. name, current = c.schema == name })
+      end
+      for _, name in ipairs(databases) do
+        table.insert(items, { kind = 'database', name = name, label = 'database  ' .. name, current = name == current_db })
+      end
+    end
   end
-  local schemas, err = list_schemas(url)
-  if not schemas then
-    return vim.notify('Choose schema: ' .. err, vim.log.levels.WARN)
+  for _, conn in ipairs(connections()) do
+    if conn.name ~= c.conn then
+      table.insert(items, { kind = 'source', name = conn.name, label = 'source    ' .. conn.name })
+    end
   end
-  table.insert(schemas, 1, '(default)')
-  vim.ui.select(schemas, { prompt = 'Schema for ' .. c.conn }, function(schema)
-    if not schema then
+  vim.ui.select(items, {
+    prompt = 'Switch ' .. vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ':t:r'),
+    format_item = function(item)
+      return (item.current and '● ' or '  ') .. item.label
+    end,
+  }, function(item)
+    if not item then
       return
     end
-    local meta = read_json(meta_file, {})
-    local path = vim.api.nvim_buf_get_name(buf)
-    meta[path].schema = schema ~= '(default)' and schema or nil
-    write_json(meta_file, meta)
-    for _, win in ipairs(vim.fn.win_findbuf(buf)) do
-      show_label(win)
+    if item.kind == 'schema' then
+      update_console(buf, { schema = item.name or vim.NIL })
+    elseif item.kind == 'database' then
+      -- the schemas of the other database are its own: back to its default
+      local default_db = url and url:match '^[^:]+://[^/?]*/([^?]*)'
+      update_console(buf, { database = item.name ~= default_db and item.name or vim.NIL, schema = vim.NIL })
+    else
+      update_console(buf, { conn = item.name, database = vim.NIL, schema = vim.NIL })
     end
   end)
 end
@@ -253,7 +306,7 @@ end
 function M.connection_name(buf)
   local c = console_of(buf)
   if c then
-    return c.conn .. (c.schema and ('.' .. c.schema) or '')
+    return c.conn .. (c.database and ('.' .. c.database) or '') .. (c.schema and ('.' .. c.schema) or '')
   end
   local key = vim.b[buf].dbui_db_key_name
   return key and key:gsub('_[^_]*$', '') or 'b:db'
@@ -367,7 +420,7 @@ function M.cancel(quiet)
 end
 
 vim.keymap.set('n', '<leader>Qq', M.open, { desc = 'Open query console' })
-vim.keymap.set('n', '<leader>Qs', M.choose_schema, { desc = 'Choose schema' })
+vim.keymap.set('n', '<leader>Qs', M.choose_schema, { desc = 'Switch schema / database / data source' })
 vim.keymap.set('n', '<leader>Qh', M.history, { desc = 'Query history' })
 vim.keymap.set('n', '<leader>Qc', function()
   M.cancel()
