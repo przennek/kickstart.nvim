@@ -67,21 +67,46 @@ local function save_connection(entry, replaces)
   return true
 end
 
--- host:port:database:user:password, replacing an existing entry for the same target
-local function store_pgpass(host, port, db, user, password)
-  local path = vim.fs.joinpath(vim.env.HOME, '.pgpass')
-  local key = table.concat({ host, port, db, user }, ':') .. ':'
+-- the fields of a ~/.pgpass line (\: and \\ are escapes)
+local function pgpass_fields(line)
+  local fields, field, i = {}, '', 1
+  while i <= #line do
+    local c = line:sub(i, i)
+    if c == '\\' and i < #line then
+      field, i = field .. line:sub(i + 1, i + 1), i + 1
+    elseif c == ':' then
+      table.insert(fields, field)
+      field = ''
+    else
+      field = field .. c
+    end
+    i = i + 1
+  end
+  table.insert(fields, field)
+  return fields
+end
+
+-- host:port:*:user:password. A PostgreSQL role has one password for the whole server, so it
+-- is stored for every database: switching to another database of the data source just works.
+-- Older entries of this server and user (for one database or all) are replaced, else libpq
+-- would keep using the first of them.
+local function store_pgpass(host, port, user, password)
+  local path = vim.env.PGPASSFILE or vim.fs.joinpath(vim.env.HOME, '.pgpass')
+  local function esc(s)
+    return (s:gsub('\\', '\\\\'):gsub(':', '\\:'))
+  end
   local lines = {}
   local f = io.open(path)
   if f then
     for line in f:lines() do
-      if not vim.startswith(line, key) then
+      local p = pgpass_fields(line)
+      if line:match '^%s*#' or not (p[1] == host and p[2] == port and p[4] == user) then
         table.insert(lines, line)
       end
     end
     f:close()
   end
-  table.insert(lines, key .. password:gsub('\\', '\\\\'):gsub(':', '\\:'))
+  table.insert(lines, table.concat({ esc(host), esc(port), '*', esc(user), esc(password) }, ':'))
   f = assert(io.open(path, 'w'))
   f:write(table.concat(lines, '\n') .. '\n')
   f:close()
@@ -248,7 +273,7 @@ function M.open(entry)
     local t = type_by_label(values.type)
     local url, pc = build(values, local_port(values))
     if t.scheme ~= 'sqlite' and values.password ~= '' and t.scheme == 'postgresql' then
-      store_pgpass(pc.local_port and '127.0.0.1' or values.host, pc.local_port and tostring(pc.local_port) or values.port, values.database ~= '' and values.database or '*', values.user, values.password)
+      store_pgpass(pc.local_port and '127.0.0.1' or values.host, pc.local_port and tostring(pc.local_port) or values.port, values.user, values.password)
     end
     local ok, err = tunnels.ensure({ name = values.name or 'new', url = url, pc = pc }, true)
     if ok then
@@ -417,5 +442,9 @@ function M.test(url)
   end
   return false, 'unknown database type: ' .. tostring(scheme)
 end
+
+
+--- Saves a PostgreSQL password for every database of host:port and user (~/.pgpass)
+M.store_pgpass = store_pgpass
 
 return M
