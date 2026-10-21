@@ -186,6 +186,14 @@ scenario() {
   k M-t; sleep 0.5; editor; k M-t; sleep 1; k C-k; sleep 0.3; editor
   esc "$HIDE_ALL"; sleep 0.8; esc "$HIDE_ALL"; sleep 1
   expect "Hide All twice: the editor stays in Normal mode" "$(q 'mode()')" n
+  # commit from the Commit window with nothing staged: every tracked change goes (IDEA: all
+  # changes checked), the agent's new files stay unversioned
+  editor; k M-0; sleep 3; k c; sleep 1; k c; sleep 3
+  lit 'Review fixes'; k Escape; sleep 0.3; ex wq; sleep 4; check commit
+  expect "commit: last message" "$(git -C "$dir" log -1 --format=%s)" "Review fixes"
+  expect "commit: no tracked change left" "$(git -C "$dir" status --porcelain --untracked-files=no | wc -l)" 0
+  expect "commit: the agent's new files stay unversioned" "$( [ -n "$(git -C "$dir" status --porcelain | grep '^??')" ] && echo yes || echo no)" yes
+  k M-0; sleep 1; editor
   hammer "$STEPS"
   stop
 }

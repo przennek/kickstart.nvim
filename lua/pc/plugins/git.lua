@@ -277,6 +277,26 @@ return {
       -- Commit window (Alt+0) slides in at the bottom like an IDEA tool window, not a full tab
       kind = 'split_below_all',
     },
+    config = function(_, opts)
+      require('neogit').setup(opts)
+      -- Commit with nothing staged commits every change of tracked files (and files the IDE
+      -- added), like IDEA's Commit window with all changes checked; staged changes alone are
+      -- committed as they are. Neogit itself only says "No changes to commit".
+      local actions = require 'neogit.popups.commit.actions'
+      local status = require('neogit.lib.git').status
+      local commit = actions.commit
+      actions.commit = function(popup)
+        if not status.anything_staged() and status.anything_unstaged() then
+          local get = popup.get_arguments
+          popup = setmetatable({
+            get_arguments = function(self)
+              return vim.list_extend(vim.deepcopy(get(self)), { '--all' })
+            end,
+          }, { __index = popup })
+        end
+        return commit(popup)
+      end
+    end,
     init = function()
       vim.api.nvim_create_autocmd('FileType', {
         pattern = 'NeogitStatus',
