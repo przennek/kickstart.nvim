@@ -200,6 +200,12 @@ scenario() {
   k M-0; sleep 1; editor
   hammer "$STEPS"
   stop
+  # Python: renaming a module in the tree changes its imports (the server's willRenameFiles)
+  start "$WORK/python" shop/calculator.py
+  sleep 10; check python-start
+  editor; k M-1; sleep 1.5; k r; sleep 1; k C-u; lit pricing.py; k Enter; sleep 4; check python-tree-rename
+  expect "Python: module renamed in the tree, its import follows" "$(head -1 "$WORK/python/tests/test_calculator.py")" "from shop.pricing import Line, PriceCalculator"
+  stop
 }
 
 case $MODE in
