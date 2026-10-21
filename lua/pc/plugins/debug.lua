@@ -317,6 +317,58 @@ return {
         dapui.open()
       end
     end
+    -- Step Into (F7) skips the JDK and the test framework in Java, like IDEA's default "Do not
+    -- step into the classes" list (it went into java.util.stream internals)
+    dap.listeners.on_config['pc-java-step-filters'] = function(config)
+      if config.type == 'java' and not config.stepFilters then
+        config = vim.deepcopy(config)
+        config.stepFilters = {
+          skipClasses = { 'java.*', 'javax.*', 'jdk.*', 'sun.*', 'com.sun.*', 'junit.*', 'org.junit.*', 'org.opentest4j.*', 'kotlin.*' },
+          skipSynthetics = true,
+          skipStaticInitializers = false,
+          skipConstructors = false,
+        }
+      end
+      return config
+    end
+    -- ...and a step that still ends in such a class (returning from a lambda into the stream
+    -- that called it) steps on, like IDEA: the next stop is project code
+    local skip_packages = { '^java%.', '^javax%.', '^jdk%.', '^sun%.', '^com%.sun%.', '^junit%.', '^org%.junit%.', '^org%.opentest4j%.', '^kotlin%.' }
+    local stepping_in, extra_steps = false, 0
+    dap.listeners.before.stepIn['pc-java-step-filters'] = function()
+      stepping_in = true
+    end
+    for _, command in ipairs { 'next', 'stepOut', 'continue', 'pause' } do
+      dap.listeners.before[command]['pc-java-step-filters'] = function()
+        stepping_in, extra_steps = false, 0
+      end
+    end
+    dap.listeners.after.event_stopped['pc-java-step-filters'] = function(session, body)
+      if not (stepping_in and body.reason == 'step' and session.config.type == 'java' and body.threadId) then
+        extra_steps = 0
+        return
+      end
+      session:request('stackTrace', { threadId = body.threadId, levels = 1 }, function(err, result)
+        local frame = not err and result and result.stackFrames and result.stackFrames[1]
+        if not frame then
+          return
+        end
+        local path = frame.source and frame.source.path or ''
+        -- jdt://contents/<module or jar>/<package>/<Class>.class?…; a generated lambda class
+        -- has no source at all
+        local package = path:match '^jdt://contents/[^/]+/([^/]+)/'
+        local skipped = path == ''
+        for _, pattern in ipairs(skip_packages) do
+          skipped = skipped or (package ~= nil and package:match(pattern) ~= nil)
+        end
+        if skipped and extra_steps < 10 then
+          extra_steps = extra_steps + 1
+          session:request('stepIn', { threadId = body.threadId }, function() end)
+        else
+          extra_steps = 0
+        end
+      end)
+    end
     dap.listeners.after.launch['dapui_config'] = on_start
     dap.listeners.after.attach['dapui_config'] = on_start
     local function on_end()

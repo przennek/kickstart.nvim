@@ -129,6 +129,9 @@ scenario() {
   editor; ex 'e src/main/java/example/shop/OrderService.java'; ex 15; esc "$AF8"
   editor; ex 'e src/test/java/example/shop/OrderServiceTest.java'; ex 19; esc "$DEBUG_CTX"; sleep 15; check debug
   expect "debugger stops in the service" "$(ql "(function() local s=require(\"dap\").session() return s and s.current_frame and (s.current_frame.source.name..\":\"..s.current_frame.line) or \"none\" end)()")" "OrderService.java:15"
+  # Step Into twice from there (BigDecimal calls on the line): the JDK is skipped, as in IDEA
+  k F7; sleep 2; k F7; sleep 2; check step-into
+  expect "Step Into stays in project code" "$(ql "(function() local s=require(\"dap\").session() local f=s and s.current_frame return f and ((f.source and f.source.path or \"\"):match(\"^jdt:\") and \"jdk\" or \"project\") or \"none\" end)()")" project
   editor; k ' xe'; sleep 0.8; k Enter; sleep 1.5; check evaluate; k Escape
   esc "$CF2"; sleep 2
   # an agent edits the open file, adds a class and a test behind the editor's back
