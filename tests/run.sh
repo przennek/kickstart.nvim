@@ -172,6 +172,10 @@ scenario() {
   k q; sleep 1.5
   editor; k ' sf'; sleep 1; lit gitign; sleep 1.5; k Enter; sleep 1; check goto-dotfile
   expect "Go to File: .gitignore" "$(q "expand('%:t')")" .gitignore
+  # Find in Path → the Find window (Ctrl+T): Enter on the file line opens its first match
+  editor; k ' sg'; sleep 1; lit SETTLED; sleep 2; k C-t; sleep 2; k Enter; sleep 1; check find-window
+  expect "Find window: Enter opens the match" "$(q "getline('.')" | grep -c SETTLED)" 1
+  k M-3; sleep 0.5; editor
   # tests again: the agent fixed the threshold, all pass
   editor; ex 'e src/test/java/example/shop/OrderServiceTest.java'; ex 9; esc "$RUN_CTX"; sleep 20; check rerun
   expect "tests window: 3 of 3 passed" "$(screen | grep -c 'OrderServiceTest  3/3 passed')" 1

@@ -59,7 +59,20 @@ return {
       warn_no_results = false,
       auto_preview = true,
       follow = false, -- don't move the selection along with the editor cursor
-      keys = { ['<F4>'] = 'jump' }, -- Jump to Source
+      -- Enter / F4 (Jump to Source) on a file line opens its first match, as in IDEA's Find
+      -- window (trouble folds there; folding stays on za / zo / zc)
+      keys = (function()
+        local jump = {
+          desc = 'Jump to the item (on a file: its first item)',
+          action = function(view, ctx)
+            if ctx.item then
+              return view:jump(ctx.item)
+            end
+            view:move { down = 1, jump = true }
+          end,
+        }
+        return { ['<cr>'] = jump, ['<F4>'] = jump }
+      end)(),
       win = { size = 12 },
     },
   },
