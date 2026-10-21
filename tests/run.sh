@@ -72,6 +72,8 @@ regression() {
   echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   out=$(headless "$WORK/java" "" console_links.lua)
   echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
+  out=$(headless "$WORK/java" "" search.lua)
+  echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   python3 "$LIB/fake_pg.py" silent 55991 & local silent=$!
   python3 "$LIB/fake_pg.py" password 55992 & local password=$!
   sleep 0.5

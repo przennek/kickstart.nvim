@@ -1,6 +1,9 @@
 -- Fuzzy Finder (files, lsp, etc)
 return {
   'nvim-telescope/telescope.nvim',
+  -- master, not kickstart's 0.1.x: 0.1.x previews through nvim-treesitter's ft_to_lang, which the
+  -- main branch of nvim-treesitter (used here) no longer has
+  branch = 'master',
   event = 'VimEnter',
   dependencies = {
     'nvim-lua/plenary.nvim',
@@ -78,8 +81,27 @@ return {
     close_with_opening_key['<F38>'] = 'move_selection_previous'
     close_with_opening_key['<F4>'] = 'select_default'
 
+    -- an older checkout (0.1.x, e.g. a machine not synced to lazy-lock.json) breaks every preview
+    -- with "ft_to_lang"; previews then use Vim syntax and :Lazy restore fixes it for good
+    local old_telescope = false
+    local utils_file = vim.api.nvim_get_runtime_file('lua/telescope/previewers/utils.lua', false)[1]
+    if utils_file then
+      for _, line in ipairs(vim.fn.readfile(utils_file)) do
+        if line:find('ft_to_lang', 1, true) then
+          old_telescope = true
+          break
+        end
+      end
+    end
+    if old_telescope then
+      vim.schedule(function()
+        vim.notify('telescope.nvim is older than lazy-lock.json (0.1.x): run :Lazy restore. Previews use Vim syntax until then.', vim.log.levels.WARN)
+      end)
+    end
+
     require('telescope').setup {
       defaults = {
+        preview = { treesitter = not old_telescope },
         mappings = {
           i = vim.tbl_extend('force', close_with_opening_key, { ['<C-t>'] = open_in_find_window }),
           n = vim.tbl_extend('force', close_with_opening_key, { ['<C-t>'] = open_in_find_window }),
@@ -94,6 +116,10 @@ return {
       --   },
       -- },
       -- pickers = {}
+      pickers = {
+        -- Go to File lists dotfiles too (.gitignore, .github/…), as IDEA does; .git stays out
+        find_files = { find_command = { 'rg', '--files', '--hidden', '--glob', '!.git' } },
+      },
       extensions = {
         ['ui-select'] = {
           require('telescope.themes').get_dropdown(),

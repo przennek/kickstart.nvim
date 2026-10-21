@@ -6,6 +6,7 @@
 --   Symbols   methods, functions, fields… of the project
 --   Actions   the actions of this config (as Alt+Shift+A)
 --   Text      text in the project (live grep)
+-- Alt+M: file mask for Files / All / Text (*.java, !*Test.java; pc.file_mask), as IDEA's filter.
 
 local M = {}
 
@@ -112,6 +113,7 @@ local function open(scope, default_text)
     }
   end
 
+  local file_mask = require 'pc.file_mask'
   local root = project_root()
   local rel = function(f)
     return vim.fs.relpath(root, f) or f
@@ -135,7 +137,7 @@ local function open(scope, default_text)
       end
     end
     if scope == 'All' or scope == 'Files' then
-      for _, f in ipairs(files) do
+      for _, f in ipairs(vim.tbl_filter(file_mask.matches, files)) do
         table.insert(out, { kind = 'file', name = vim.fs.basename(f), detail = f, file = root .. '/' .. f })
       end
     end
@@ -167,7 +169,7 @@ local function open(scope, default_text)
 
   require('telescope.pickers')
     .new({}, {
-      prompt_title = 'Search Everywhere · ' .. table.concat(tabs, ' ') .. ' · Tab: next',
+      prompt_title = 'Search Everywhere · ' .. table.concat(tabs, ' ') .. file_mask.label() .. ' · Tab: next · Alt+M: mask',
       default_text = default_text,
       finder = require('telescope.finders').new_dynamic {
         fn = results,
@@ -231,6 +233,13 @@ local function open(scope, default_text)
         end
         map({ 'i', 'n' }, '<Tab>', switch(1))
         map({ 'i', 'n' }, '<S-Tab>', switch(-1))
+        map({ 'i', 'n' }, '<M-m>', function()
+          local text = state.get_current_line()
+          actions_t.close(prompt_bufnr)
+          file_mask.ask(function()
+            open(scope, text)
+          end)
+        end)
         return true
       end,
     })
