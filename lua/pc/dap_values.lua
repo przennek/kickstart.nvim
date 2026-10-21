@@ -3,7 +3,9 @@
 --                (expression under the cursor or the selection); objects are copied as their
 --                toString() / str(), not as the debugger's summary
 --   Add to Watches   w on a variable, <leader>xw in the editor (word or selection)
---   Set Value    e on a variable (nvim-dap-ui), F2 too
+--   Set Value    F2 / e on a variable: Java through an assignment (java-debug sets only
+--                primitives and strings itself; IDEA sets objects too: new BigDecimal("100")),
+--                elsewhere nvim-dap-ui's edit
 --   Inspect      <leader>xi: expandable tree of the expression in a float (like IDEA's Inspect)
 
 local M = {}
@@ -43,7 +45,8 @@ local function value_text(expression, callback)
         callback((text:gsub('^"(.*)"$', '%1')))
       end)
     end
-    callback(resp.result)
+    -- a string value as its text, like IDEA (the clipboard context quotes it)
+    callback(ft == 'java' and (resp.result:gsub('^"(.*)"$', '%1')) or resp.result)
   end)
 end
 
@@ -137,6 +140,43 @@ function M.copy_variable()
   vim.notify(('Copied %s = %s'):format(name, value))
 end
 
+-- Java: name = value in the stopped frame, then Variables / Watches are fetched again
+local function set_java(expression, current)
+  local s = session()
+  if not s then
+    return
+  end
+  require('pc.input').open({ prompt = 'Set Value: ' .. expression, default = current or '', history = 'set value' }, function(value)
+    if not value or vim.trim(value) == '' then
+      return
+    end
+    evaluate(s, ('%s = %s'):format(expression, value), 'repl', function(err, resp)
+      if err or not resp then
+        return vim.notify('Set Value: ' .. (err and err.message or 'no answer'), vim.log.levels.WARN)
+      end
+      vim.notify(('%s = %s'):format(expression, resp.result))
+      -- Variables and Watches show the new value (as after a step)
+      pcall(s._request_scopes, s, s.current_frame)
+    end)
+  end)
+end
+
+function M.set_variable()
+  local s = require('dap').session()
+  local java = s and s.config and s.config.type == 'java'
+  if not java then
+    local edit = vim.fn.maparg('e', 'n', false, true)
+    return edit.callback and edit.callback()
+  end
+  local line = vim.api.nvim_get_current_line()
+  -- a primitive / string starts from its value; an object from nothing (its summary,
+  -- BigDecimal@13, is no expression)
+  local current = not line:match '^%s*[▸▾]' and line:match ' = (.*)$' or nil
+  variable_under_cursor(function(expression)
+    set_java(expression, current)
+  end)
+end
+
 function M.copy_expression()
   local expr = editor_expression()
   if expr then
@@ -169,12 +209,7 @@ vim.api.nvim_create_autocmd('FileType', {
     end
     map('<M-c>', M.copy_variable, 'Copy Value')
     map('yv', M.copy_variable, 'Copy Value')
-    map('<F2>', function()
-      local edit = vim.fn.maparg('e', 'n', false, true)
-      if edit.callback then
-        edit.callback()
-      end
-    end, 'Set Value')
+    map('<F2>', M.set_variable, 'Set Value')
   end,
 })
 

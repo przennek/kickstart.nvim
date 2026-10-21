@@ -129,6 +129,13 @@ scenario() {
   editor; ex 'e src/main/java/example/shop/OrderService.java'; ex 15; esc "$AF8"
   editor; ex 'e src/test/java/example/shop/OrderServiceTest.java'; ex 19; esc "$DEBUG_CTX"; sleep 15; check debug
   expect "debugger stops in the service" "$(ql "(function() local s=require(\"dap\").session() return s and s.current_frame and (s.current_frame.source.name..\":\"..s.current_frame.line) or \"none\" end)()")" "OrderService.java:15"
+  # Variables (Alt+5): Copy Value of an object is its text, Set Value takes an object expression
+  k M-5; sleep 1
+  ql "(function() for _,w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do local b=vim.api.nvim_win_get_buf(w) if vim.bo[b].filetype==\"dapui_scopes\" then vim.api.nvim_set_current_win(w) for i,l in ipairs(vim.api.nvim_buf_get_lines(b,0,-1,false)) do if l:find(\"newTotal\") then vim.api.nvim_win_set_cursor(w,{i,0}) return i end end end end end)()" >/dev/null
+  k M-c; sleep 1; check copy-value
+  expect "Copy Value: the object's text" "$(q 'g:test_clip[0][0]')" 50
+  k F2; sleep 1.5; lit 'new java.math.BigDecimal("100")'; k Enter; sleep 2; check set-value
+  expect "Set Value: an object" "$(ql "(function() local s=require(\"dap\").session() local out s:request(\"evaluate\",{expression=\"String.valueOf(newTotal)\",frameId=s.current_frame.id,context=\"repl\"},function(e,r) out=r and r.result end) vim.wait(3000,function() return out ~= nil end) return out end)()")" '"100"'
   # Step Into twice from there (BigDecimal calls on the line): the JDK is skipped, as in IDEA
   k F7; sleep 2; k F7; sleep 2; check step-into
   expect "Step Into stays in project code" "$(ql "(function() local s=require(\"dap\").session() local f=s and s.current_frame return f and ((f.source and f.source.path or \"\"):match(\"^jdt:\") and \"jdk\" or \"project\") or \"none\" end)()")" project
