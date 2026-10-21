@@ -139,8 +139,15 @@ scenario() {
   esc "$SF6"; sleep 1.5; lit countUnpaid; k Enter; sleep 5; check rename
   expect "rename saved in the service" "$(grep -c 'countUnpaid' "$dir/src/main/java/example/shop/OrderService.java")" 1
   expect "rename saved in the test" "$(grep -c 'countUnpaid' "$dir/src/test/java/example/shop/OrderServiceTest.java")" 1
+  # rename the record: its file is renamed, every use changes, the new file is in git (a commit
+  # would otherwise take the deletion of Order.java only)
+  editor; ex 'e src/main/java/example/shop/Order.java'; q "execute('call search(\"record Order\") | normal! w')" >/dev/null; sleep 2
+  esc "$SF6"; sleep 1.5; k C-u; lit PurchaseOrder; k Enter; sleep 6; check rename-class
+  expect "rename class: file renamed" "$(ls "$dir/src/main/java/example/shop" | grep -c '^Order.java$\|^PurchaseOrder.java$')-$(q "expand('%:t')")" "1-PurchaseOrder.java"
+  expect "rename class: uses changed and saved" "$(grep -rl 'PurchaseOrder' "$dir/src" | wc -l)" 4
+  expect "rename class: new file added to git" "$(git -C "$dir" status --short -- src/main/java/example/shop/PurchaseOrder.java | cut -c1-2)" " A"
   # Replace in Path: exactly the (case-sensitive) matches it lists, in every file
-  editor; q "execute('call search(\"\\\"PAID\") | normal! l')" >/dev/null
+  editor; ex 'e src/main/java/example/shop/OrderService.java'; q "execute('call search(\"\\\"PAID\") | normal! l')" >/dev/null
   k ' sR'; sleep 1; k Enter; sleep 0.8; lit SETTLED; k Enter; sleep 2; k Enter; sleep 2; check replace
   expect "Replace in Path: 3 files" "$(grep -rl '"SETTLED"' "$dir/src" | wc -l)" 3
   expect "Replace in Path: lower-case 'paid' in a comment left alone" "$(grep -c 'in paid orders' "$dir/src/main/java/example/shop/OrderService.java")" 1
