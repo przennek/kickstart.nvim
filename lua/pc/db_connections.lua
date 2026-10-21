@@ -1,9 +1,12 @@
 -- Data Sources dialog like IDEA's (a form, see pc.form): type, host, port, database, user,
 -- password, plus an SSH tunnel and / or a SOCKS5 / HTTP proxy (pc.db_tunnels); Test Connection
 -- (Ctrl+T) and OK (Ctrl+S) save it to the Database window's list.
+-- A URL (postgresql://user:password@host:port/db, jdbc:…) or host:port/db pasted into Host fills
+-- the fields.
 --   in the Database window: a or Alt+Insert = new data source, E = edit data sources, R = refresh
 --   <leader>Qd / :DBDataSources = pick a data source to edit (or + New), :DBAddConnection = new
--- PostgreSQL passwords go to ~/.pgpass (mode 600), not into the saved connection list.
+-- PostgreSQL passwords go to ~/.pgpass (mode 600, for every database of the server), not into
+-- the saved connection list.
 
 local M = {}
 
@@ -160,13 +163,11 @@ local function decode(s)
   end))
 end
 
--- Form values of a saved connection: its own settings, or parsed from the URL
-local function values_of(entry)
-  if entry.pc then
-    return vim.tbl_extend('force', vim.deepcopy(entry.pc), { name = entry.name, password = '' })
-  end
-  local scheme, rest = entry.url:match '^(%w+):(.*)$'
-  local v = { name = entry.name }
+-- Form values in a URL (scheme://user:password@host:port/database?…, also jdbc:… and
+-- postgres://); only what it contains
+local function parse_url(url)
+  local scheme, rest = vim.trim(url):gsub('^jdbc:', ''):match '^(%w+):(.*)$'
+  local v = {}
   for _, t in ipairs(TYPES) do
     if scheme and (t.scheme == scheme or (t.scheme == 'postgresql' and scheme == 'postgres')) then
       v.type = t.label
@@ -176,10 +177,54 @@ local function values_of(entry)
     v.file = rest
     return v
   end
-  local auth, host, port, db = (rest or ''):match '^//([^@/]*@?)([^:/?]*):?(%d*)/?([^?]*)'
-  local user = auth and auth:match '^([^:@]*)'
-  v.host, v.port, v.database, v.user = host, port ~= '' and port or nil, db, user and decode(user)
+  -- //[user[:password]@]host[:port][/database][?…]; the password may contain @ : /
+  local body = (rest or ''):match '^//(.*)$'
+  if not body then
+    return v
+  end
+  body = body:gsub('%?.*$', '')
+  local after_auth = (body:match '^.*()@' or 0) + 1
+  local slash = body:find('/', after_auth, true)
+  local authority, path = body:sub(1, (slash or #body + 1) - 1), slash and body:sub(slash) or ''
+  local auth, hostport = authority:match '^(.*)@(.*)$'
+  hostport = hostport or authority
+  if auth then
+    local user, password = auth:match '^([^:]*):?(.*)$'
+    v.user = decode(user)
+    v.password = password ~= '' and decode(password) or nil
+  end
+  local host, port = hostport:match '^(.-):?(%d*)$'
+  local db = path:gsub('^/', '')
+  v.host, v.port, v.database = host, port ~= '' and port or nil, db ~= '' and db and decode(db) or nil
   return v
+end
+
+-- Form values of a saved connection: its own settings, or parsed from the URL
+local function values_of(entry)
+  if entry.pc then
+    return vim.tbl_extend('force', vim.deepcopy(entry.pc), { name = entry.name, password = '' })
+  end
+  local v = parse_url(entry.url)
+  v.name, v.password = entry.name, nil
+  return v
+end
+
+-- A URL or host:port[/database] pasted into Host fills the fields it has (like the URL field
+-- of IDEA's dialog): what the cloud console or a colleague gives you works as it is
+local function split_host(values)
+  local host = vim.trim(values.host or '')
+  local parsed
+  if host:match '^%w+:' and host:match '://' then
+    parsed = parse_url(host)
+    -- another type without a port: that type's default
+    parsed.port = parsed.port or (parsed.type and type_by_label(parsed.type).port) or nil
+  else
+    local h, port, db = host:match '^([^:/%s]+):(%d+)/?(.*)$'
+    parsed = h and { host = h, port = port, database = db ~= '' and db or nil } or { host = host }
+  end
+  for k, v in pairs(parsed) do
+    values[k] = v
+  end
 end
 
 -- URL and saved settings of the form's values
@@ -289,6 +334,8 @@ function M.open(entry)
     on_change = function(values, key)
       if key == 'type' then
         values.port = type_by_label(values.type).port
+      elseif key == 'host' then
+        split_host(values)
       end
     end,
     buttons = {
@@ -446,5 +493,10 @@ end
 
 --- Saves a PostgreSQL password for every database of host:port and user (~/.pgpass)
 M.store_pgpass = store_pgpass
+
+
+--- Form values of a URL; fills values from a URL / host:port pasted into Host
+M.parse_url = parse_url
+M.split_host = split_host
 
 return M

@@ -31,5 +31,23 @@ if not vim.deep_equal(got, want) then
   table.insert(bad, 'pgpass: ' .. table.concat(got, ' | '))
 end
 os.remove(pgpass)
+-- a URL or host:port pasted into Host fills the fields (what a cloud console gives)
+local pastes = {
+  { 'postgresql://app:p%40ss:w/rd@db.example.com:6543/shop?sslmode=require', 'PostgreSQL|db.example.com|6543|shop|app|p@ss:w/rd' },
+  { 'jdbc:postgresql://db.example.com/shop', 'PostgreSQL|db.example.com|5432|shop|me|' },
+  { 'postgres://app@db.example.com', 'PostgreSQL|db.example.com|5432||app|' },
+  { 'mysql://root:x@127.0.0.1:3307/app', 'MySQL / MariaDB|127.0.0.1|3307|app|root|x' },
+  { 'db.example.com:5433/shop', 'PostgreSQL|db.example.com|5433|shop|me|' },
+  { ' db.example.com:5433 ', 'PostgreSQL|db.example.com|5433||me|' },
+  { 'db.example.com', 'PostgreSQL|db.example.com|5432||me|' },
+}
+for _, p in ipairs(pastes) do
+  local v = { type = 'PostgreSQL', host = p[1], port = '5432', database = '', user = 'me', password = '' }
+  dbc.split_host(v)
+  local got = table.concat({ v.type, v.host, v.port, v.database or '', v.user, v.password or '' }, '|')
+  if got ~= p[2] then
+    table.insert(bad, ('paste %q: %s'):format(p[1], got))
+  end
+end
 io.stdout:write((#bad == 0 and 'OK data source connections' or ('FAIL data source connections: ' .. table.concat(bad, '; '))) .. '\n')
 vim.cmd 'qa!'
