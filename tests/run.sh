@@ -23,6 +23,10 @@ WORK=$(mktemp -d "${TMPDIR:-/tmp}/nvim-tests.XXXXXX")
 export WORK LIB
 source "$LIB/harness.sh"
 : > "$LOG"
+# nvim runs this config: lazy.nvim rewrites lazy-lock.json when it sees other plugins (e.g. a
+# test with its own data directory); the tests must leave it as it was
+LOCK=$(dirname "$HERE")/lazy-lock.json
+cp "$LOCK" "$WORK/lazy-lock.before"
 
 cleanup() {
   t kill-server 2>/dev/null
@@ -164,5 +168,9 @@ case $MODE in
   all) regression; scenario ;;
   *) echo "usage: tests/run.sh [regression|scenario [steps]|all]"; exit 2 ;;
 esac
+if ! cmp -s "$LOCK" "$WORK/lazy-lock.before"; then
+  cp "$WORK/lazy-lock.before" "$LOCK"
+  fail "the tests changed lazy-lock.json (restored)"
+fi
 echo "== $FAILS failure(s)"
 exit $FAILS
