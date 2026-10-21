@@ -25,6 +25,7 @@ local ITEMS = {
   { 'Diff working tree', '<leader>vd' },
   { 'Compare file with Branch…', '<leader>vw' },
   { 'Compare project with Branch…', '<leader>vW' },
+  { 'Compare file with Revision…', '<leader>vo' },
   { 'Compare with Clipboard', '<leader>vy' },
   { 'Compare file with another file…', '<leader>v=' },
   { 'Changed Files…', '<leader>vf' },

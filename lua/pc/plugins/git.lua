@@ -25,6 +25,54 @@ local function compare_with_branch(file_only)
   end
 end
 
+-- Compare with Revision… (Git menu of IDEA): the commits that changed this file, with what each
+-- changed in the preview; Enter diffs the file as it is now against that revision
+local function compare_with_revision()
+  local file = vim.fn.expand '%:p'
+  if file == '' or vim.bo.buftype ~= '' then
+    return vim.notify('Compare with Revision: open a file first', vim.log.levels.INFO)
+  end
+  if vim.fn.systemlist({ 'git', '-C', vim.fs.dirname(file), 'ls-files', '--error-unmatch', file })[1] == nil or vim.v.shell_error ~= 0 then
+    return vim.notify('Compare with Revision: ' .. vim.fn.expand '%:t' .. ' is not in git', vim.log.levels.INFO)
+  end
+  require('telescope.builtin').git_bcommits {
+    prompt_title = 'Compare ' .. vim.fn.expand '%:t' .. ' with revision',
+    attach_mappings = function(prompt_bufnr)
+      local actions = require 'telescope.actions'
+      actions.select_default:replace(function()
+        local entry = require('telescope.actions.state').get_selected_entry()
+        actions.close(prompt_bufnr)
+        if entry then
+          diff_with(entry.value, file)
+        end
+      end)
+      return true
+    end,
+  }
+end
+
+-- Compare with Local in the Git log / file history (D): the revision under the cursor against the
+-- working tree — that file (a file of the commit, or the file whose history this is), else the
+-- whole commit
+local function compare_with_local()
+  local view = require('diffview.lib').get_current_view()
+  local panel = view and view.panel
+  local item = panel and panel.get_item_at_cursor and panel:get_item_at_cursor()
+  local entry = panel and panel.get_log_entry_at_cursor and panel:get_log_entry_at_cursor()
+  if not entry or not entry.commit then
+    return vim.notify('Compare with Local: put the cursor on a revision', vim.log.levels.INFO)
+  end
+  local path = item and item ~= entry and item.path or nil
+  local single = panel.log_options and panel.log_options.single_file
+  if not path and single and single.path_args and #single.path_args == 1 and #entry.files == 1 then
+    path = entry.files[1].path
+  end
+  local dir = view.adapter and view.adapter.ctx and view.adapter.ctx.toplevel or vim.fn.getcwd()
+  local hash = entry.commit.hash
+  vim.cmd 'DiffviewClose'
+  diff_with(hash, path and vim.fs.joinpath(dir, path) or nil)
+end
+
 -- Git Branches popup (<leader>d in .ideavimrc): type e.g. origin/main, then
 --   Enter   Show Diff with Working Tree (all changed files, in the current split)
 --   Ctrl+F  compare only the current file with that branch
@@ -257,6 +305,7 @@ return {
       { '<leader>vX', function() require('pc.merge').abort() end, desc = 'VCS: Abort merge / rebase' },
       { '<leader>vw', compare_with_branch(true), desc = 'VCS: Compare file [w]ith branch' },
       { '<leader>vW', compare_with_branch(false), desc = 'VCS: Compare project [W]ith branch' },
+      { '<leader>vo', compare_with_revision, desc = 'VCS: Compare file with revision ([o]lder version)' },
       { '<leader>d', branches_popup, desc = 'Git Branches' },
       -- Show Diff (Cmd+D): the current file against HEAD
       { '<M-d>', function() require('pc.split_diff').toggle_file_diff() end, desc = 'VCS: Show diff of this file (toggle)' },
@@ -287,7 +336,12 @@ return {
         keymaps = {
           view = view,
           file_panel = { close, esc },
-          file_history_panel = { close, esc, { 'n', 'gR', revert_commit, { desc = 'Revert this commit' } } },
+          file_history_panel = {
+            close,
+            esc,
+            { 'n', 'gR', revert_commit, { desc = 'Revert this commit' } },
+            { 'n', 'D', compare_with_local, { desc = 'Compare with Local' } },
+          },
         },
       }
     end,

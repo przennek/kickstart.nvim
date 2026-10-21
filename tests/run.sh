@@ -144,6 +144,17 @@ scenario() {
   k ' sR'; sleep 1; k Enter; sleep 0.8; lit SETTLED; k Enter; sleep 2; k Enter; sleep 2; check replace
   expect "Replace in Path: 3 files" "$(grep -rl '"SETTLED"' "$dir/src" | wc -l)" 3
   expect "Replace in Path: lower-case 'paid' in a comment left alone" "$(grep -c 'in paid orders' "$dir/src/main/java/example/shop/OrderService.java")" 1
+  # review: Find in Path only in the sources (mask without tests), the file against its last
+  # commit, the .gitignore through Go to File
+  editor; k ' sg'; sleep 1; lit SETTLED; sleep 1.5; k M-m; sleep 0.8; lit '*.java, !*Test.java'; k Enter; sleep 2; check find-mask
+  expect "Find in Path with a mask: no test file listed" "$(screen | grep -c 'Test.java:')" 0
+  expect "Find in Path with a mask: the sources listed" "$( screen | grep -q 'OrderService.java:' && echo yes || echo no)" yes
+  k M-m; sleep 0.8; k C-u; k Enter; sleep 1; k Escape; k Escape
+  editor; ex 'e src/main/java/example/shop/OrderService.java'; k ' vo'; sleep 2; k Enter; sleep 3; check compare-revision
+  expect "Compare with Revision: last commit against the working tree" "$(ql "(function() local v=require(\"diffview.lib\").get_current_view() return v and (tostring(v.left):sub(1,7)..\" \"..tostring(v.right)) or \"none\" end)()")" "$(git -C "$dir" rev-parse --short=7 HEAD) LOCAL"
+  k q; sleep 1.5
+  editor; k ' sf'; sleep 1; lit gitign; sleep 1.5; k Enter; sleep 1; check goto-dotfile
+  expect "Go to File: .gitignore" "$(q "expand('%:t')")" .gitignore
   # tests again: the agent fixed the threshold, all pass
   editor; ex 'e src/test/java/example/shop/OrderServiceTest.java'; ex 9; esc "$RUN_CTX"; sleep 20; check rerun
   expect "tests window: 3 of 3 passed" "$(screen | grep -c 'OrderServiceTest  3/3 passed')" 1
