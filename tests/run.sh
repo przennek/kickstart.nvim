@@ -78,6 +78,10 @@ regression() {
   echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   out=$(headless "$WORK/java" "" search.lua)
   echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
+  # on a copy: it renames and moves files of the repository
+  cp -r "$WORK/java" "$WORK/java-git"
+  out=$(headless "$WORK/java-git" "" git_track.lua)
+  echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   python3 "$LIB/fake_pg.py" silent 55991 & local silent=$!
   python3 "$LIB/fake_pg.py" password 55992 & local password=$!
   sleep 0.5
@@ -146,6 +150,12 @@ scenario() {
   expect "rename class: file renamed" "$(ls "$dir/src/main/java/example/shop" | grep -c '^Order.java$\|^PurchaseOrder.java$')-$(q "expand('%:t')")" "1-PurchaseOrder.java"
   expect "rename class: uses changed and saved" "$(grep -rl 'PurchaseOrder' "$dir/src" | wc -l)" 4
   expect "rename class: new file added to git" "$(git -C "$dir" status --short -- src/main/java/example/shop/PurchaseOrder.java | cut -c1-2)" " A"
+  # move it to a new package in the tree (m): jdtls' Move - package line, imports of its users
+  editor; ex 'e src/main/java/example/shop/PurchaseOrder.java'; sleep 1; k M-1; sleep 1.5
+  k m; sleep 1; k C-u; lit model/PurchaseOrder.java; k Enter; sleep 12; check tree-move
+  expect "tree move: package line" "$(head -1 "$dir/src/main/java/example/shop/model/PurchaseOrder.java" 2>/dev/null)" "package example.shop.model;"
+  expect "tree move: imports in its users" "$(grep -rl 'import example.shop.model.PurchaseOrder;' "$dir/src" | wc -l)" 3
+  k Escape; editor
   # Replace in Path: exactly the (case-sensitive) matches it lists, in every file
   editor; ex 'e src/main/java/example/shop/OrderService.java'; q "execute('call search(\"\\\"PAID\") | normal! l')" >/dev/null
   k ' sR'; sleep 1; k Enter; sleep 0.8; lit SETTLED; k Enter; sleep 2; k Enter; sleep 2; check replace

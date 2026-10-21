@@ -87,6 +87,7 @@ function M.java_class(dir, on_done)
           local body = SKELETONS[values.kind]:gsub('%%s', name)
           local text = (pkg ~= '' and ('package ' .. pkg .. ';\n\n') or '') .. body .. '\n'
           vim.fn.writefile(vim.split(text, '\n', { plain = true }), path)
+          require('pc.git_track').add(path)
           form:close()
           -- the empty line inside the type
           local lines = vim.split(text, '\n', { plain = true })
@@ -119,6 +120,7 @@ function M.menu(dir, on_done)
         vim.fn.mkdir(vim.fs.dirname(path), 'p')
         if not vim.uv.fs_stat(path) then
           vim.fn.writefile({}, path)
+          require('pc.git_track').add(path)
         end
         open_at(path)
         after_create(on_done)
@@ -130,6 +132,7 @@ function M.menu(dir, on_done)
         vim.fn.mkdir(pkg_dir, 'p')
         if not vim.uv.fs_stat(pkg_dir .. '/__init__.py') then
           vim.fn.writefile({}, pkg_dir .. '/__init__.py')
+          require('pc.git_track').add(pkg_dir .. '/__init__.py')
         end
         after_create(on_done)
       end)

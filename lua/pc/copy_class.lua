@@ -144,6 +144,7 @@ function M.copy(path)
           local out = java and java_copy(lines, old_name, v.name, old_pkg, v.package, sibling_imports(path, lines, old_name, old_pkg)) or lines
           vim.fn.mkdir(vim.fs.dirname(new), 'p')
           vim.fn.writefile(out, new)
+          require('pc.git_track').add(new)
           form:close()
           vim.cmd.edit(vim.fn.fnameescape(new))
           vim.notify('Copied to ' .. relative(new))

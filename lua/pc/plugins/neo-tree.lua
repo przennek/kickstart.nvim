@@ -52,6 +52,41 @@ return {
     { '<A-1>', project_tree, desc = 'Project (reveal current file)' },
   },
   opts = {
+    -- renaming / moving in the tree is a refactoring, like in IDEA: the language servers update
+    -- the code first (X.java renamed: its class and the uses; imports), then the files renamed,
+    -- moved, copied or added go into git (pc.git_track)
+    event_handlers = (function()
+      local tracked = {}
+      local function before(args)
+        tracked[args.source] = require('pc.git_track').tracked(args.source)
+        require('pc.move').will_rename(args.source, args.destination)
+      end
+      -- a Java class to another package: jdtls' Move (package line, imports of its users)
+      local function before_move(args)
+        tracked[args.source] = require('pc.git_track').tracked(args.source)
+        if require('pc.move').java_move(args.source, args.destination) then
+          return { handled = true }
+        end
+        require('pc.move').will_rename(args.source, args.destination)
+      end
+      local function after(args)
+        require('pc.move').did_rename(args.source, args.destination)
+        require('pc.git_track').add(args.destination, args.source, tracked[args.source])
+        tracked[args.source] = nil
+      end
+      return {
+        { event = 'before_file_rename', handler = before },
+        { event = 'before_file_move', handler = before_move },
+        { event = 'file_renamed', handler = after },
+        { event = 'file_moved', handler = after },
+        {
+          event = 'file_added',
+          handler = function(path)
+            require('pc.git_track').add(path)
+          end,
+        },
+      }
+    end)(),
     filesystem = {
       hijack_netrw_behavior = 'open_current',
       -- Opening the tree somewhere else must not change Neovim's cwd

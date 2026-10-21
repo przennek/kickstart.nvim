@@ -152,9 +152,13 @@ return {
         } or {},
       }
 
-      -- nvim-cmp adds capabilities, broadcast them to every server (including jdtls)
+      -- nvim-cmp adds capabilities, broadcast them to every server (including jdtls); file
+      -- operations: renaming / moving a file (tree, F6) asks the servers for their edits first
+      -- (pc.move.will_rename) - ts_ls updates imports
       vim.lsp.config('*', {
-        capabilities = require('cmp_nvim_lsp').default_capabilities(),
+        capabilities = vim.tbl_deep_extend('force', require('cmp_nvim_lsp').default_capabilities(), {
+          workspace = { fileOperations = { willRename = true, didRename = true } },
+        }),
       })
 
       -- Language servers, by lspconfig name. Override config per server here.

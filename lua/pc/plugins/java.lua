@@ -100,7 +100,12 @@ local function start_jdtls()
     -- files changed outside nvim (an LLM agent, git, the terminal) reach jdtls' index too;
     -- Neovim leaves file watching off on Linux by default
     capabilities = vim.tbl_deep_extend('force', require('cmp_nvim_lsp').default_capabilities(), {
-      workspace = { didChangeWatchedFiles = { dynamicRegistration = true } },
+      workspace = {
+        didChangeWatchedFiles = { dynamicRegistration = true },
+        -- X.java renamed / moved in the tree: jdtls renames the class and updates its uses and
+        -- the package line (pc.move.will_rename)
+        fileOperations = { willRename = true, didRename = true },
+      },
     }),
     -- settings go in init_options too: jdtls reads some of them only during initialize
     init_options = { bundles = bundles, settings = settings },
