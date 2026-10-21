@@ -3,9 +3,10 @@
 --                (expression under the cursor or the selection); objects are copied as their
 --                toString() / str(), not as the debugger's summary
 --   Add to Watches   w on a variable, <leader>xw in the editor (word or selection)
---   Set Value    F2 / e on a variable: Java through an assignment (java-debug sets only
---                primitives and strings itself; IDEA sets objects too: new BigDecimal("100")),
---                elsewhere nvim-dap-ui's edit
+--   Set Value    F2 on a variable: the box at the cursor, then an assignment in the stopped
+--                frame (Java, Python; java-debug sets only primitives and strings itself, IDEA
+--                takes any expression: new BigDecimal("100")); other debuggers: nvim-dap-ui's edit
+--                (e works everywhere)
 --   Inspect      <leader>xi: expandable tree of the expression in a float (like IDEA's Inspect)
 
 local M = {}
@@ -107,18 +108,28 @@ local function hook_watches()
   watches.pc_hooked = true
 end
 
+-- a variable of the scope itself (not a field): its name is the expression
+local function top_level_name()
+  local line = vim.api.nvim_get_current_line()
+  return line:match '^ [▸▾] ([%w_$]+) ' or line:match '^   ([%w_$]+) '
+end
+
 local function variable_under_cursor(fn)
   hook_watches()
   local map = vim.fn.maparg('w', 'n', false, true)
   if not map.callback then
     return vim.notify('Not on a variable', vim.log.levels.INFO)
   end
+  local name = top_level_name()
   capture = fn
   map.callback()
-  -- dapui runs its mappings asynchronously
+  -- dapui runs its mappings asynchronously; for plain values it may hand over nothing
   vim.defer_fn(function()
     if capture == fn then
       capture = nil
+      if name then
+        return fn(name)
+      end
       vim.notify('Not on a variable', vim.log.levels.INFO)
     end
   end, 500)
@@ -140,8 +151,8 @@ function M.copy_variable()
   vim.notify(('Copied %s = %s'):format(name, value))
 end
 
--- Java: name = value in the stopped frame, then Variables / Watches are fetched again
-local function set_java(expression, current)
+-- name = value in the stopped frame, then Variables / Watches are fetched again
+local function assign(expression, current)
   local s = session()
   if not s then
     return
@@ -163,8 +174,8 @@ end
 
 function M.set_variable()
   local s = require('dap').session()
-  local java = s and s.config and s.config.type == 'java'
-  if not java then
+  local type = s and s.config and s.config.type
+  if type ~= 'java' and type ~= 'python' and type ~= 'debugpy' then
     local edit = vim.fn.maparg('e', 'n', false, true)
     return edit.callback and edit.callback()
   end
@@ -173,7 +184,7 @@ function M.set_variable()
   -- BigDecimal@13, is no expression)
   local current = not line:match '^%s*[▸▾]' and line:match ' = (.*)$' or nil
   variable_under_cursor(function(expression)
-    set_java(expression, current)
+    assign(expression, current)
   end)
 end
 
