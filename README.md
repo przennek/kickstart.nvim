@@ -1,7 +1,8 @@
 # My neovim config based on kickstart
 
 Dependencies: [DEPENDENCIES.md](DEPENDENCIES.md). Plugin versions are pinned in `lazy-lock.json`
-(`:Lazy restore` installs them; after `:Lazy update` run the tests and commit the lock).
+(`:Lazy restore` installs them). Update with `tests/update-plugins.sh`: it updates, runs the
+tests and brings the old versions back when something fails; on success commit the lock.
 
 ## Tests
 
