@@ -65,6 +65,8 @@ function M.run_in_console(cmd, cwd, on_exit)
     end,
   })
   vim.bo[console.buf].filetype = 'pcrun'
+  -- file:line in the output (compiler errors, stack traces) opens in the editor
+  require('pc.console_links').attach(console.buf, cwd)
   vim.cmd 'normal! G'
   -- keep editing while it runs, like IDEA
   if vim.api.nvim_win_is_valid(prev) then

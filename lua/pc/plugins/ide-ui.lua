@@ -173,6 +173,18 @@ return {
     },
     config = function(_, opts)
       require('toggleterm').setup(opts)
+      -- file:line in the shell's output opens in the editor (Normal mode: Enter / double click);
+      -- relative paths from the shell's current directory
+      vim.api.nvim_create_autocmd('FileType', {
+        group = vim.api.nvim_create_augroup('pc-toggleterm-links', { clear = true }),
+        pattern = 'toggleterm',
+        callback = function(event)
+          require('pc.console_links').attach(event.buf, function()
+            local pid = vim.b[event.buf].terminal_job_pid
+            return pid and vim.uv.fs_readlink('/proc/' .. pid .. '/cwd') or vim.fn.getcwd()
+          end)
+        end,
+      })
       vim.api.nvim_create_autocmd('BufEnter', {
         group = vim.api.nvim_create_augroup('pc-toggleterm-insert', { clear = true }),
         callback = function(event)
