@@ -72,6 +72,12 @@ regression() {
   echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   out=$(headless "$WORK/java" "" console_links.lua)
   echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
+  python3 "$LIB/fake_pg.py" silent 55991 & local silent=$!
+  python3 "$LIB/fake_pg.py" password 55992 & local password=$!
+  sleep 0.5
+  out=$(headless "$WORK" "" db_connect.lua SILENT_PORT=55991 PASSWORD_PORT=55992 FREE_PORT=55993 PGPASSFILE=/dev/null)
+  kill $silent $password 2>/dev/null; wait $silent $password 2>/dev/null
+  echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   echo "== debugger"
   local out
   out=$(headless "$WORK/java" src/test/java/example/shop/OrderServiceTest.java debug.lua WAIT=40000 BP_FILE=src/main/java/example/shop/OrderService.java BP_LINE=15 START="require('jdtls').test_class()")

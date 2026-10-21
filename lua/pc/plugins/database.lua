@@ -40,6 +40,11 @@ return {
     -- its <leader>S (execute) in SQL buffers would hide the Database window key; executing is
     -- Alt+Enter here, save query / bind parameters stay below
     vim.g.db_ui_disable_mappings_sql = 1
+    -- A server that stops answering (VPN dropped, firewall) fails the query after 10 s with
+    -- "timeout expired" instead of leaving the console waiting (psql and lazysql read it)
+    if not vim.env.PGCONNECT_TIMEOUT then
+      vim.env.PGCONNECT_TIMEOUT = '10'
+    end
     -- Connections and saved queries live outside the projects
     vim.g.db_ui_save_location = vim.fn.stdpath 'data' .. '/dadbod'
 

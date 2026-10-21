@@ -88,13 +88,17 @@ local function store_pgpass(host, port, db, user, password)
   vim.uv.fs_chmod(path, tonumber('600', 8))
 end
 
+--- Connects with the client and runs a trivial query: ok, message (never empty on failure)
 local function test_connection(t, url)
   if vim.fn.executable(t.client) == 0 then
     return false, t.client .. ' is not installed'
   end
-  local cmd
+  local cmd, env
   if t.scheme == 'postgresql' then
-    cmd = { 'psql', url, '-X', '-q', '-c', 'select 1' }
+    -- -w: a missing password is an error, not a prompt nobody sees; psql's own connect timeout
+    -- says which host did not answer (a dropped packet would otherwise just wait)
+    cmd = { 'psql', url, '-X', '-q', '-w', '-c', 'select 1' }
+    env = { PGCONNECT_TIMEOUT = '8' }
   elseif t.scheme == 'mysql' then
     -- the mysql client takes no URL; credentials are checked when the connection is first used
     return true, ''
@@ -103,8 +107,17 @@ local function test_connection(t, url)
   else
     cmd = { 'sqlite3', url:gsub('^sqlite:', ''), 'select 1;' }
   end
-  local result = vim.system(cmd, { text = true, timeout = 10000 }):wait()
-  return result.code == 0, vim.trim((result.stderr ~= '' and result.stderr) or result.stdout or '')
+  local result = vim.system(cmd, { text = true, timeout = 10000, env = env }):wait()
+  local out = vim.trim((result.stderr ~= '' and result.stderr) or result.stdout or '')
+  if result.code == 0 then
+    return true, out
+  end
+  if out == '' then
+    -- killed by the timeout before it printed anything
+    out = result.signal ~= 0 and 'no answer within 10 s: the host is unreachable from here (VPN, firewall / security group?)'
+      or ('%s exited with code %d'):format(cmd[1], result.code)
+  end
+  return false, out
 end
 
 local function type_by_label(label)
@@ -392,5 +405,17 @@ vim.api.nvim_create_autocmd('FileType', {
     end)
   end,
 })
+
+
+--- ok, message of Test Connection for a URL (`scheme://…`)
+function M.test(url)
+  local scheme = url:match '^(%w+):'
+  for _, t in ipairs(TYPES) do
+    if t.scheme == scheme then
+      return test_connection(t, url)
+    end
+  end
+  return false, 'unknown database type: ' .. tostring(scheme)
+end
 
 return M
