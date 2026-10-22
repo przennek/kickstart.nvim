@@ -32,6 +32,8 @@ local function start_jdtls()
   local mason = vim.fn.stdpath 'data' .. '/mason'
   local root_dir = vim.fs.root(0, { 'mvnw', 'gradlew', 'pom.xml', 'build.gradle', 'build.gradle.kts', 'settings.gradle', '.git' })
     or vim.fn.getcwd()
+  -- outside the project: Eclipse refuses a workspace inside it ("overlaps the workspace
+  -- location"; the Maven import fails), so not in .idea
   local workspace = vim.fn.stdpath 'cache' .. '/jdtls/' .. root_dir:gsub('/', '_')
 
   -- Debugger + test runner extensions
@@ -92,6 +94,9 @@ local function start_jdtls()
     cmd = {
       mason .. '/bin/jdtls',
       '--jvm-arg=-javaagent:' .. mason .. '/packages/jdtls/lombok.jar',
+      -- Eclipse's .project / .classpath / .settings / .factorypath go into the workspace, not into
+      -- the project root (a system property of jdtls' filesystem plugin, not a setting)
+      '--jvm-arg=-Djava.import.generatesMetadataFilesAtProjectRoot=false',
       '-data',
       workspace,
     },
