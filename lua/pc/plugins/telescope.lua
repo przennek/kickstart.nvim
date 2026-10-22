@@ -76,6 +76,15 @@ return {
     } do
       close_with_opening_key[key] = 'close'
     end
+    -- the terminal key closes the popup and opens the terminal, as in IDEA (it was left open
+    -- in Normal mode); the other tool windows take the focus and so close it on their own
+    close_with_opening_key['<M-t>'] = function(prompt_bufnr)
+      require('telescope.actions').close(prompt_bufnr)
+      vim.schedule(function()
+        vim.cmd 'stopinsert'
+        vim.api.nvim_feedkeys(vim.keycode '<M-t>', 'm', false)
+      end)
+    end
     -- Switcher: Ctrl+Tab / Ctrl+Shift+Tab (F37 / F38) move through the list, F4 opens
     close_with_opening_key['<F37>'] = 'move_selection_next'
     close_with_opening_key['<F38>'] = 'move_selection_previous'

@@ -158,6 +158,10 @@ for _, lhs in ipairs(vim.list_extend({ '<M-t>', '<F12>' }, IDE_KEYS)) do
       vim.api.nvim_feedkeys(vim.keycode(lhs), 'm', false)
     end)
   end, { desc = 'IDE shortcut while typing' })
+  -- and with a selection (the selection ends, as when IDEA's focus moves)
+  if vim.fn.maparg(lhs, 'x') == '' then
+    map('x', lhs, '<Esc>' .. lhs, { remap = true, desc = 'IDE shortcut with a selection' })
+  end
 end
 
 -- Cmd+Option shortcuts (macOS Alacritty sends them as Ctrl+Alt+F1…F7; on Linux Ctrl+Alt

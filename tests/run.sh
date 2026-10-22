@@ -141,6 +141,16 @@ scenario() {
   expect "typing: Alt+T opens the terminal" "$(q '&ft')/$(q 'mode()')" "toggleterm/t"
   k M-t; editor; expect "typing: the text stays as typed" "$(q 'getline("$")')" "int typed = 1"
   k u; check typing-tool-windows
+  # Alt+T from a popup: Search Everywhere and an input box close, the terminal opens
+  editor; k ' ' ' '; sleep 1; lit Ord; sleep 0.5; k M-t; sleep 1.5
+  expect "Search Everywhere: Alt+T opens the terminal" "$(q '&ft')/$(q 'mode()')" "toggleterm/t"
+  k M-t; editor; ql 'require("pc.input").open({ prompt = "Name" }, function() end)' >/dev/null; sleep 0.5; lit abc; k M-t; sleep 1.5
+  expect "input box: Alt+T opens the terminal" "$(q '&ft')/$(q 'mode()')" "toggleterm/t"
+  k M-t; check popup-terminal
+  # with a selection too (Visual: it was Esc + t, waiting for a character)
+  editor; k V; k j; k M-1; sleep 1
+  expect "selection: Alt+1 opens the project tree" "$(q '&ft')/$(q 'mode()')" "neo-tree/n"
+  k M-1; check visual-tool-window
   # Search Everywhere finds a method (jdtls lists only classes unless told otherwise)
   k ' ' ' '; sleep 1; lit loyaltyDisc; sleep 3; k Enter; sleep 1.5; check search-everywhere
   expect "Search Everywhere: a method" "$(q "expand('%:t').':'.line('.')")" OrderService.java:10

@@ -6,6 +6,21 @@ local M = {}
 --- Wraps a toggle function. `is_tool(win)` tells the tool window's windows apart.
 function M.activate(is_tool, toggle, on_focus)
   return function()
+    -- from a popup (an input box, a hover): it closes and the tool window opens, as in IDEA;
+    -- a dialog (pc.form) is modal and keeps the key
+    if vim.api.nvim_win_get_config(0).relative ~= '' then
+      if vim.bo.filetype == 'pcform' then
+        return
+      end
+      local back = vim.fn.win_getid(vim.fn.winnr '#')
+      if back == 0 or vim.api.nvim_win_get_config(back).relative ~= '' then
+        back = vim.tbl_filter(function(w)
+          return vim.api.nvim_win_get_config(w).relative == ''
+        end, vim.api.nvim_tabpage_list_wins(0))[1]
+      end
+      vim.cmd 'stopinsert'
+      vim.api.nvim_set_current_win(back)
+    end
     local current = vim.api.nvim_get_current_win()
     local first
     for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
