@@ -149,6 +149,16 @@ for _, lhs in ipairs(IDE_KEYS) do
     end)
   end, { desc = 'IDE shortcut from the terminal' })
 end
+-- While typing in the editor they work too (IDEA's do): without this Alt+1 was Esc + 1 and
+-- Alt+T Esc + t, waiting for a character
+for _, lhs in ipairs(vim.list_extend({ '<M-t>', '<F12>' }, IDE_KEYS)) do
+  map('i', lhs, function()
+    vim.cmd 'stopinsert'
+    vim.schedule(function()
+      vim.api.nvim_feedkeys(vim.keycode(lhs), 'm', false)
+    end)
+  end, { desc = 'IDE shortcut while typing' })
+end
 
 -- Cmd+Option shortcuts (macOS Alacritty sends them as Ctrl+Alt+F1…F7; on Linux Ctrl+Alt
 -- belongs to the window manager). Each runs the existing <leader> mapping.

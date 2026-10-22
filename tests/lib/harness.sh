@@ -37,6 +37,9 @@ check() {   # check <label>: nvim alive and answering, no new errors
   if [ -n "$e" ] && [ "$e" != "$LAST_ERR" ]; then fail "[$STEP $1] error: ${e#"$LAST_ERR"}"; LAST_ERR=$e; fi
   local me; me=$(q "execute('messages')" | grep -E 'E[0-9]+:|rror|stack traceback' | grep -v 'E35\|E21\|E486\|E384\|E385' | tail -2)
   if [ -n "$me" ] && [ "$me" != "$LAST_MSG" ]; then fail "[$STEP $1] message: $me"; LAST_MSG=$me; fi
+  # a shortcut must never type into a shell (vim-tmux-navigator's Vim mappings did)
+  local sh; sh=$(ql "(function() local n=0 for _,b in ipairs(vim.api.nvim_list_bufs()) do if vim.bo[b].buftype==\"terminal\" then for _,l in ipairs(vim.api.nvim_buf_get_lines(b,0,-1,false)) do if l:find(\"command not found\",1,true) then n=n+1 end end end end return n end)()")
+  if [ -n "$sh" ] && [ "$sh" != "0" ] && [ "$sh" != "${LAST_SH:-0}" ]; then fail "[$STEP $1] typed into a shell: $sh 'command not found'"; LAST_SH=$sh; fi
   echo "ok [$STEP $1] $(wins)" >> $LOG
   return 0
 }

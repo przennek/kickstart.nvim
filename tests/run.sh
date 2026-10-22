@@ -121,6 +121,26 @@ scenario() {
   start "$dir" src/test/java/example/shop/OrderServiceTest.java
   sleep 45
   check start
+  # Terminal (Alt+T): Ctrl+K to the editor and Ctrl+J back, a few times; the shell gets none
+  # of it (the plugin's own mappings typed "TmuxNavigateUp" into it), what you typed stays
+  k M-t; sleep 2; lit 'echo nav'
+  k C-k; sleep 0.5; expect "terminal: Ctrl+K goes to the editor" "$(q '&buftype')/$(q 'mode()')" "/n"
+  k C-j; sleep 0.5; expect "editor: Ctrl+J back to the terminal, typing" "$(q '&buftype')/$(q 'mode()')" "terminal/t"
+  k C-k; k C-j; k C-k; k C-j; lit ' ok'; k Enter; sleep 1; check terminal-navigation
+  local term_text; term_text=$(ql 'table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n")')
+  expect "terminal: the command ran" "$(printf '%s' "$term_text" | grep -c '^nav ok$')" 1
+  expect "terminal: nothing typed into the shell" "$(printf '%s' "$term_text" | grep -cE 'TmuxNavigate|command not found')" 0
+  # a program in the foreground (fzf, less…) keeps Ctrl+K: here cat shows it as ^K
+  lit 'cat'; k Enter; sleep 0.5; k C-k; sleep 0.5
+  expect "terminal: Ctrl+K belongs to a running program" "$(q '&buftype')/$(q 'mode()')" "terminal/t"
+  k C-d; k C-c; sleep 0.5; k C-k; sleep 0.5; esc "$HIDE_ALL"; check terminal-program
+  # while typing, Alt+1 / Alt+T open their tool windows (they were Esc + 1 / Esc + t)
+  editor; k G; k o; lit 'int typed = 1'; k M-1; sleep 1
+  expect "typing: Alt+1 opens the project tree" "$(q '&ft')/$(q 'mode()')" "neo-tree/n"
+  k M-1; editor; k A; k M-t; sleep 1.5
+  expect "typing: Alt+T opens the terminal" "$(q '&ft')/$(q 'mode()')" "toggleterm/t"
+  k M-t; editor; expect "typing: the text stays as typed" "$(q 'getline("$")')" "int typed = 1"
+  k u; check typing-tool-windows
   # Search Everywhere finds a method (jdtls lists only classes unless told otherwise)
   k ' ' ' '; sleep 1; lit loyaltyDisc; sleep 3; k Enter; sleep 1.5; check search-everywhere
   expect "Search Everywhere: a method" "$(q "expand('%:t').':'.line('.')")" OrderService.java:10
