@@ -1,7 +1,7 @@
 -- Hide All Tool Windows (IDEA's Ctrl+Shift+F12; Alt+Shift+F12 in your keymap, which
 -- Alacritty translates to Ctrl+Shift+F12; Cmd+Shift+F12 on the Mac). First press hides every
 -- tool window (project tree, structure, Find / Problems, Run, terminals, debugger, commit,
--- Database, Maven, hierarchy, notifications, query results…), leaving only the editor windows;
+-- Maven, hierarchy, notifications, query results…), leaving only the editor windows;
 -- the second press brings back exactly the ones that were open, where they were.
 
 local M = {}
@@ -24,14 +24,6 @@ local MODULES = {
     end,
     show = function()
       vim.cmd 'Neogit'
-    end,
-  },
-  dbui = {
-    hide = function()
-      vim.cmd 'DBUIClose'
-    end,
-    show = function()
-      vim.cmd 'DBUIToggle'
     end,
   },
   pcnotifications = {
@@ -81,7 +73,7 @@ local function tool_window(win)
   if ft:match '^Diffview' or ft == 'pcdifffiles' then
     return false
   end
-  return vim.bo[buf].buftype ~= '' or ft == 'dbout'
+  return vim.bo[buf].buftype ~= ''
 end
 
 local function side(win)

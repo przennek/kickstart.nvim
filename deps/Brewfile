@@ -17,11 +17,7 @@ brew "go"
 brew "llvm"          # clangd (keg-only: Mason's clangd is used when it isn't on PATH)
 brew "clang-format"
 
-# Databases, cloud, infra
-brew "sqlite"
-brew "libpq"         # psql; keg-only: brew link --force libpq
-brew "mongosh"
-brew "lazysql"       # Database window (<leader>S)
+# Cloud, infra
 brew "awscli"
 brew "hashicorp/tap/terraform"
 

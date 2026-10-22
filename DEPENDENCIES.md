@@ -11,7 +11,6 @@ które go wymagają, są pomijane i raz pokazuje się komunikat, czego brakuje.
 
 ```sh
 sudo pacman -S --needed - < deps/arch-packages.txt
-yay -S --needed - < deps/aur-packages.txt      # mongosh (MongoDB), lazysql (Database window)
 ```
 
 ## macOS
@@ -19,7 +18,6 @@ yay -S --needed - < deps/aur-packages.txt      # mongosh (MongoDB), lazysql (Dat
 ```sh
 xcode-select --install                          # kompilator C i make
 brew bundle --file=deps/Brewfile
-brew link --force libpq                         # psql na PATH
 ```
 
 `clangd` z `brew llvm` nie trafia na PATH — wtedy używany jest clangd z Masona (sam się instaluje).

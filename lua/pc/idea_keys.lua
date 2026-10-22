@@ -172,7 +172,6 @@ local cmd_option = {
   { '<C-M-F3>', '<leader>vr', 'Rollback (Cmd+Option+Z)', { 'n', 'x' } },
   { '<C-M-F4>', '<leader>vC', 'Commit and Push (Cmd+Option+K)' },
   { '<C-M-F5>', '<leader>i', 'Auto-Indent Lines (Cmd+Option+I)', { 'n', 'x' } },
-  { '<C-M-F6>', '<leader>Qh', 'Database: query history (Cmd+Option+E)' },
   { '<C-M-F7>', '<leader>yr', 'Copy Reference (Cmd+Option+Shift+C)' },
 }
 for _, k in ipairs(cmd_option) do

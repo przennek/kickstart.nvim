@@ -20,9 +20,7 @@ npm
 python
 go
 clang
-# Databases, cloud, infra
-sqlite
-postgresql-libs
+# Cloud, infra
 aws-cli-v2
 terraform
 # Terminal and font

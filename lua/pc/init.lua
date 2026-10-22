@@ -2,6 +2,7 @@
 vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 require 'pc.actions' -- first: records the keymaps defined below for Find Action
+require 'pc.error_log' -- early: every error from here on goes to :ErrorLog
 require 'pc.notifications' -- early: plugin messages go to the Notifications window
 require 'pc.proxy' -- early: the saved proxy goes to the environment before anything is spawned
 require 'pc.config'
@@ -12,11 +13,6 @@ require 'pc.hide_windows'
 require 'pc.projects'
 require 'pc.splits'
 require 'pc.split_diff'
-require 'pc.db_connections'
-require 'pc.db_tui'
-require 'pc.db_console'
-require 'pc.db_table'
-require 'pc.db_grid'
 require 'pc.aws'
 require 'pc.aws_explorer'
 require 'pc.gutter'

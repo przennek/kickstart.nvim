@@ -15,7 +15,3 @@ copied to a fresh temporary directory:
   tests from the context, debugging, files changed behind the editor (an "LLM agent"), Recent
   Changes, Rename, tests again, then N random tool-window / IDE actions;
 - `tests/run.sh all` — both. The exit status is the number of failures.
-
-With `PG_URL=postgresql://user@host:port/db` (a throwaway PostgreSQL server where the user may
-create databases) the regression also switches a SQL console between schemas, databases and
-data sources; without it that test is skipped.

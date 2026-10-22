@@ -1,9 +1,9 @@
 -- Settings like IDEA's (Ctrl+Alt+S): one place for every settings dialog (pc.form).
---   Ctrl+Alt+S / <leader>, / :Settings   Editor, Appearance, HTTP Proxy, Data Sources, Project
+--   Ctrl+Alt+S / <leader>, / :Settings   Editor, Appearance, HTTP Proxy, Project
 --                                        Structure, Maven, Run/Debug Configurations
 -- Editor holds what IDEA keeps under Editor → General / Appearance (whitespace, soft wraps, line
 -- numbers, caret line, inlay hints, breadcrumbs, indentation, format on save, inline blame,
--- notifications) and which Database window to use; it is saved in
+-- notifications); it is saved in
 -- stdpath('data')/pc_settings.json and applied at startup.
 
 local M = {}
@@ -25,7 +25,6 @@ local DEFAULTS = {
   inline_blame = true,
   notify_echo_errors = true,
   notify_status_bar = true,
-  db_window = 'lazysql',
 }
 
 local function read()
@@ -116,8 +115,6 @@ function M.editor()
       { header = 'Notifications (<leader>tn)' },
       { key = 'notify_echo_errors', label = 'Show errors in the command line', check = true },
       { key = 'notify_status_bar', label = 'Show the last message in the status bar', check = true },
-      { header = 'Database (<leader>S)' },
-      { key = 'db_window', label = 'Database window', choices = { 'lazysql', 'dadbod-ui' } },
     },
     buttons = {
       {
@@ -153,9 +150,6 @@ local PAGES = {
   end },
   { label = 'Appearance → HTTP Proxy', open = function()
     require('pc.proxy').open()
-  end },
-  { label = 'Database → Data Sources', open = function()
-    require('pc.db_connections').manage()
   end },
   { label = 'Project Structure (SDK)', open = function()
     require('pc.project_structure').open()

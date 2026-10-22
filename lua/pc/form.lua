@@ -7,7 +7,7 @@
 --   the buttons' keys (shown at the bottom, e.g. Ctrl+S OK, Ctrl+T Test), q / Esc cancels
 --
 -- require('pc.form').open {
---   title = 'Data Source',
+--   title = 'Run Configuration',
 --   fields = {
 --     { header = 'General' },
 --     { key = 'host', label = 'Host', default = 'localhost' },
