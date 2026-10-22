@@ -64,18 +64,14 @@ local function profiles_of(p)
 end
 
 ---------------------------------------------------------------------------
--- Settings per project (stdpath('data')/pc_maven.json)
+-- Settings per project (.idea/nvim/maven.json)
 ---------------------------------------------------------------------------
 
-local SETTINGS_FILE = vim.fn.stdpath 'data' .. '/pc_maven.json'
-
-local function all_settings()
-  local ok, all = pcall(vim.json.decode, read(SETTINGS_FILE))
-  return ok and type(all) == 'table' and all or {}
-end
+local store = require 'pc.project_store'
 
 local function settings(p)
-  return all_settings()[p.root] or {}
+  local values = store.get(p.root, 'maven', 'pc_maven.json')
+  return type(values) == 'table' and values or {}
 end
 
 -- The executable and the options every Maven call of the project gets
@@ -423,11 +419,7 @@ function M.settings()
         label = 'OK',
         key = '<C-s>',
         run = function(values, form)
-          local all = all_settings()
-          all[p.root] = values
-          local f = assert(io.open(SETTINGS_FILE, 'w'))
-          f:write(vim.json.encode(all))
-          f:close()
+          store.set(p.root, 'maven', values, 'pc_maven.json')
           state.offline, state.skip_tests = values.offline, values.skip_tests
           state.profiles[p.root] = vim.split(values.profiles or '', '%s*,%s*', { trimempty = true })
           plugin_cache[p.pom] = nil

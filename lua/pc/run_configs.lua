@@ -4,41 +4,25 @@
 --                      (run and debug through jdtls / java-debug)
 --   Python script      script, arguments, environment, working directory (debug through debugpy)
 --   Shell command      anything: a C binary, make, npm, mvn… (runs in the Run window)
--- Saved per project (git root, else the working directory) in stdpath('data')/run_configs.json.
+-- Saved per project (git root, else the working directory) in .idea/nvim/run_configs.json.
 
 local M = {}
 
-local FILE = vim.fn.stdpath 'data' .. '/run_configs.json'
 local TYPES = { 'Java application', 'Python script', 'Shell command' }
 
 local function project()
   return vim.fs.root(0, { '.git', 'pom.xml', 'build.gradle', 'pyproject.toml', 'package.json', 'Makefile' }) or vim.fn.getcwd()
 end
 
-local function read_all()
-  local f = io.open(FILE)
-  if not f then
-    return {}
-  end
-  local ok, all = pcall(vim.json.decode, f:read '*a')
-  f:close()
-  return ok and type(all) == 'table' and all or {}
-end
-
-local function write_all(all)
-  local f = assert(io.open(FILE, 'w'))
-  f:write(vim.json.encode(all))
-  f:close()
-end
+local store = require 'pc.project_store'
 
 function M.list()
-  return read_all()[project()] or {}
+  local list = store.get(project(), 'run_configs', 'run_configs.json')
+  return type(list) == 'table' and list or {}
 end
 
 local function save_list(list)
-  local all = read_all()
-  all[project()] = #list > 0 and list or nil
-  write_all(all)
+  store.set(project(), 'run_configs', #list > 0 and list or nil, 'run_configs.json')
 end
 
 -- 'a "b c" d' → { 'a', 'b c', 'd' }

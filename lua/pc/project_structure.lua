@@ -1,21 +1,16 @@
 -- Project Structure like IDEA's (Ctrl+Alt+Shift+S, Settings → Project Structure, :ProjectStructure):
 -- the project's SDK (a JDK from SDKMAN or /usr/lib/jvm) and its language level from pom.xml.
 -- The chosen JDK becomes jdtls' default runtime for the project; jdtls restarts to pick it up.
--- Saved per project in stdpath('data')/pc_project.json.
+-- Saved per project in .idea/nvim/project.json.
 
 local M = {}
 
-local FILE = vim.fn.stdpath 'data' .. '/pc_project.json'
 local DEFAULT = 'Default (SDKMAN current)'
+local store = require 'pc.project_store'
 
-local function read_all()
-  local f = io.open(FILE)
-  if not f then
-    return {}
-  end
-  local ok, all = pcall(vim.json.decode, f:read '*a')
-  f:close()
-  return ok and type(all) == 'table' and all or {}
+local function settings(root)
+  local values = store.get(root, 'project', 'pc_project.json')
+  return type(values) == 'table' and values or {}
 end
 
 function M.root(buf)
@@ -24,7 +19,7 @@ end
 
 --- The project's chosen JDK home, or nil for the default
 function M.sdk(root)
-  local sdk = (read_all()[root] or {}).sdk
+  local sdk = settings(root).sdk
   return sdk and sdk ~= DEFAULT and sdk or nil
 end
 
@@ -94,7 +89,7 @@ function M.open()
   local choices = vim.list_extend({ DEFAULT }, M.jdks())
   require('pc.form').open {
     title = 'Project Structure: ' .. vim.fs.basename(root),
-    values = { sdk = (read_all()[root] or {}).sdk or DEFAULT },
+    values = { sdk = settings(root).sdk or DEFAULT },
     fields = {
       { header = 'Project' },
       { key = 'sdk', label = 'SDK', choices = choices },
@@ -114,11 +109,7 @@ function M.open()
         label = 'OK',
         key = '<C-s>',
         run = function(values, form)
-          local all = read_all()
-          all[root] = { sdk = values.sdk }
-          local f = assert(io.open(FILE, 'w'))
-          f:write(vim.json.encode(all))
-          f:close()
+          store.set(root, 'project', { sdk = values.sdk }, 'pc_project.json')
           form:close()
           vim.notify('Project SDK: ' .. values.sdk .. (M.restart_jdtls() and ' (restarting jdtls)' or ''))
         end,

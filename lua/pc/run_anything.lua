@@ -6,35 +6,25 @@
 
 local M = {}
 
-local FILE = vim.fn.stdpath 'data' .. '/pc_run_anything.json'
+local store = require 'pc.project_store'
 local HISTORY = 30
 
 local function root()
   return vim.fs.root(0, { '.git', 'pom.xml', 'package.json', 'pyproject.toml', 'Makefile', 'build.gradle' }) or vim.fn.getcwd()
 end
 
-local function read_all()
-  local f = io.open(FILE)
-  if not f then
-    return {}
-  end
-  local ok, all = pcall(vim.json.decode, f:read '*a')
-  f:close()
-  return ok and type(all) == 'table' and all or {}
+-- recent commands of the project (.idea/nvim/run_anything.json)
+local function history(dir)
+  local list = store.get(dir, 'run_anything', 'pc_run_anything.json')
+  return type(list) == 'table' and list or {}
 end
 
 local function remember(dir, cmd)
-  local all = read_all()
   local list = vim.tbl_filter(function(c)
     return c ~= cmd
-  end, all[dir] or {})
+  end, history(dir))
   table.insert(list, 1, cmd)
-  all[dir] = vim.list_slice(list, 1, HISTORY)
-  local f = io.open(FILE, 'w')
-  if f then
-    f:write(vim.json.encode(all))
-    f:close()
-  end
+  pcall(store.set, dir, 'run_anything', vim.list_slice(list, 1, HISTORY), 'pc_run_anything.json')
 end
 
 -- Suggestions for the project: { cmd, kind }
@@ -46,7 +36,7 @@ local function suggestions(dir)
       table.insert(items, { cmd = cmd, kind = kind })
     end
   end
-  for _, cmd in ipairs(read_all()[dir] or {}) do
+  for _, cmd in ipairs(history(dir)) do
     add(cmd, 'recent')
   end
   local pkg = vim.fs.joinpath(dir, 'package.json')

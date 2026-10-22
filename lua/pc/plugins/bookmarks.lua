@@ -2,7 +2,8 @@
 -- optional description shown at the end of the line, searchable list.
 -- Keys follow .ideavimrc (<leader>pa / pr = ToggleBookmark, <leader>sb = ShowBookmarks)
 -- and the IDEA keymap (F11 / Ctrl+F11 = toggle, Alt+F11 = with description, Shift+F11 = list).
--- Stored globally in ~/.bookmarks, so they survive restarts.
+-- Stored in the project like IDEA's (.idea/nvim/bookmarks.json, see pc.project_store), outside a
+-- project in ~/.bookmarks; bookmarks made before move there with the next change.
 local function bm(fn)
   return function()
     require('bookmarks')[fn]()
@@ -50,8 +51,15 @@ return {
     { '<M-2>', show_bookmarks, desc = 'Show Bookmarks' },
   },
   config = function()
+    -- the plugin keeps a project's bookmarks in its scope file once that file exists
+    local root = vim.fs.root(vim.fn.getcwd(), { '.git', 'pom.xml', 'build.gradle', 'pyproject.toml', 'package.json', 'Makefile' })
+    local dir = root and require('pc.project_store').dir(root, true)
+    if dir and not vim.uv.fs_stat(dir .. '/bookmarks.json') then
+      vim.fn.writefile({}, dir .. '/bookmarks.json')
+    end
     require('bookmarks').setup {
       virt_text = true, -- show descriptions at the end of the line
+      scope_file = '.idea/nvim/bookmarks.json',
     }
     require('telescope').load_extension 'bookmarks'
   end,

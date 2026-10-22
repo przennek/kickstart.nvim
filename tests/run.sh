@@ -82,6 +82,9 @@ regression() {
   cp -r "$WORK/java" "$WORK/java-git"
   out=$(headless "$WORK/java-git" "" git_track.lua)
   echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
+  cp -r "$WORK/java" "$WORK/java-store"
+  out=$(headless "$WORK/java-store" "" project_store.lua)
+  echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   python3 "$LIB/fake_pg.py" silent 55991 & local silent=$!
   python3 "$LIB/fake_pg.py" password 55992 & local password=$!
   sleep 0.5
