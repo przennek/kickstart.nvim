@@ -91,6 +91,9 @@ local function add(msg, level, opts)
   msg = type(msg) == 'string' and msg or vim.inspect(msg)
   local name = NAMES[type(level) == 'number' and level or vim.log.levels.INFO] or 'INFO'
   table.insert(log, { time = os.time(), level = name, title = opts and opts.title, msg = msg })
+  if name == 'ERROR' or name == 'WARN' then
+    require('pc.error_log').record(name .. (opts and opts.title and (' ' .. opts.title) or ''), msg)
+  end
   if #log > MAX then
     table.remove(log, 1)
   end
