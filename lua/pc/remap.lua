@@ -108,7 +108,14 @@ map('n', '<leader>N', function()
 end, { desc = '[N]ew scratch file' })
 
 -- Back / Forward (Ctrl+Alt+H/L in IDEA, but Ctrl+Alt+H/L switches GNOME workspaces here)
-map('n', '<M-h>', '<C-o>', { desc = 'Back' })
+-- (in a diff, Back leaves the whole diff instead of stepping back in one side: pc.diff_ui)
+map('n', '<M-h>', function()
+  if require('pc.diff_ui').active() then
+    vim.schedule(require('pc.diff_ui').close)
+    return ''
+  end
+  return '<C-o>'
+end, { expr = true, desc = 'Back' })
 map('n', '<M-l>', '<C-i>', { desc = 'Forward' })
 
 -- Problems: F2 / Shift+F2 = next / previous, Alt+F1 = error description

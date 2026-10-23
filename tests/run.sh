@@ -139,6 +139,23 @@ scenario() {
   editor; k V; k j; k M-1; sleep 1
   expect "selection: Alt+1 opens the project tree" "$(q '&ft')/$(q 'mode()')" "neo-tree/n"
   k M-1; check visual-tool-window
+  # Show Diff: sides labelled, Back (Ctrl+Shift+P = Alt+H) closes all of it, so does q
+  editor; k M-d; sleep 2
+  expect "diff: sides labelled" "$(q 'join(map(filter(range(1,winnr("$")), {_,n->getwinvar(n,"&diff")}), {_,n->getwinvar(n,"&winbar") =~ "Previous\\|Current"}), "")')" 11
+  k M-h; sleep 1; expect "diff: Back closes the whole diff" "$(q 'len(filter(range(1,winnr("$")), {_,n->getwinvar(n,"&diff")}))')" 0
+  k M-d; sleep 2; k q; sleep 1; expect "diff: q closes the whole diff" "$(q 'len(filter(range(1,winnr("$")), {_,n->getwinvar(n,"&diff")}))')" 0
+  check diff-close
+  # terminal after scrolling and copying takes typing again (it was "modifiable is off")
+  k M-t; sleep 1.5; lit 'seq 1 40'; k Enter; sleep 0.5; t send-keys -t $SES 'C-\' 'C-n'; sleep 0.3; k g; k g; k y; k y; sleep 0.5
+  expect "terminal: copying goes back to typing" "$(q 'mode()')" t
+  t send-keys -t $SES 'C-\' 'C-n'; sleep 0.3; k x; sleep 0.3
+  expect "terminal: a key after scrolling types" "$(q 'mode()')" t
+  k C-u; k M-t; check terminal-typing
+  # your moves are in the error log, the text you typed is not (only how many characters)
+  local moves=$WORK/state/nvim/pc-errors.log
+  expect "telemetry: Alt+T recorded" "$(grep -c 'move .*<M-t>' "$moves" | grep -v '^0$' >/dev/null && echo yes)" yes
+  expect "telemetry: typing counted" "$(grep -c 'move .* chars)' "$moves" | grep -v '^0$' >/dev/null && echo yes)" yes
+  expect "telemetry: no typed text" "$(grep -c 'int typed = 1\|echo nav' "$moves")" 0
   # Search Everywhere finds a method (jdtls lists only classes unless told otherwise)
   k ' ' ' '; sleep 1; lit loyaltyDisc; sleep 3; k Enter; sleep 1.5; check search-everywhere
   expect "Search Everywhere: a method" "$(q "expand('%:t').':'.line('.')")" OrderService.java:10

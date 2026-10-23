@@ -245,6 +245,21 @@ local function on_popup()
   end
 end
 
+--- The mouse menu's items for the current buffer (Find Action lists them under the same names):
+--- { label, run, shortcut }
+function M.items()
+  if vim.bo.filetype == 'neo-tree' then
+    return vim.tbl_filter(function(i)
+      return i ~= '-'
+    end, tree_items())
+  elseif vim.bo.buftype == '' and vim.api.nvim_buf_get_name(0) ~= '' then
+    return vim.tbl_filter(function(i)
+      return i ~= '-'
+    end, editor_items(false))
+  end
+  return {}
+end
+
 -- Neovim's default mouse menu (Go to definition, diagnostics…) is replaced
 pcall(vim.api.nvim_del_augroup_by_name, 'nvim.popupmenu')
 vim.api.nvim_create_autocmd('MenuPopup', {

@@ -25,6 +25,7 @@ local DEFAULTS = {
   inline_blame = true,
   notify_echo_errors = true,
   notify_status_bar = true,
+  telemetry = true,
 }
 
 local function read()
@@ -115,6 +116,7 @@ function M.editor()
       { header = 'Notifications (<leader>tn)' },
       { key = 'notify_echo_errors', label = 'Show errors in the command line', check = true },
       { key = 'notify_status_bar', label = 'Show the last message in the status bar', check = true },
+      { key = 'telemetry', label = 'Record my moves in the error log (:ErrorLog)', check = true },
     },
     buttons = {
       {

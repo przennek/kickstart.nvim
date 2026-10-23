@@ -196,6 +196,8 @@ return {
             local pid = vim.b[event.buf].terminal_job_pid
             return pid and vim.uv.fs_readlink('/proc/' .. pid .. '/cwd') or vim.fn.getcwd()
           end)
+          -- typing / pasting after scrolling or copying goes to the shell
+          require('pc.terminal_typing').attach(event.buf)
         end,
       })
       vim.api.nvim_create_autocmd('BufEnter', {

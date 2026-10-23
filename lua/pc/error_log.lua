@@ -16,8 +16,9 @@ local MAX = 2 * 1024 * 1024
 
 local last_entry, last_time = nil, 0
 
---- Appends an entry; `source` e.g. 'vim', 'ERROR lsp', 'WARN telescope'
-function M.record(source, msg)
+--- Appends an entry; `source` e.g. 'vim', 'ERROR lsp', 'WARN telescope'; `where` the file /
+--- window it happened in (default: the current buffer)
+function M.record(source, msg, where)
   msg = vim.trim(type(msg) == 'string' and msg or vim.inspect(msg))
   if msg == '' then
     return
@@ -33,6 +34,9 @@ function M.record(source, msg)
     os.rename(M.FILE, M.FILE:gsub('%.log$', os.date '-%Y%m%d-%H%M%S.log'))
   end
   local ok, file = pcall(function()
+    if where then
+      return where
+    end
     local name = vim.api.nvim_buf_get_name(0)
     return name ~= '' and vim.fn.fnamemodify(name, ':~:.') or vim.bo.filetype
   end)

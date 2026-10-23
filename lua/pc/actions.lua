@@ -141,6 +141,20 @@ local function available()
       table.insert(list, { name = action.name, keys = table.concat(keys, ', '), run = run })
     end
   end
+  -- what the mouse menu offers here (the tree's file actions, Git: Show Diff…), by its names
+  local ok, menu = pcall(function()
+    return require('pc.context_menu').items()
+  end)
+  local have = {}
+  for _, a in ipairs(list) do
+    have[a.name] = true
+  end
+  for _, item in ipairs(ok and menu or {}) do
+    if not have[item[1]] then
+      have[item[1]] = true
+      table.insert(list, { name = item[1], keys = item[3] or '', run = { fn = item[2] } })
+    end
+  end
   table.sort(list, function(a, b)
     return a.name:lower() < b.name:lower()
   end)
@@ -153,6 +167,9 @@ local function execute(k, tries)
     return vim.defer_fn(function()
       execute(k, (tries or 0) + 1)
     end, 10)
+  end
+  if k.fn then
+    return k.fn()
   end
   if k.mode == 'x' then
     -- visual-only action from normal mode: work on the last selection
