@@ -32,9 +32,8 @@ local function start_jdtls()
   local mason = vim.fn.stdpath 'data' .. '/mason'
   local root_dir = vim.fs.root(0, { 'mvnw', 'gradlew', 'pom.xml', 'build.gradle', 'build.gradle.kts', 'settings.gradle', '.git' })
     or vim.fn.getcwd()
-  -- outside the project: Eclipse refuses a workspace inside it ("overlaps the workspace
-  -- location"; the Maven import fails), so not in .idea
-  local workspace = vim.fn.stdpath 'cache' .. '/jdtls/' .. root_dir:gsub('/', '_')
+  -- Eclipse's project files in .idea/nvim/eclipse (pc.project_store)
+  local workspace = require('pc.project_store').jdtls_workspace(root_dir)
 
   -- Debugger + test runner extensions
   local bundles = vim.fn.glob(mason .. '/packages/java-debug-adapter/extension/server/com.microsoft.java.debug.plugin-*.jar', true, true)

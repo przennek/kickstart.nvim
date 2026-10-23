@@ -51,6 +51,33 @@ function M.dir(root, create)
   return dir
 end
 
+--- jdtls' workspace (index, build state) stays in stdpath('cache')/jdtls: Eclipse refuses a
+--- workspace inside the project ("overlaps the workspace location", also through a link; the
+--- Maven import fails). Eclipse's project files (.project, .classpath, .settings, .factorypath,
+--- which jdtls keeps in the workspace) are in .idea/nvim/eclipse: the workspace's folder for
+--- them is a link there. Returns the path for `-data`.
+function M.jdtls_workspace(root)
+  local workspace = vim.fn.stdpath 'cache' .. '/jdtls/' .. root:gsub('/', '_')
+  local dir = M.dir(root, true)
+  if not dir then
+    return workspace
+  end
+  local real = dir .. '/eclipse'
+  local link = workspace .. '/.metadata/.plugins/org.eclipse.core.resources/.projects'
+  vim.fn.mkdir(real, 'p')
+  if vim.uv.fs_readlink(link) ~= real then
+    -- the project files of an older version (a folder there) move into .idea
+    local stat = vim.uv.fs_lstat(link)
+    if stat and stat.type == 'directory' then
+      vim.fn.system { 'cp', '-a', link .. '/.', real }
+    end
+    vim.fn.delete(link, 'rf')
+    vim.fn.mkdir(vim.fs.dirname(link), 'p')
+    vim.uv.fs_symlink(real, link)
+  end
+  return workspace
+end
+
 --- The stored value of `name` for the project, or nil. `legacy` is the stdpath('data') file of
 --- older versions ({ [root] = value }).
 function M.get(root, name, legacy)

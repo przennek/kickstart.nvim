@@ -68,6 +68,10 @@ regression() {
     local out; out=$(headless "$WORK/$1" "$2" startup.lua SERVERS="$3" WAIT="$4")
     echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   done
+  # jdtls keeps Eclipse's project files in .idea/nvim/eclipse, not in the project root
+  local eclipse; eclipse=$(cd "$WORK/java" && ls -d .project .classpath .settings .factorypath 2>/dev/null | tr '\n' ' ')
+  expect "java: no Eclipse files in the project root" "$eclipse" ""
+  expect "java: Eclipse files in .idea" "$([ -f "$WORK/java/.idea/nvim/eclipse/shop/.project" ] && echo yes)" yes
   out=$(headless "$WORK/java" "" hooks.lua)
   echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   out=$(headless "$WORK/java" src/main/java/example/shop/OrderService.java editing.lua)

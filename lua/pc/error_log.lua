@@ -6,7 +6,8 @@
 -- Each entry: time, source, the file you were in, the message (more lines indented).
 --   :ErrorLog        open the log (newest at the end)
 --   :ErrorLogClear   empty it
--- Over 2 MB the log moves to pc-errors.log.old and starts again.
+-- Entries are only ever added; over 2 MB the log moves to pc-errors-<date>.log (kept) and a new
+-- one starts.
 
 local M = {}
 
@@ -29,7 +30,7 @@ function M.record(source, msg)
   last_entry, last_time = msg, now
   local stat = vim.uv.fs_stat(M.FILE)
   if stat and stat.size > MAX then
-    os.rename(M.FILE, M.FILE .. '.old')
+    os.rename(M.FILE, M.FILE:gsub('%.log$', os.date '-%Y%m%d-%H%M%S.log'))
   end
   local ok, file = pcall(function()
     local name = vim.api.nvim_buf_get_name(0)

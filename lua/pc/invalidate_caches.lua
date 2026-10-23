@@ -16,6 +16,12 @@ local function jdtls_dir(root)
   return CACHE .. '/jdtls/' .. root:gsub('/', '_')
 end
 
+-- Eclipse's project files of the workspace, in .idea (pc.project_store)
+local function eclipse_dir(root)
+  local dir = require('pc.project_store').dir(root)
+  return dir and (dir .. '/eclipse')
+end
+
 -- language servers of the open buffers: stop them, then attach again like opening the files
 local function restart_servers()
   local buffers = {}
@@ -70,9 +76,15 @@ function M.open()
           end
           if values.jdtls_all then
             vim.fn.delete(CACHE .. '/jdtls', 'rf')
+            if eclipse_dir(root) then
+              vim.fn.delete(eclipse_dir(root), 'rf')
+            end
             table.insert(done, 'Java data of all projects')
           elseif values.jdtls then
             vim.fn.delete(jdtls_dir(root), 'rf')
+            if eclipse_dir(root) then
+              vim.fn.delete(eclipse_dir(root), 'rf')
+            end
             table.insert(done, 'Java data of this project')
           end
           if values.local_history then
