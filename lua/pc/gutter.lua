@@ -14,7 +14,8 @@ end
 
 vim.keymap.set('n', '<LeftMouse>', function()
   local mouse = vim.fn.getmousepos()
-  if mouse.winid == 0 or mouse.line == 0 or mouse.wincol > 4 then
+  -- a window without the sign column (a terminal, the tree): its first columns are text
+  if mouse.winid == 0 or mouse.line == 0 or mouse.wincol > 4 or vim.wo[mouse.winid].signcolumn == 'no' then
     return '<LeftMouse>'
   end
   local buf = vim.api.nvim_win_get_buf(mouse.winid)

@@ -50,6 +50,8 @@ function M.attach(buf)
       vim.cmd 'startinsert'
     end
   end, { buffer = buf, desc = 'Scroll; at the end back to typing' })
+  -- a mouse selection copies itself on release, as in a terminal emulator (the log: drag, then y)
+  vim.keymap.set('x', '<LeftRelease>', '<LeftRelease>y', { buffer = buf, desc = 'Copy the mouse selection' })
   vim.api.nvim_create_autocmd('TextYankPost', {
     buffer = buf,
     group = vim.api.nvim_create_augroup('pc-terminal-typing-' .. buf, { clear = true }),

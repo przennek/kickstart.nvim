@@ -188,6 +188,10 @@ scenario() {
   expect "terminal: typing after the wheel" "$(screen | grep -c '^wheeled')" 1
   for i in 1 2 3; do esc "\033[<64;20;${row}M"; done; for i in 1 2 3 4 5 6; do esc "\033[<65;20;${row}M"; done
   expect "terminal: wheel down to the end types" "$(q 'mode()')" t
+  # a mouse drag copies on release, typing goes on
+  q "setreg('0', '')" >/dev/null
+  esc "\033[<0;2;${row}M"; sleep 0.3; esc "\033[<32;5;${row}M"; sleep 0.3; esc "\033[<32;8;${row}M"; sleep 0.3; esc "\033[<0;8;${row}m"; sleep 0.5
+  expect "terminal: a drag copies" "$(q "(getreg('0') != '' ? 'copied/' : 'empty/').mode()")" copied/t
   k M-t; check terminal-wheel
   # the agent terminal: Alt+I over the whole editor, again back; what runs in it stays
   k M-i; sleep 1.5
