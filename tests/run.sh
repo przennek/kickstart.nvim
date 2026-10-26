@@ -151,6 +151,52 @@ scenario() {
   t send-keys -t $SES 'C-\' 'C-n'; sleep 0.3; k x; sleep 0.3
   expect "terminal: a key after scrolling types" "$(q 'mode()')" t
   k C-u; k M-t; check terminal-typing
+  # from your log (Downloads/pc-errors.log, 2026-10-26):
+  # Ctrl+L in the terminal (tmux prefix + Ctrl+L too) clears it when nothing is to the right
+  k M-t; sleep 1; lit 'echo clearme'; k Enter; sleep 0.5; k C-l; sleep 1
+  expect "terminal: Ctrl+L clears the screen" "$(q 'mode()')/$(screen | grep -c clearme)" "t/0"
+  # a file:line printed in the terminal opens with gd (it was "no link")
+  lit 'echo src/main/java/example/shop/OrderService.java:15'; k Enter; sleep 0.5
+  t send-keys -t $SES 'C-\' 'C-n'; sleep 0.3; k k; k k; k g; k d; sleep 1
+  expect "terminal: gd opens the file:line" "$(q "expand('%:t').':'.line('.')")" OrderService.java:15
+  # files save themselves (you forgot :wa before git in the terminal)
+  editor; k o; lit '// autosaved'; k Escape; sleep 2
+  expect "autosave: saved after typing" "$(q '&modified')/$(grep -c '// autosaved' "$dir/src/main/java/example/shop/OrderService.java")" "0/1"
+  k u; sleep 2; expect "autosave: the undo saved too" "$(grep -c '// autosaved' "$dir/src/main/java/example/shop/OrderService.java")" 0
+  # one Esc closes a popup (it took two)
+  k ' ' ' '; sleep 1; k Escape; sleep 0.5
+  expect "popup: one Esc closes it" "$(q '&ft')/$(q 'mode()')" "java/n"
+  # Space in the project tree is the leader as in the editor (it folded the node, d deleted)
+  k M-1; sleep 1; expect "tree: Space is the leader" "$(q '&ft')/$(ql '(vim.fn.maparg(" ", "n", false, true).desc or "which"):match("which") and "leader" or "tree"')" "neo-tree/leader"
+  k M-1; check log-cases
+  # a diff follows a commit made in the terminal (it had to be opened again)
+  editor; k M-d; sleep 2; k M-t; sleep 1
+  lit "echo '// refreshed' >> src/main/java/example/shop/OrderService.java && git commit -qam refresh"; k Enter; sleep 1.5; k M-t; sleep 2
+  expect "diff: follows a commit in the terminal" "$(ql '(function() for _,w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do local b=vim.api.nvim_win_get_buf(w) if vim.wo[w].diff and vim.api.nvim_buf_get_name(b):match("^fugitive://") then return vim.api.nvim_buf_get_lines(b,-2,-1,false)[1] end end return "none" end)()')" "// refreshed"
+  k q; sleep 1; check diff-refresh
+  # a note of yours in :ErrorLog (o / a / i there), next to the moves
+  ex ErrorLog; sleep 0.5; k o; sleep 0.5; lit 'my note'; k Enter; sleep 0.5
+  expect "error log: note added" "$(grep -c 'note .*my note' "$WORK/state/nvim/pc-errors.log")" 1
+  ex tabclose; check error-note
+  # the mouse wheel in the terminal: up scrolls, a letter then types (e of echo was a motion),
+  # down to the end types again
+  k M-t; sleep 1; lit 'seq 1 300'; k Enter; sleep 0.5
+  local row=$(( $(q '&lines') - 4 ))   # inside the terminal at the bottom
+  for i in 1 2 3; do esc "\033[<64;20;${row}M"; done
+  expect "terminal: wheel up scrolls" "$(q 'mode()')" n
+  lit 'echo wheeled'; k Enter; sleep 0.5
+  expect "terminal: typing after the wheel" "$(screen | grep -c '^wheeled')" 1
+  for i in 1 2 3; do esc "\033[<64;20;${row}M"; done; for i in 1 2 3 4 5 6; do esc "\033[<65;20;${row}M"; done
+  expect "terminal: wheel down to the end types" "$(q 'mode()')" t
+  k M-t; check terminal-wheel
+  # the agent terminal: Alt+I over the whole editor, again back; what runs in it stays
+  k M-i; sleep 1.5
+  expect "agent: full screen, typing" "$(q '&ft')/$(q 'mode()')/$(q 'winwidth(0) == &columns')" "toggleterm/t/1"
+  lit 'cat'; k Enter; k M-i; sleep 0.7
+  expect "agent: hidden, back in the editor" "$(q '&buftype')/$(q 'mode()')" "/n"
+  k M-i; sleep 1; lit 'kept'; k Enter; sleep 0.5
+  expect "agent: the program still runs" "$(screen | grep -c '^kept')" 2
+  k C-d; k M-i; check agent-terminal
   # your moves are in the error log, the text you typed is not (only how many characters)
   local moves=$WORK/state/nvim/pc-errors.log
   expect "telemetry: Alt+T recorded" "$(grep -c 'move .*<M-t>' "$moves" | grep -v '^0$' >/dev/null && echo yes)" yes

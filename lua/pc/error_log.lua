@@ -4,7 +4,8 @@
 --   Vim / Lua errors you saw (E… messages, "Error executing lua callback" with its traceback),
 --   which never pass vim.notify: read from the message history
 -- Each entry: time, source, the file you were in, the message (more lines indented).
---   :ErrorLog        open the log (newest at the end)
+--   :ErrorLog        open the log (newest at the end); o / a / i … there add a note, R reloads
+--   :Note [text]     a note of yours in the log (what went wrong, what you expected)
 --   :ErrorLogClear   empty it
 -- Entries are only ever added; over 2 MB the log moves to pc-errors-<date>.log (kept) and a new
 -- one starts.
@@ -128,11 +129,54 @@ vim.api.nvim_create_autocmd('VimLeavePre', {
   callback = check,
 })
 
+--- A note of yours in the log, in its place among the moves and errors
+function M.note(text, where)
+  if text and vim.trim(text) ~= '' then
+    M.record('note', text, where)
+  end
+end
+
+local function ask_note(where, after)
+  vim.ui.input({ prompt = 'Note for the log: ' }, function(text)
+    M.note(text, where)
+    if after then
+      after()
+    end
+  end)
+end
+
 vim.api.nvim_create_user_command('ErrorLog', function()
   vim.cmd('tabnew ' .. vim.fn.fnameescape(M.FILE))
-  vim.bo.readonly = true
+  local buf = vim.api.nvim_get_current_buf()
+  -- the log grows while it is open: it is never edited here (no "changed on disk" questions),
+  -- it follows the file, and typing (o / a / i …) adds a note at its end instead
+  vim.bo[buf].modifiable = false
+  vim.bo[buf].readonly = true
+  vim.bo[buf].autoread = true
+  local function reload()
+    if vim.api.nvim_buf_is_valid(buf) then
+      vim.api.nvim_buf_call(buf, function()
+        vim.cmd 'silent! edit'
+        vim.bo.readonly, vim.bo.modifiable = true, false
+        vim.cmd 'normal! G'
+      end)
+    end
+  end
+  for _, lhs in ipairs { 'o', 'O', 'a', 'A', 'i', 'I', 'c', 'C', 's', 'S' } do
+    vim.keymap.set('n', lhs, function()
+      ask_note('note', reload)
+    end, { buffer = buf, desc = 'Add a note to the log' })
+  end
+  vim.keymap.set('n', 'R', reload, { buffer = buf, desc = 'Reload the log' })
   vim.cmd 'normal! G'
 end, { desc = 'Open the error log' })
+vim.api.nvim_create_user_command('Note', function(cmd)
+  if cmd.args ~= '' then
+    M.note(cmd.args)
+  else
+    ask_note()
+  end
+end, { nargs = '*', desc = 'Add a note to the error log' })
 vim.api.nvim_create_user_command('ErrorLogClear', function()
   local f = io.open(M.FILE, 'w')
   if f then

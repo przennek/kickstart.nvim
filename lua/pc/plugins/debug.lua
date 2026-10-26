@@ -73,8 +73,14 @@ return {
     -- F7 / Shift+F7 in a diff window jump to the next / previous change (and past the last
     -- one to the next / previous file in Diffview), like IDEA's diff viewer.
     -- Outside of a diff F7 is Step Into.
+    -- set while Diffview loads the next file: F7 held down / hammered waits for it instead of
+    -- jumping in a half-shown diff (it landed in the empty side of an added / deleted file)
+    local switching = false
     local function diff_change(dir, fallback)
       return function()
+        if switching then
+          return
+        end
         local in_diffview = package.loaded['diffview'] and require('diffview.lib').get_current_view()
         if not vim.wo.diff and in_diffview then
           -- e.g. focus is in the file panel: move to the working-tree (right) side of the diff
@@ -98,7 +104,9 @@ return {
           require('diffview.actions')[dir == 'next' and 'select_next_entry' or 'select_prev_entry']()
           -- Land on the first change of the next file (or the last one of the previous file)
           -- once Diffview has loaded it
+          switching = true
           vim.defer_fn(function()
+            switching = false
             local wins = vim.tbl_filter(function(win)
               return vim.wo[win].diff
             end, vim.api.nvim_tabpage_list_wins(0))

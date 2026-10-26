@@ -4,6 +4,7 @@
 --                                            (Back used to step back in one side only)
 --   winbar of each side                       ◀ Previous · <revision>   |   Current · working copy ▶
 --                                            (Next · <revision> when both sides are revisions)
+--   back from the terminal / another app       the diff is shown again for the new state
 
 local M = {}
 
@@ -141,6 +142,19 @@ vim.api.nvim_create_autocmd({ 'OptionSet' }, { group = group, pattern = 'diff', 
 vim.api.nvim_create_autocmd({ 'BufWinEnter', 'WinEnter', 'TabEnter', 'DiffUpdated', 'WinClosed' }, {
   group = group,
   callback = vim.schedule_wrap(update),
+})
+
+-- Back from the terminal or another app (git pull, rebase, commit): the diff shows the new state
+vim.api.nvim_create_autocmd({ 'TermLeave', 'FocusGained' }, {
+  group = group,
+  callback = vim.schedule_wrap(function()
+    local sd = package.loaded['pc.split_diff']
+    if sd and sd.current() then
+      sd.refresh()
+    elseif diffview_open() then
+      pcall(vim.cmd, 'DiffviewRefresh')
+    end
+  end),
 })
 
 ---------------------------------------------------------------------------

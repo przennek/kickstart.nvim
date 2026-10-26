@@ -19,6 +19,7 @@ end
 ---@type { ctx: string, where: string, keys: string[], typed: integer }?
 local group
 local timer = vim.uv.new_timer()
+local recent = '' -- the last keys typed, as keytrans() text
 
 local function write(g)
   if not g or (#g.keys == 0 and g.typed == 0) then
@@ -65,6 +66,13 @@ vim.on_key(function(_, typed)
   if short == 'c' then
     return
   end
+  local key = vim.fn.keytrans(typed)
+  -- which-key replays a combination it waited on (g d → gd, <Space> d → <Space>d): written once
+  local replay = #key:gsub('<[^>]+>', 'x') > 1 and recent:sub(-#key) == key
+  recent = (recent .. key):sub(-64)
+  if replay then
+    return
+  end
   local ctx, where = context(short)
   if group and (group.ctx ~= ctx or group.where ~= where) then
     local old = group
@@ -74,7 +82,6 @@ vim.on_key(function(_, typed)
     group = nil
   end
   group = group or { ctx = ctx, where = where, keys = {}, typed = 0 }
-  local key = vim.fn.keytrans(typed)
   if TEXT_MODES[short] and vim.fn.strchars(key) == 1 or (TEXT_MODES[short] and key == '<Space>') then
     group.typed = group.typed + 1
   else

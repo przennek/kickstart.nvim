@@ -137,10 +137,9 @@ return {
           ['='] = function(state)
             require('pc.compare_files').mark(state.tree:get_node().path)
           end,
-          ['<space>'] = {
-            'toggle_node',
-            nowait = false, -- disable `nowait` if you have existing combos starting with this char that you want to use
-          },
+          -- Space is the leader here as in the editor (<Space>d branches, <Space>s… search…);
+          -- Enter opens and folds nodes
+          ['<space>'] = 'none',
         },
       },
     },

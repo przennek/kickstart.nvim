@@ -4,6 +4,7 @@
 --   Python          File "path", line 12             Java stack traces      at a.B.c(File.java:123)
 -- Relative paths are taken from the command's directory; a stack trace's file is looked for in
 -- the project. A line without a location does what Enter / the click normally does.
+-- URLs (http/https) open in the browser; gd / gx and Ctrl / Alt (Cmd) + click open as well.
 
 local M = {}
 
@@ -93,16 +94,90 @@ function M.follow(win, cwd)
   return true
 end
 
---- Enter / double click on a location in `buf` (a terminal or console) opens it; cwd: where
---- relative paths start (a function for terminals that change directory)
+-- the URL under the cursor, else the first one on the line
+local function url_at(win)
+  local pattern = "https?://[%w%-%._~:/%?#%[%]@!%$&'%*%+,;=%%]+"
+  local function clean(u)
+    return (u:gsub('[%.,;:!%?\'"%]]+$', ''))
+  end
+  local line = vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(win), vim.api.nvim_win_get_cursor(win)[1] - 1, vim.api.nvim_win_get_cursor(win)[1], false)[1] or ''
+  local col = vim.api.nvim_win_get_cursor(win)[2] + 1
+  local init = 1
+  while true do
+    local from, to = line:find(pattern, init)
+    if not from then
+      break
+    end
+    if col >= from and col <= to then
+      return clean(line:sub(from, to))
+    end
+    init = to + 1
+  end
+  local first = logical_line(win):match(pattern)
+  return first and clean(first)
+end
+
+local cwds = {} -- buf -> cwd (a string or a function)
+
+local function dir_of(buf)
+  local cwd = cwds[buf]
+  return type(cwd) == 'function' and cwd() or cwd or vim.fn.getcwd()
+end
+
+--- Opens the file:line or the URL under the cursor; false when there is none
+function M.open(win)
+  win = win or vim.api.nvim_get_current_win()
+  if M.follow(win, dir_of(vim.api.nvim_win_get_buf(win))) then
+    return true
+  end
+  local url = url_at(win)
+  if url then
+    vim.ui.open(url)
+    return true
+  end
+  return false
+end
+
+--- Ctrl / Alt (Cmd) + click: the link where the mouse is
+function M.click()
+  local pos = vim.fn.getmousepos()
+  if pos.winid == 0 or pos.line == 0 then
+    return
+  end
+  vim.api.nvim_set_current_win(pos.winid)
+  pcall(vim.api.nvim_win_set_cursor, pos.winid, { pos.line, math.max(pos.column - 1, 0) })
+  M.open(pos.winid)
+end
+
+--- Enter / double click / gd / gx / Ctrl+click / Alt (Cmd)+click on a location or a URL in
+--- `buf` (a terminal or console) opens it; cwd: where relative paths start (a function for
+--- terminals that change directory)
 function M.attach(buf, cwd)
+  cwds[buf] = cwd
+  vim.api.nvim_create_autocmd('BufWipeout', {
+    buffer = buf,
+    once = true,
+    callback = function()
+      cwds[buf] = nil
+    end,
+  })
   for _, lhs in ipairs { '<CR>', '<2-LeftMouse>', 'gf' } do
     vim.keymap.set('n', lhs, function()
-      local dir = type(cwd) == 'function' and cwd() or cwd or vim.fn.getcwd()
-      if not M.follow(vim.api.nvim_get_current_win(), dir) then
+      if not M.open() then
         vim.api.nvim_feedkeys(vim.keycode(lhs), 'n', false)
       end
-    end, { buffer = buf, desc = 'Open the file:line under the cursor' })
+    end, { buffer = buf, desc = 'Open the file:line or link under the cursor' })
+  end
+  for _, lhs in ipairs { 'gd', 'gx' } do
+    vim.keymap.set('n', lhs, function()
+      if not M.open() then
+        vim.notify('No file:line or link on this line', vim.log.levels.INFO)
+      end
+    end, { buffer = buf, desc = 'Open the file:line or link under the cursor' })
+  end
+  for _, lhs in ipairs { '<C-LeftMouse>', '<M-LeftMouse>' } do
+    vim.keymap.set('n', lhs, M.click, { buffer = buf, desc = 'Open the link clicked' })
+    vim.keymap.set('t', lhs, '<C-\\><C-n><cmd>lua require("pc.console_links").click()<cr>', { buffer = buf, desc = 'Open the link clicked' })
   end
 end
 

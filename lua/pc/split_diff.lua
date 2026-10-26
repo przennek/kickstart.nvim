@@ -6,6 +6,7 @@
 --   F7 / Shift+F7  next / previous change; past the last one the next changed file opens
 --                  in the same place (handled in debug.lua together with Diffview)
 --   Esc          close the diff and bring back what the window showed before
+--   the branch moving under the diff (git pull / rebase / commit in the terminal) shows it again
 
 local M = {}
 
@@ -23,6 +24,8 @@ local M = {}
 ---@field prev_cursor integer[]
 ---@field bufnr? integer   buffer of the file currently diffed
 ---@field showing? boolean while show() itself switches the file
+---@field single? boolean one file only (no changes list)
+---@field state? string what the diff was made from (M.refresh)
 
 ---@type table<integer, pc.SplitDiff>  per tab page
 local sessions = {}
@@ -146,6 +149,78 @@ local function show(s, idx, from_end)
   vim.api.nvim_echo({ { ('Diff with %s: %d/%d %s'):format(s.ref, idx, #s.files, rel), 'ModeMsg' } }, false, {})
 end
 
+-- Files changed against `ref`: paths, { path = M/A/D… }; nil, error when git fails
+local function changed_files(ref, root)
+  local out = git({ 'diff', '--name-status', ref }, root)
+  if out.code ~= 0 then
+    return nil, nil, out.stderr
+  end
+  local files, status = {}, {}
+  for _, line in ipairs(vim.split(vim.trim(out.stdout), '\n', { trimempty = true })) do
+    -- "M<Tab>path", renames "R100<Tab>old<Tab>new"
+    local st, path = line:match '^(%S+)\t(.*)$'
+    if st then
+      path = path:match '\t(.*)$' or path
+      table.insert(files, path)
+      status[path] = st:sub(1, 1)
+    end
+  end
+  return files, status
+end
+
+-- what the diff depends on: the commit of the branch, HEAD and the list of changed files
+local function state_of(s)
+  local out = git({ 'rev-parse', s.ref, 'HEAD' }, s.root)
+  local list = not s.single and git({ 'diff', '--name-status', s.ref }, s.root).stdout or ''
+  return out.stdout .. list
+end
+
+--- Shows the diff again when the branch moved under it (git pull / rebase / commit in the
+--- terminal): the list of files and the branch side follow, the cursor stays
+function M.refresh()
+  local s = M.current()
+  if not s or s.showing then
+    return
+  end
+  local now = state_of(s)
+  if now == s.state then
+    return
+  end
+  s.state = now
+  local here = s.files[s.idx]
+  if not s.single then
+    local files, status = changed_files(s.ref, s.root)
+    if not files then
+      return
+    end
+    if #files == 0 then
+      M.close()
+      return vim.notify('No differences with ' .. s.ref .. ' any more')
+    end
+    s.files, s.status = files, status
+    s.idx = 1
+    for i, f in ipairs(files) do
+      if f == here then
+        s.idx = i
+      end
+    end
+  end
+  local win = vim.api.nvim_get_current_win()
+  local cursor = vim.api.nvim_win_get_cursor(s.win)
+  -- the old branch side holds the old text: a new one is read
+  local refbuf = s.refbuf
+  show(s, s.idx)
+  if refbuf and refbuf ~= s.refbuf and vim.api.nvim_buf_is_valid(refbuf) then
+    pcall(vim.api.nvim_buf_delete, refbuf, { force = true })
+  end
+  if s.files[s.idx] == here then
+    pcall(vim.api.nvim_win_set_cursor, s.win, cursor)
+  end
+  if vim.api.nvim_win_is_valid(win) then
+    vim.api.nvim_set_current_win(win)
+  end
+end
+
 --- Open a diff in the current window. `file` (absolute path) limits it to one file.
 function M.open(ref, file)
   M.close()
@@ -154,19 +229,10 @@ function M.open(ref, file)
   if file then
     files = { vim.fs.relpath(root, file) or file }
   else
-    local out = git({ 'diff', '--name-status', ref }, root)
-    if out.code ~= 0 then
-      return vim.notify(out.stderr, vim.log.levels.ERROR)
-    end
-    files, status = {}, {}
-    for _, line in ipairs(vim.split(vim.trim(out.stdout), '\n', { trimempty = true })) do
-      -- "M<Tab>path", renames "R100<Tab>old<Tab>new"
-      local st, path = line:match '^(%S+)\t(.*)$'
-      if st then
-        path = path:match '\t(.*)$' or path
-        table.insert(files, path)
-        status[path] = st:sub(1, 1)
-      end
+    local err
+    files, status, err = changed_files(ref, root)
+    if not files then
+      return vim.notify(err, vim.log.levels.ERROR)
     end
     if #files == 0 then
       return vim.notify('No differences with ' .. ref)
@@ -189,8 +255,10 @@ function M.open(ref, file)
     prev_buf = vim.api.nvim_get_current_buf(),
     prev_cursor = vim.api.nvim_win_get_cursor(0),
     status = status or {},
+    single = file ~= nil,
   }
   sessions[vim.api.nvim_get_current_tabpage()] = s
+  s.state = state_of(s)
   if not file then
     M.open_list(s)
   end

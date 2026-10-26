@@ -112,7 +112,8 @@ return {
       defaults = {
         preview = { treesitter = not old_telescope },
         mappings = {
-          i = vim.tbl_extend('force', close_with_opening_key, { ['<C-t>'] = open_in_find_window }),
+          -- one Esc closes the popup, as in IDEA (it used to stop typing first and take a second Esc)
+          i = vim.tbl_extend('force', close_with_opening_key, { ['<C-t>'] = open_in_find_window, ['<Esc>'] = 'close' }),
           n = vim.tbl_extend('force', close_with_opening_key, { ['<C-t>'] = open_in_find_window }),
         },
       },

@@ -26,13 +26,28 @@ function M.keys(key, dir)
   return ('<C-\\><C-n><cmd>lua require("pc.terminal_nav").navigate %q<cr>'):format(dir)
 end
 
+-- Is this Neovim's tmux pane (still) the active one? true outside tmux
+local function own_pane_active()
+  local pane = vim.env.TMUX_PANE
+  if not (vim.env.TMUX and pane) then
+    return true
+  end
+  local out = vim.system({ 'tmux', 'display-message', '-p', '-t', pane, '#{pane_active}' }, { text = true }):wait()
+  return out.code ~= 0 or vim.trim(out.stdout) == '1'
+end
+
 -- Leaves typing and moves; staying in the same window (no split / pane that way) types in the
--- shell again
+-- shell again. Ctrl+L with nothing to the right clears the screen as in any terminal (the tmux
+-- prefix + Ctrl+L sends the same key)
 function M.navigate(dir)
   local win = vim.api.nvim_get_current_win()
+  local buf = vim.api.nvim_get_current_buf()
   vim.cmd('TmuxNavigate' .. dir)
   if vim.api.nvim_get_current_win() == win and vim.bo.buftype == 'terminal' then
     vim.cmd 'startinsert'
+    if dir == 'Right' and own_pane_active() then
+      pcall(vim.api.nvim_chan_send, vim.bo[buf].channel, vim.keycode '<C-l>')
+    end
   end
 end
 
