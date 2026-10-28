@@ -79,6 +79,10 @@ return {
             vim.lsp.buf.hover { border = 'rounded' }
           end, 'Quick Documentation')
           map('<M-p>', function()
+            -- a server of this buffer without it (yaml, json…): IDEA's quiet "No parameter info"
+            if #vim.lsp.get_clients { bufnr = 0, method = 'textDocument/signatureHelp' } == 0 then
+              return vim.api.nvim_echo({ { 'No parameter info' } }, false, {})
+            end
             vim.lsp.buf.signature_help { border = 'rounded' }
           end, 'Parameter Info', { 'n', 'i' })
 

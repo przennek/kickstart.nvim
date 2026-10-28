@@ -163,6 +163,19 @@ scenario() {
   editor; k o; lit '// autosaved'; k Escape; sleep 2
   expect "autosave: saved after typing" "$(q '&modified')/$(grep -c '// autosaved' "$dir/src/main/java/example/shop/OrderService.java")" "0/1"
   k u; sleep 2; expect "autosave: the undo saved too" "$(grep -c '// autosaved' "$dir/src/main/java/example/shop/OrderService.java")" 0
+  # Maven from the terminal: jdtls' auto-build is off while it runs (it rebuilt target/ mid-build)
+  local src="$dir/src/main/java/example/shop/OrderService.java" cls="$dir/target/classes/example/shop/OrderService.class"
+  printf '#!/bin/sh\nsleep 14\n' > "$dir/mvnw"; chmod +x "$dir/mvnw"
+  k M-t; sleep 1; lit './mvnw clean test'; k Enter; sleep 3
+  expect "maven: jdtls auto-build paused while it runs" "$(ql 'tostring(require("pc.maven_guard").paused())')" true
+  local built; built=$(stat -c %Y "$cls" 2>/dev/null); sleep 1.2
+  echo '// guarded' >> "$src"; sleep 6
+  expect "maven: jdtls didn't build into target/ meanwhile" "$(stat -c %Y "$cls" 2>/dev/null)" "$built"
+  sleep 7
+  expect "maven: auto-build on again after it" "$(ql 'tostring(require("pc.maven_guard").paused())')" false
+  sleep 6
+  expect "maven: then jdtls builds the change" "$([ "$(stat -c %Y "$cls" 2>/dev/null)" != "$built" ] && echo yes)" yes
+  sed -i '/\/\/ guarded/d' "$src"; rm -f "$dir/mvnw"; k M-t; sleep 1; check maven-guard
   # one Esc closes a popup (it took two)
   k ' ' ' '; sleep 1; k Escape; sleep 0.5
   expect "popup: one Esc closes it" "$(q '&ft')/$(q 'mode()')" "java/n"
@@ -201,6 +214,29 @@ scenario() {
   k M-i; sleep 1; lit 'kept'; k Enter; sleep 0.5
   expect "agent: the program still runs" "$(screen | grep -c '^kept')" 2
   k C-d; k M-i; check agent-terminal
+  # a full-screen program without mouse support (Kiro's chat): the wheel and clicks keep typing
+  # in it (Neovim scrolled its scrollback over the UI, the next keys went to Neovim)
+  cat > "$WORK/tui.py" <<'PY'
+import os, sys, termios, tty
+out = open(sys.argv[1], 'w', buffering=1)
+sys.stdout.write('\x1b[?1049h\x1b[HFAKE TUI\r\n'); sys.stdout.flush()
+saved = termios.tcgetattr(0)
+tty.setraw(0)
+try:
+    while (c := os.read(0, 1)) != b'q':
+        out.write(c.decode(errors='replace')); out.flush()
+finally:
+    termios.tcsetattr(0, termios.TCSADRAIN, saved); sys.stdout.write('\x1b[?1049l'); sys.stdout.flush()
+PY
+  k M-i; sleep 1; lit "python3 $WORK/tui.py $WORK/tui.out"; k Enter; sleep 1.5
+  for i in 1 2 3 4 5 6; do esc "\033[<64;20;10M"; done; esc "\033[<65;20;10M"; esc "\033[<0;20;10M"; esc "\033[<0;20;10m"; sleep 0.5
+  expect "agent: the wheel and a click keep typing in a program" "$(q 'mode()')" t
+  lit 'abc'; sleep 0.5
+  expect "agent: then the keys reach the program" "$(cat "$WORK/tui.out" 2>/dev/null)" abc
+  lit 'q'; sleep 1; lit 'seq 1 200'; k Enter; sleep 0.5
+  for i in 1 2 3; do esc "\033[<64;20;10M"; done; sleep 0.3
+  expect "agent: at the shell prompt the wheel scrolls" "$(q 'mode()')" n
+  k i; sleep 0.3; k M-i; check agent-mouse
   # your moves are in the error log, the text you typed is not (only how many characters)
   local moves=$WORK/state/nvim/pc-errors.log
   expect "telemetry: Alt+T recorded" "$(grep -c 'move .*<M-t>' "$moves" | grep -v '^0$' >/dev/null && echo yes)" yes

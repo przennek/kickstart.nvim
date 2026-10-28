@@ -144,17 +144,27 @@ vim.api.nvim_create_autocmd({ 'BufWinEnter', 'WinEnter', 'TabEnter', 'DiffUpdate
   callback = vim.schedule_wrap(update),
 })
 
--- Back from the terminal or another app (git pull, rebase, commit): the diff shows the new state
+-- Back from the terminal or another app (git pull, rebase, commit): the diff shows the new state.
+-- Once, 0.5 s after the last of them: each wheel turn over a terminal leaves Terminal mode, and
+-- 40 turns ran git 80 times in a row (Neovim hung for seconds)
+local refresh_timer = vim.uv.new_timer()
 vim.api.nvim_create_autocmd({ 'TermLeave', 'FocusGained' }, {
   group = group,
-  callback = vim.schedule_wrap(function()
-    local sd = package.loaded['pc.split_diff']
-    if sd and sd.current() then
-      sd.refresh()
-    elseif diffview_open() then
-      pcall(vim.cmd, 'DiffviewRefresh')
-    end
-  end),
+  callback = function()
+    refresh_timer:stop()
+    refresh_timer:start(
+      500,
+      0,
+      vim.schedule_wrap(function()
+        local sd = package.loaded['pc.split_diff']
+        if sd and sd.current() then
+          sd.refresh()
+        elseif diffview_open() then
+          pcall(vim.cmd, 'DiffviewRefresh')
+        end
+      end)
+    )
+  end,
 })
 
 ---------------------------------------------------------------------------

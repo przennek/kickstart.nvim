@@ -23,6 +23,34 @@ end
 ---@type table<string, Terminal>
 local terms = {}
 
+-- Is a program (Kiro…) in the foreground of the terminal's shell? (`ps`: also on macOS)
+local function program_running(buf)
+  local pid = vim.b[buf].terminal_job_pid
+  if not pid then
+    return false
+  end
+  local out = vim.system({ 'ps', '-o', 'tpgid=', '-p', tostring(pid) }, { text = true }):wait()
+  local tpgid = out.code == 0 and tonumber(vim.trim(out.stdout or ''))
+  return tpgid ~= nil and tpgid > 0 and tpgid ~= pid
+end
+
+-- While a program runs in the agent terminal, the wheel and clicks don't leave typing: such a
+-- program (Kiro's chat) doesn't take the mouse, so Neovim scrolled its own scrollback over it
+-- (the shell's old output above a cut-off UI) and the keys typed next went to Neovim, not to
+-- Kiro. At the shell prompt they work as in any terminal (scrolling, selecting to copy)
+local MOUSE = { '<ScrollWheelUp>', '<ScrollWheelDown>', '<LeftMouse>', '<LeftDrag>', '<LeftRelease>', '<2-LeftMouse>', '<RightMouse>', '<MiddleMouse>' }
+local function guard_mouse(buf)
+  if vim.b[buf].pc_mouse_guard then
+    return
+  end
+  vim.b[buf].pc_mouse_guard = true
+  for _, key in ipairs(MOUSE) do
+    vim.keymap.set('t', key, function()
+      return program_running(buf) and '' or key
+    end, { buffer = buf, expr = true, desc = 'Mouse (kept typing while a program runs)' })
+  end
+end
+
 local function create(name, cmd)
   local Terminal = require('toggleterm.terminal').Terminal
   return Terminal:new {
@@ -43,6 +71,10 @@ local function create(name, cmd)
       end,
     },
     on_open = function(t)
+      -- the database TUIs take the mouse themselves (Neovim passes it on)
+      if not cmd then
+        guard_mouse(t.bufnr)
+      end
       vim.schedule(function()
         if vim.api.nvim_get_current_win() == t.window then
           vim.cmd 'startinsert'
