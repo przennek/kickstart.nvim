@@ -130,3 +130,9 @@ map('n', '<S-F2>', jump_diag(-1), { desc = 'Previous problem' })
 map('n', '<F14>', jump_diag(-1), { desc = 'Previous problem' })
 map('n', '<M-F1>', vim.diagnostic.open_float, { desc = 'Show error description' })
 map('n', '<F49>', vim.diagnostic.open_float, { desc = 'Show error description' })
+
+-- Ctrl+T (back from a tag) says nothing when there's nowhere to go back to, instead of E73
+-- (a Ctrl+T meant for the agent terminal that lands in the editor)
+map('n', '<C-t>', function()
+  pcall(vim.cmd, vim.v.count1 .. 'pop')
+end, { desc = 'Back from tag' })

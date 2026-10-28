@@ -40,5 +40,6 @@ return {
       server = { cmd = cmd },
       filetypes = enabled,
     }
+    --     require('pc.lsp_guard').sonarlint()
   end,
 }
