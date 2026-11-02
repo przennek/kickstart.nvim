@@ -23,17 +23,6 @@ end
 ---@type table<string, Terminal>
 local terms = {}
 
--- Is a program (Kiro…) in the foreground of the terminal's shell? (`ps`: also on macOS)
-local function program_running(buf)
-  local pid = vim.b[buf].terminal_job_pid
-  if not pid then
-    return false
-  end
-  local out = vim.system({ 'ps', '-o', 'tpgid=', '-p', tostring(pid) }, { text = true }):wait()
-  local tpgid = out.code == 0 and tonumber(vim.trim(out.stdout or ''))
-  return tpgid ~= nil and tpgid > 0 and tpgid ~= pid
-end
-
 -- While a program runs in the agent terminal, the wheel and clicks don't leave typing: such a
 -- program (Kiro's chat) doesn't take the mouse, so Neovim scrolled its own scrollback over it
 -- (the shell's old output above a cut-off UI) and the keys typed next went to Neovim, not to
@@ -46,8 +35,33 @@ local function guard_mouse(buf)
   vim.b[buf].pc_mouse_guard = true
   for _, key in ipairs(MOUSE) do
     vim.keymap.set('t', key, function()
-      return program_running(buf) and '' or key
+      return require('pc.terminal_nav').program_running(buf) and '' or key
     end, { buffer = buf, expr = true, desc = 'Mouse (kept typing while a program runs)' })
+  end
+end
+
+-- The database TUI gets every key (Ctrl+H/J/K/L, Esc, Alt+1…: Neovim's in other terminals) but
+-- Alt+Shift+D, back to Neovim, and Alt+I. lazysql: Cmd+<key> (Alt) does what its Ctrl+<key> does
+-- (Cmd+E SQL editor, Cmd+R / Cmd+Enter run the query, Cmd+S save changes…), as Ctrl in IDEA is Cmd on
+-- the Mac
+local OWN = { ['<M-D>'] = true, ['<M-i>'] = true }
+local LAZYSQL = { '<M-e>', '<M-r>', '<M-s>', '<M-p>', '<M-t>', '<M-d>', '<M-u>' }
+local function pass_keys(buf, cmd)
+  local keys = {}
+  for _, m in ipairs(vim.api.nvim_get_keymap 't') do
+    local first = m.lhs:match '^<[^>]+>' or m.lhs:sub(1, 1)
+    keys[vim.fn.keytrans(vim.keycode(first))] = true
+  end
+  for key in pairs(keys) do
+    if not OWN[key] then
+      vim.keymap.set('t', key, key, { buffer = buf, nowait = true, desc = 'To the database TUI' })
+    end
+  end
+  if vim.fs.basename(vim.split(cmd, ' ')[1]) == 'lazysql' then
+    for _, key in ipairs(LAZYSQL) do
+      vim.keymap.set('t', key, '<C-' .. key:sub(4), { buffer = buf, desc = 'lazysql: Ctrl' .. key:sub(3) })
+    end
+    vim.keymap.set('t', '<M-CR>', '<C-r>', { buffer = buf, desc = 'lazysql: run the query' })
   end
 end
 
@@ -74,6 +88,9 @@ local function create(name, cmd)
       -- the database TUIs take the mouse themselves (Neovim passes it on)
       if not cmd then
         guard_mouse(t.bufnr)
+      elseif not vim.b[t.bufnr].pc_keys_passed then
+        vim.b[t.bufnr].pc_keys_passed = true
+        pass_keys(t.bufnr, cmd)
       end
       vim.schedule(function()
         if vim.api.nvim_get_current_win() == t.window then

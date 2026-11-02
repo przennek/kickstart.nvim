@@ -3,24 +3,22 @@
 
 local M = {}
 
--- Is a program (fzf, less, vim, htop…) in the terminal's foreground instead of the shell? Then
--- the key is that program's. (/proc: the foreground process group of the shell's tty; without
--- /proc, e.g. on macOS, the key always moves)
-local function program_running(buf)
+-- Is a program (fzf, less, vim, htop, a database TUI…) in the terminal's foreground instead of the
+-- shell? Then the key is that program's. (`ps`: /proc is Linux only, on macOS the key always moved
+-- and hid lazysql)
+function M.program_running(buf)
   local pid = vim.b[buf].terminal_job_pid
-  local f = pid and io.open('/proc/' .. pid .. '/stat')
-  if not f then
+  if not pid then
     return false
   end
-  local stat = f:read '*a'
-  f:close()
-  local fields = vim.split(vim.trim(stat:match '%)(.*)$' or ''), ' ')
-  return fields[6] ~= nil and tonumber(fields[6]) ~= pid
+  local out = vim.system({ 'ps', '-o', 'tpgid=', '-p', tostring(pid) }, { text = true }):wait()
+  local tpgid = out.code == 0 and tonumber(vim.trim(out.stdout or ''))
+  return tpgid ~= nil and tpgid > 0 and tpgid ~= pid
 end
 
 --- Keys for an expr mapping of Ctrl+<key> in Terminal mode
 function M.keys(key, dir)
-  if program_running(vim.api.nvim_get_current_buf()) then
+  if M.program_running(vim.api.nvim_get_current_buf()) then
     return '<C-' .. key .. '>'
   end
   return ('<C-\\><C-n><cmd>lua require("pc.terminal_nav").navigate %q<cr>'):format(dir)
