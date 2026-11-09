@@ -136,3 +136,11 @@ map('n', '<F49>', vim.diagnostic.open_float, { desc = 'Show error description' }
 map('n', '<C-t>', function()
   pcall(vim.cmd, vim.v.count1 .. 'pop')
 end, { desc = 'Back from tag' })
+
+-- Option+Left / Option+Right (Alt): a word left / right, as on macOS; unmapped, Neovim took Alt+key
+-- as Esc then the key (the log: <Left> <Esc> <Left> <Esc>… one character at a time, then b)
+map({ 'n', 'x', 'o' }, '<M-Left>', 'b', { desc = 'Word left' })
+map({ 'n', 'x', 'o' }, '<M-Right>', 'w', { desc = 'Word right' })
+map({ 'i', 'c' }, '<M-Left>', '<C-Left>', { desc = 'Word left' })
+map({ 'i', 'c' }, '<M-Right>', '<C-Right>', { desc = 'Word right' })
+map('i', '<M-BS>', '<C-w>', { desc = 'Delete the word before the cursor' })
