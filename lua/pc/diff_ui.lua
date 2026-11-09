@@ -38,7 +38,16 @@ function M.close()
     return true
   end
   if diffview_open() then
-    vim.cmd 'DiffviewClose'
+    -- every Diffview, not the one in this tab only: opened twice, :q had to be typed twice
+    local lib = require 'diffview.lib'
+    for _ = 1, #lib.views + 1 do
+      local view = lib.get_current_view() or lib.views[1]
+      if not view then
+        break
+      end
+      pcall(vim.api.nvim_set_current_tabpage, view.tabpage)
+      vim.cmd 'DiffviewClose'
+    end
     return true
   end
   if not vim.wo.diff then

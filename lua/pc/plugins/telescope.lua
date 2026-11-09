@@ -91,7 +91,7 @@ return {
     close_with_opening_key['<F4>'] = 'select_default'
 
     -- an older checkout (0.1.x, e.g. a machine not synced to lazy-lock.json) breaks every preview
-    -- with "ft_to_lang"; previews then use Vim syntax until the restart after the restore below
+    -- with "ft_to_lang"; previews then use Vim syntax until pc.plugin_sync has restored it
     local old_telescope = false
     local utils_file = vim.api.nvim_get_runtime_file('lua/telescope/previewers/utils.lua', false)[1]
     if utils_file then
@@ -101,13 +101,6 @@ return {
           break
         end
       end
-    end
-    if old_telescope then
-      -- brought to lazy-lock.json by itself (the warning to run :Lazy restore came every session)
-      vim.schedule(function()
-        require('lazy').restore { plugins = { 'telescope.nvim' }, show = false, wait = false }
-        vim.notify('telescope.nvim brought to lazy-lock.json: previews use Tree-sitter after a restart', vim.log.levels.INFO)
-      end)
     end
 
     require('telescope').setup {

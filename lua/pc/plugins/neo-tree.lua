@@ -52,6 +52,8 @@ return {
     { '<A-1>', project_tree, desc = 'Project (reveal current file)' },
   },
   opts = {
+    -- :q / :wq on the last file leaves Neovim, not the tree alone (a second :q every time)
+    close_if_last_window = true,
     -- renaming / moving in the tree is a refactoring, like in IDEA: the language servers update
     -- the code first (X.java renamed: its class and the uses; imports), then the files renamed,
     -- moved, copied or added go into git (pc.git_track)
