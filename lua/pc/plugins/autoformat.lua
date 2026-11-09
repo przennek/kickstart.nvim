@@ -7,7 +7,21 @@ return { -- Autoformat
       -- Reformat Code (Cmd+Shift+L in IDEA; <leader>f is Find Usages)
       '<M-L>',
       function()
-        require('conform').format { async = true, lsp_format = 'fallback' }
+        local conform = require 'conform'
+        local lsp = #vim.lsp.get_clients { bufnr = 0, method = 'textDocument/formatting' } > 0
+        if #conform.list_formatters_to_run(0) == 0 and not lsp then
+          -- no formatter installed (prettier / jsonls need npm…): the indentation at least, and why
+          -- (it did nothing, silently: the log had JSON re-indented by hand after three tries)
+          local view = vim.fn.winsaveview()
+          vim.cmd(vim.fn.mode():match '[vV\22]' and 'normal! =' or 'keepjumps normal! gg=G')
+          vim.fn.winrestview(view)
+          return vim.notify(('Reformat Code: no formatter for %s installed (:Mason), indentation fixed'):format(vim.bo.filetype), vim.log.levels.INFO)
+        end
+        conform.format({ async = true, lsp_format = 'fallback' }, function(err)
+          if err then
+            vim.notify('Reformat Code: ' .. err, vim.log.levels.WARN)
+          end
+        end)
       end,
       mode = '',
       desc = 'Reformat Code',
