@@ -120,13 +120,21 @@ vim.api.nvim_create_autocmd({ 'BufReadPost', 'BufNewFile', 'BufWritePost' }, {
   group = group,
   callback = function(event)
     vim.b[event.buf].pc_mtime = mtime(vim.api.nvim_buf_get_name(event.buf))
+    -- a file that is not on disk yet (autosave creates it, pc.autosave)
+    vim.b[event.buf].pc_new_file = event.event == 'BufNewFile' or nil
     warned[event.buf] = nil
     watch(event.buf)
   end,
 })
+-- not while your changes are still in the buffer (W12 answered OK): Neovim keeps the old time to
+-- warn on writing, and autosave then asked "changed since reading it, really write?" on every
+-- window change; it stays off until you :w (keeps yours) or :e! (loads theirs)
 vim.api.nvim_create_autocmd('FileChangedShellPost', {
   group = group,
   callback = function(event)
+    if vim.bo[event.buf].modified then
+      return
+    end
     vim.b[event.buf].pc_mtime = mtime(vim.api.nvim_buf_get_name(event.buf))
   end,
 })

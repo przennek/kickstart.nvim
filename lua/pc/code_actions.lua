@@ -5,6 +5,10 @@
 local M = {}
 
 function M.show()
+  -- a terminal, a file without a server that has them: say so instead of an error
+  if #vim.lsp.get_clients { bufnr = 0, method = 'textDocument/codeAction' } == 0 then
+    return vim.api.nvim_echo({ { 'No actions' } }, false, {})
+  end
   local seen = {}
   vim.lsp.buf.code_action {
     filter = function(action)

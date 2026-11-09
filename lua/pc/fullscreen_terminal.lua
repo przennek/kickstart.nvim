@@ -23,21 +23,61 @@ end
 ---@type table<string, Terminal>
 local terms = {}
 
--- While a program runs in the agent terminal, the wheel and clicks don't leave typing: such a
--- program (Kiro's chat) doesn't take the mouse, so Neovim scrolled its own scrollback over it
--- (the shell's old output above a cut-off UI) and the keys typed next went to Neovim, not to
--- Kiro. At the shell prompt they work as in any terminal (scrolling, selecting to copy)
-local MOUSE = { '<ScrollWheelUp>', '<ScrollWheelDown>', '<LeftMouse>', '<LeftDrag>', '<LeftRelease>', '<2-LeftMouse>', '<RightMouse>', '<MiddleMouse>' }
-local function guard_mouse(buf)
-  if vim.b[buf].pc_mouse_guard then
+-- In the agent terminal the wheel scrolls back through Kiro's chat and a drag selects to copy, as
+-- in any terminal; typing then goes back to the program: the key reaches it, at the bottom, not
+-- Neovim (after scrolling the next keys were Neovim's). Leaving typing with Esc Esc keeps Normal
+-- mode as usual (Vim motions, / search). (Blocking the wheel instead left no way to scroll.)
+local TYPING = { ['<CR>'] = true, ['<BS>'] = true, ['<Tab>'] = true, ['<Space>'] = true, ['<lt>'] = true, ['<Up>'] = true, ['<Down>'] = true, ['<Left>'] = true, ['<Right>'] = true, ['<C-C>'] = true }
+local mouse_key = false
+local by_mouse = {} -- agent buffer -> left typing with the mouse (true), the keys typed since (string)
+vim.on_key(function(_, typed)
+  if not typed or typed == '' then
     return
   end
-  vim.b[buf].pc_mouse_guard = true
-  for _, key in ipairs(MOUSE) do
-    vim.keymap.set('t', key, function()
-      return require('pc.terminal_nav').program_running(buf) and '' or key
-    end, { buffer = buf, expr = true, desc = 'Mouse (kept typing while a program runs)' })
+  local name = vim.fn.keytrans(typed)
+  mouse_key = name:find 'Mouse' or name:find 'Scroll' or name:find 'Drag' or name:find 'Release'
+  local buf = vim.api.nvim_get_current_buf()
+  if mouse_key or not by_mouse[buf] or vim.fn.mode() ~= 'n' then
+    return
   end
+  if vim.fn.strchars(name) == 1 or TYPING[name] then
+    -- the keys typed until typing has started go after it, in order
+    if by_mouse[buf] == true then
+      by_mouse[buf] = typed
+      vim.schedule(function()
+        local keys = by_mouse[buf]
+        by_mouse[buf] = nil
+        vim.cmd.startinsert()
+        vim.api.nvim_feedkeys(keys, 'n', false)
+      end)
+    else
+      by_mouse[buf] = by_mouse[buf] .. typed
+    end
+    return ''
+  end
+end)
+local function typing_returns(buf)
+  vim.b[buf].pc_agent = true
+  local group = vim.api.nvim_create_augroup('pc-agent-typing-' .. buf, { clear = true })
+  vim.api.nvim_create_autocmd('ModeChanged', {
+    group = group,
+    buffer = buf,
+    callback = function()
+      local mode = vim.v.event.new_mode
+      if mode == 't' then
+        by_mouse[buf] = nil
+      elseif vim.v.event.old_mode == 't' and mouse_key then
+        by_mouse[buf] = true
+      end
+    end,
+  })
+  vim.api.nvim_create_autocmd('BufWipeout', {
+    group = group,
+    buffer = buf,
+    callback = function()
+      by_mouse[buf] = nil
+    end,
+  })
 end
 
 -- The database TUI gets every key (Ctrl+H/J/K/L, Esc, Alt+1…: Neovim's in other terminals) but
@@ -87,7 +127,9 @@ local function create(name, cmd)
     on_open = function(t)
       -- the database TUIs take the mouse themselves (Neovim passes it on)
       if not cmd then
-        guard_mouse(t.bufnr)
+        if not vim.b[t.bufnr].pc_agent then
+          typing_returns(t.bufnr)
+        end
       elseif not vim.b[t.bufnr].pc_keys_passed then
         vim.b[t.bufnr].pc_keys_passed = true
         pass_keys(t.bufnr, cmd)

@@ -180,7 +180,6 @@ vim.keymap.set('n', 'q', function()
   return 'q'
 end, { expr = true, desc = 'Close the diff' })
 
--- :q in a diff closes all of it
-vim.cmd [[cnoreabbrev <expr> q (getcmdtype() ==# ':' && getcmdline() ==# 'q' && luaeval('require("pc.diff_ui").active()')) ? 'lua require("pc.diff_ui").close()' : 'q']]
+-- :q / :q! in a diff closes all of it: pc.cmdline_enter
 
 return M

@@ -26,8 +26,9 @@ local function savable(buf)
     and not bo.readonly
     and name ~= ''
     and not name:match '^%a[%w+.-]*://'
-    -- a file deleted or moved away is not brought back
-    and vim.uv.fs_stat(name) ~= nil
+    -- a file deleted or moved away is not brought back; a new one (nvim notes.txt) is created,
+    -- as in IDEA (it was never saved, and :q said E37 hours later)
+    and (vim.uv.fs_stat(name) ~= nil or vim.b[buf].pc_new_file and vim.uv.fs_stat(vim.fs.dirname(name)) ~= nil)
     -- changed on disk since loaded (git, an agent): yours or theirs stays your choice (pc.autoreload)
     and not changed_on_disk(buf, name)
 end
