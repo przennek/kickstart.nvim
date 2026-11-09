@@ -82,6 +82,8 @@ regression() {
   echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   out=$(headless "$WORK" "" lsp_guard.lua)
   echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
+  out=$(headless "$WORK" "" ux_typos.lua)
+  echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   out=$(headless "$WORK/java" "" search.lua)
   echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   # on a copy: it renames and moves files of the repository
@@ -207,6 +209,10 @@ scenario() {
   q "setreg('0', '')" >/dev/null
   esc "\033[<0;2;${row}M"; sleep 0.3; esc "\033[<32;5;${row}M"; sleep 0.3; esc "\033[<32;8;${row}M"; sleep 0.3; esc "\033[<0;8;${row}m"; sleep 0.5
   expect "terminal: a drag copies" "$(q "(getreg('0') != '' ? 'copied/' : 'empty/').mode()")" copied/t
+  # a click in the output, then typing: every key goes to the shell (g i j k, Enter, Ctrl+C: the log)
+  lit 'sleep 30'; k Enter; esc "\033[<0;8;${row}M"; esc "\033[<0;8;${row}m"; k C-c; sleep 0.3
+  esc "\033[<0;8;${row}M"; esc "\033[<0;8;${row}m"; lit 'echo gi-jk-clicked'; k Enter; sleep 0.5
+  expect "terminal: after a click, Ctrl+C and typing go to the shell" "$(q 'mode()')/$(screen | grep -c '^gi-jk-clicked')" t/1
   k M-t; check terminal-wheel
   # the agent terminal: Alt+I over the whole editor, again back; what runs in it stays
   k M-i; sleep 1.5
@@ -216,28 +222,32 @@ scenario() {
   k M-i; sleep 1; lit 'kept'; k Enter; sleep 0.5
   expect "agent: the program still runs" "$(screen | grep -c '^kept')" 2
   k C-d; k M-i; check agent-terminal
-  # a full-screen program without mouse support (Kiro's chat): the wheel and clicks keep typing
-  # in it (Neovim scrolled its scrollback over the UI, the next keys went to Neovim)
-  cat > "$WORK/tui.py" <<'PY'
+  # a chat program without mouse support (Kiro): the wheel scrolls back through its chat, a drag
+  # copies; typing then goes to the program, in order (not to Neovim)
+  cat > "$WORK/chat.py" <<'PY'
 import os, sys, termios, tty
 out = open(sys.argv[1], 'w', buffering=1)
-sys.stdout.write('\x1b[?1049h\x1b[HFAKE TUI\r\n'); sys.stdout.flush()
+for i in range(200): sys.stdout.write(f'chat line {i}\r\n')
+sys.stdout.write('> '); sys.stdout.flush()
 saved = termios.tcgetattr(0)
 tty.setraw(0)
 try:
-    while (c := os.read(0, 1)) != b'q':
+    while (c := os.read(0, 16)) != b'q':
         out.write(c.decode(errors='replace')); out.flush()
 finally:
-    termios.tcsetattr(0, termios.TCSADRAIN, saved); sys.stdout.write('\x1b[?1049l'); sys.stdout.flush()
+    termios.tcsetattr(0, termios.TCSADRAIN, saved)
 PY
-  k M-i; sleep 1; lit "python3 $WORK/tui.py $WORK/tui.out"; k Enter; sleep 1.5
-  for i in 1 2 3 4 5 6; do esc "\033[<64;20;10M"; done; esc "\033[<65;20;10M"; esc "\033[<0;20;10M"; esc "\033[<0;20;10m"; sleep 0.5
-  expect "agent: the wheel and a click keep typing in a program" "$(q 'mode()')" t
-  lit 'abc'; sleep 0.5
-  expect "agent: then the keys reach the program" "$(cat "$WORK/tui.out" 2>/dev/null)" abc
-  lit 'q'; sleep 1; lit 'seq 1 200'; k Enter; sleep 0.5
-  for i in 1 2 3; do esc "\033[<64;20;10M"; done; sleep 0.3
-  expect "agent: at the shell prompt the wheel scrolls" "$(q 'mode()')" n
+  k M-i; sleep 1; lit "python3 $WORK/chat.py $WORK/chat.out"; k Enter; sleep 1.5
+  for i in 1 2 3 4 5 6; do esc "\033[<64;20;10M"; done; sleep 0.5
+  expect "agent: the wheel scrolls back through the chat" "$(q 'mode()')/$( [ "$(q 'line("w$")')" -lt "$(q 'line("$")')" ] && echo up)" n/up
+  lit 'abc'; sleep 0.7
+  expect "agent: then typing goes to the program, in order" "$(q 'mode()')/$(cat "$WORK/chat.out" 2>/dev/null)" t/abc
+  esc "\033[<64;20;10M"; sleep 0.3; q "setreg('0', '')" >/dev/null
+  esc "\033[<0;2;20M"; sleep 0.3; esc "\033[<32;5;20M"; sleep 0.3; esc "\033[<32;8;20M"; sleep 0.3; esc "\033[<0;8;20m"; sleep 0.5
+  expect "agent: a drag copies, typing goes on" "$(q "(getreg('0') != '' ? 'copied/' : 'empty/').mode()")" copied/t
+  KS=0.05 k Escape; KS=0.05 k Escape; sleep 0.5; lit 'k'; sleep 0.3
+  expect "agent: Esc Esc keeps Normal mode (Vim keys)" "$(q 'mode()')/$(cat "$WORK/chat.out")" n/abc
+  lit 'i'; sleep 0.3; lit 'q'; sleep 0.5
   k i; sleep 0.3; k M-i; check agent-mouse
   # your moves are in the error log, the text you typed is not (only how many characters)
   local moves=$WORK/state/nvim/pc-errors.log

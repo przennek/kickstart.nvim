@@ -10,9 +10,14 @@ local function tb(picker, opts)
   end
 end
 
--- Switcher (Ctrl+Tab / Ctrl+Shift+Tab): recent files; keep pressing Ctrl+Tab to move down
-map('n', '<F37>', tb('buffers', { sort_mru = true, ignore_current_buffer = true }), { desc = 'Switcher' })
-map('n', '<F38>', tb('buffers', { sort_mru = true, ignore_current_buffer = true }), { desc = 'Switcher' })
+-- Switcher (Ctrl+Tab / Ctrl+Shift+Tab): recent files and tool windows (pc.switcher); keep pressing
+-- Ctrl+Tab to move down
+map('n', '<F37>', function()
+  require('pc.switcher').open()
+end, { desc = 'Switcher' })
+map('n', '<F38>', function()
+  require('pc.switcher').open()
+end, { desc = 'Switcher' })
 
 -- Find (Cmd+F), Find Next / Previous (F3 / Shift+F3), Find Word at Caret (Cmd+F3)
 map('n', '<M-f>', '/', { desc = 'Find' })

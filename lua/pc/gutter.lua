@@ -14,8 +14,14 @@ end
 
 vim.keymap.set('n', '<LeftMouse>', function()
   local mouse = vim.fn.getmousepos()
-  -- a window without the sign column (a terminal, the tree): its first columns are text
-  if mouse.winid == 0 or mouse.line == 0 or mouse.wincol > 4 or vim.wo[mouse.winid].signcolumn == 'no' then
+  -- a window without a shown sign column (a terminal, the tree, signcolumn=auto without signs: the
+  -- agent terminal opened from a Java file kept auto, and a drag from its first columns copied
+  -- nothing): its first columns are text
+  if mouse.winid == 0 or mouse.line == 0 then
+    return '<LeftMouse>'
+  end
+  local gutter = math.min(4, vim.fn.getwininfo(mouse.winid)[1].textoff)
+  if mouse.wincol > gutter or vim.wo[mouse.winid].signcolumn == 'no' then
     return '<LeftMouse>'
   end
   local buf = vim.api.nvim_win_get_buf(mouse.winid)

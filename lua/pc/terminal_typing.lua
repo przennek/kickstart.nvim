@@ -25,7 +25,80 @@ local function send(buf, text)
   end
 end
 
+-- Left typing with the mouse (a click, the wheel: Kiro's chat, the shell's output), every key you
+-- type goes back to the program, in order, Enter and Ctrl+C too: after a click "git" lost its g i
+-- to Vim, Ctrl+C / Enter did nothing, ":" ran a Neovim command. Leaving typing with Esc Esc keeps
+-- the Normal mode below (j k / v y…).
+local TYPING = { ['<CR>'] = true, ['<BS>'] = true, ['<Del>'] = true, ['<Tab>'] = true, ['<Space>'] = true, ['<lt>'] = true, ['<Esc>'] = true, ['<Up>'] = true, ['<Down>'] = true, ['<Left>'] = true, ['<Right>'] = true, ['<Home>'] = true, ['<End>'] = true }
+-- the shell's Ctrl keys (Ctrl+C, Ctrl+R history, Ctrl+A / Ctrl+E…), not Ctrl+H/J/K/L (windows)
+for _, key in ipairs { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'N', 'P', 'R', 'U', 'W', 'Y', 'Z' } do
+  TYPING['<C-' .. key .. '>'] = true
+end
+local mouse_key = false
+local by_mouse = {} -- terminal buffer -> left typing with the mouse
+local queue = {} -- terminal buffer -> keys typed since, not sent yet
+-- only characters and TYPING keys (one key, or several held back by a pending mapping: <Space>/)
+local function typing(name)
+  for key in name:gmatch '<[^>]+>' do
+    if not TYPING[key] then
+      return false
+    end
+  end
+  return name ~= ''
+end
+vim.on_key(function(_, typed)
+  if not typed or typed == '' then
+    return
+  end
+  local name = vim.fn.keytrans(typed)
+  mouse_key = name:find 'Mouse' or name:find 'Scroll' or name:find 'Drag' or name:find 'Release'
+  local buf = vim.api.nvim_get_current_buf()
+  if mouse_key or not by_mouse[buf] or vim.fn.mode() ~= 'n' then
+    return
+  end
+  if typing(name) then
+    -- kept until typing has started, then sent in order (keys typed fast / pasted come before
+    -- Neovim is back in the terminal)
+    local first = queue[buf] == nil
+    queue[buf] = (queue[buf] or '') .. typed
+    if first then
+      vim.schedule(function()
+        local keys = queue[buf]
+        queue[buf] = nil
+        if vim.fn.mode() ~= 't' then
+          vim.cmd.startinsert()
+        end
+        vim.api.nvim_feedkeys(keys, 'ni', false)
+      end)
+    end
+    return ''
+  end
+end)
+local function typing_returns(buf)
+  local group = vim.api.nvim_create_augroup('pc-terminal-mouse-' .. buf, { clear = true })
+  vim.api.nvim_create_autocmd('ModeChanged', {
+    group = group,
+    buffer = buf,
+    callback = function()
+      local mode = vim.v.event.new_mode
+      if mode == 't' then
+        by_mouse[buf] = nil
+      elseif vim.v.event.old_mode == 't' and mouse_key then
+        by_mouse[buf] = true
+      end
+    end,
+  })
+  vim.api.nvim_create_autocmd('BufWipeout', {
+    group = group,
+    buffer = buf,
+    callback = function()
+      by_mouse[buf] = nil
+    end,
+  })
+end
+
 function M.attach(buf)
+  typing_returns(buf)
   for _, key in ipairs(TYPE) do
     vim.keymap.set('n', key, function()
       vim.cmd 'startinsert'

@@ -253,9 +253,9 @@ return {
     end, { desc = 'Go to Symbol' })
     vim.keymap.set('n', '<M-N>', builtin.find_files, { desc = 'Go to File' })
     vim.keymap.set('n', '<leader>n', builtin.find_files, { desc = 'Go to File' })
-    -- Switcher: open files, most recently used first
+    -- Switcher: open files, most recently used first, then the tool windows (pc.switcher)
     vim.keymap.set('n', '<leader>q', function()
-      builtin.buffers { sort_mru = true, ignore_current_buffer = true }
+      require('pc.switcher').open()
     end, { desc = 'Switcher' })
     -- Find Action (Alt+Shift+A) is in lua/pc/actions.lua
 

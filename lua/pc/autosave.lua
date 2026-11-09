@@ -57,6 +57,18 @@ vim.api.nvim_create_autocmd({ 'FocusLost', 'BufLeave', 'WinLeave', 'TermEnter', 
   end,
 })
 
+-- :q / :wq right after typing (the save 1 s after leaving Insert mode had not happened yet: :q
+-- said E37); :q! still throws your changes away
+vim.api.nvim_create_autocmd('QuitPre', {
+  group = group,
+  nested = true,
+  callback = function(event)
+    if not vim.fn.histget(':', -1):match '!%s*$' then
+      M.save(event.buf)
+    end
+  end,
+})
+
 -- after typing: not while in Insert mode (a half-written line would be formatted / linted)
 local timer = vim.uv.new_timer()
 vim.api.nvim_create_autocmd({ 'TextChanged', 'InsertLeave' }, {
