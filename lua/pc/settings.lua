@@ -24,6 +24,7 @@ local DEFAULTS = {
   format_on_save = false,
   autosave = true,
   inline_blame = true,
+  diff_collapse = true,
   notify_echo_errors = true,
   notify_status_bar = true,
   telemetry = true,
@@ -37,6 +38,21 @@ local function read()
   local ok, cfg = pcall(vim.json.decode, f:read '*a')
   f:close()
   return vim.tbl_extend('force', DEFAULTS, ok and type(cfg) == 'table' and cfg or {})
+end
+
+--- Saves the editor settings and applies them
+function M.save(values)
+  local f = assert(io.open(FILE, 'w'))
+  f:write(vim.json.encode(values))
+  f:close()
+  M.apply(values)
+end
+
+--- One editor setting changed (a toggle action), saved and applied
+function M.set(key, value)
+  local cfg = read()
+  cfg[key] = value
+  M.save(cfg)
 end
 
 --- Applies the editor settings to every window and to new ones
@@ -66,6 +82,13 @@ function M.apply(cfg)
   vim.g.pc_format_on_save = cfg.format_on_save
   if package.loaded.gitsigns then
     require('gitsigns').toggle_current_line_blame(cfg.inline_blame)
+  end
+  vim.g.pc_diff_collapse = cfg.diff_collapse
+  -- diffs fold the unchanged lines, or show the whole files
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if vim.wo[win].diff then
+      vim.wo[win].foldenable = cfg.diff_collapse
+    end
   end
   vim.g.pc_breadcrumbs = cfg.breadcrumbs
   if package.loaded.dropbar then
@@ -115,6 +138,7 @@ function M.editor()
       { key = 'autosave', label = 'Save files automatically', check = true },
       { header = 'Version Control' },
       { key = 'inline_blame', label = 'Inline blame of the line', check = true },
+      { key = 'diff_collapse', label = 'Collapse unchanged lines in diffs', check = true },
       { header = 'Notifications (<leader>tn)' },
       { key = 'notify_echo_errors', label = 'Show errors in the command line', check = true },
       { key = 'notify_status_bar', label = 'Show the last message in the status bar', check = true },
@@ -125,10 +149,7 @@ function M.editor()
         label = 'OK',
         key = '<C-s>',
         run = function(values, form)
-          local f = assert(io.open(FILE, 'w'))
-          f:write(vim.json.encode(values))
-          f:close()
-          M.apply(values)
+          M.save(values)
           form:close()
           vim.notify 'Editor settings saved'
         end,

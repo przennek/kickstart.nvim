@@ -319,7 +319,16 @@ return {
       { '<leader>vl', '<cmd>DiffviewFileHistory<CR>', desc = 'VCS: [L]og' },
       { '<leader>vh', '<cmd>DiffviewFileHistory %<CR>', desc = 'VCS: File [h]istory' },
       { '<leader>vh', ":'<,'>DiffviewFileHistory<CR>", mode = 'v', desc = 'VCS: Selection history' },
-      { '<leader>vd', '<cmd>DiffviewOpen<CR>', desc = 'VCS: [D]iff working tree' },
+      -- back to the open one (after F4 to the file), not a second Diffview
+      {
+        '<leader>vd',
+        function()
+          if not require('pc.diff_ui').back_to_diff() then
+            vim.cmd 'DiffviewOpen'
+          end
+        end,
+        desc = 'VCS: [D]iff working tree',
+      },
       { '<leader>vm', function() require('pc.merge').open() end, desc = 'VCS: Resolve conflicts ([m]erge tool)' },
       { '<leader>vx', function() require('pc.merge').continue() end, desc = 'VCS: Continue merge / rebase' },
       { '<leader>vX', function() require('pc.merge').abort() end, desc = 'VCS: Abort merge / rebase' },
@@ -355,7 +364,8 @@ return {
       return {
         keymaps = {
           view = view,
-          file_panel = { close, esc },
+          -- F4: the file in the editor, the diff stays (Space vd back), as F4 in a diff
+          file_panel = { close, esc, { 'n', '<F4>', actions.goto_file_edit, { desc = 'Jump to Source' } } },
           file_history_panel = {
             close,
             esc,

@@ -93,7 +93,14 @@ map({ 'n', 'x' }, '<F40>', function()
 end, { desc = 'Generate' })
 
 -- Jump to Source (F4) / Jump to Last Window (F12) / Restore Default Layout (Shift+F12)
-map('n', '<F4>', tb 'lsp_definitions', { desc = 'Jump to Source' })
+map('n', '<F4>', function()
+  -- in a diff: the file being read, in the editor (pc.diff_ui)
+  local diff = require 'pc.diff_ui'
+  if diff.active() then
+    return diff.jump_to_source()
+  end
+  require('telescope.builtin').lsp_definitions()
+end, { desc = 'Jump to Source' })
 map({ 'n', 't' }, '<F12>', '<cmd>wincmd p<CR>', { desc = 'Jump to last window' })
 local function restore_layout()
   require('pc.hide_windows').reset()

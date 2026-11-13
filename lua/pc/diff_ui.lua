@@ -191,4 +191,88 @@ end, { expr = true, desc = 'Close the diff' })
 
 -- :q / :q! in a diff closes all of it: pc.cmdline_enter
 
+-- The file a diff window shows, on disk: diffview://<repo>/.git/<rev>/<path>, fugitive://… or the
+-- file itself
+local function source_file(buf)
+  local name = vim.api.nvim_buf_get_name(buf)
+  local repo, rel = name:match '^diffview://(.-)/%.git/[^/]+/(.+)$'
+  if not repo then
+    repo, rel = name:match '^fugitive://(.-)/%.git//%x+/(.+)$'
+  end
+  local file = repo and (repo .. '/' .. rel) or name
+  return file ~= '' and not file:match '^%a+://' and vim.uv.fs_stat(file) and file or nil
+end
+
+-- Jump to Source (F4 in a diff, as in IDEA's diff viewer): the file you are reading, at this line,
+-- in the editor; a Diffview stays open in its tab (Space vd / the Switcher go back to it), the
+-- diff of one file (Show Diff) closes and leaves you in the file. The log: :q out of the diff,
+-- then Search Everywhere for the same file, every time.
+function M.jump_to_source()
+  local file = source_file(0)
+  if not file then
+    return vim.notify('Jump to Source: no file on disk for this side', vim.log.levels.INFO)
+  end
+  local line = vim.fn.line '.'
+  if not diffview_open() then
+    M.close()
+  else
+    M.diff_tab = vim.api.nvim_get_current_tabpage()
+    local target
+    for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
+      if tab ~= M.diff_tab and not target then
+        target = tab
+      end
+    end
+    if target then
+      vim.api.nvim_set_current_tabpage(target)
+    else
+      vim.cmd 'tabnew'
+    end
+    -- an editor window of that tab (not the tree, a terminal…)
+    for _, w in ipairs(normal_wins()) do
+      if vim.bo[vim.api.nvim_win_get_buf(w)].buftype == '' and not vim.wo[w].diff then
+        vim.api.nvim_set_current_win(w)
+        break
+      end
+    end
+  end
+  if vim.fs.normalize(vim.api.nvim_buf_get_name(0)) ~= vim.fs.normalize(file) then
+    vim.cmd.edit(vim.fn.fnameescape(file))
+  end
+  pcall(vim.api.nvim_win_set_cursor, 0, { math.min(line, vim.api.nvim_buf_line_count(0)), 0 })
+  vim.cmd 'normal! zz'
+end
+
+--- Back to the open Diffview (the one F4 left), if any; true when there was one
+function M.back_to_diff()
+  if not package.loaded['diffview'] then
+    return false
+  end
+  local lib = require 'diffview.lib'
+  local view = (M.diff_tab and vim.api.nvim_tabpage_is_valid(M.diff_tab) and M.diff_tab) or (lib.views[1] and lib.views[1].tabpage)
+  if view and vim.api.nvim_tabpage_is_valid(view) then
+    vim.api.nvim_set_current_tabpage(view)
+    return true
+  end
+  return false
+end
+
+vim.api.nvim_create_autocmd('OptionSet', {
+  group = vim.api.nvim_create_augroup('pc-diff-collapse', { clear = true }),
+  pattern = 'diff',
+  callback = function()
+    if vim.v.option_new and vim.g.pc_diff_collapse ~= nil then
+      vim.wo.foldenable = vim.g.pc_diff_collapse
+    end
+  end,
+})
+
+--- Diffs fold the unchanged lines (on) or show whole files (off); Settings → Editor too
+function M.toggle_collapse()
+  local on = vim.g.pc_diff_collapse == false
+  require('pc.settings').set('diff_collapse', on)
+  vim.notify('Diffs: unchanged lines ' .. (on and 'collapsed' or 'shown'))
+end
+vim.keymap.set('n', '<leader>vz', M.toggle_collapse, { desc = 'Diff: collapse unchanged lines (on / off)' })
+
 return M

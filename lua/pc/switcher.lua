@@ -42,6 +42,10 @@ function M.open()
     local name = vim.fn.fnamemodify(info.name, ':~:.')
     table.insert(entries, { display = name .. (info.changed == 1 and ' ●' or ''), ordinal = name, buf = info.bufnr })
   end
+  -- the open Diffview first among the tools (back after F4 to the file)
+  if package.loaded['diffview'] and #require('diffview.lib').views > 0 then
+    table.insert(entries, { display = ('%-14s %s'):format('Diff', 'Space vd'), ordinal = 'Diff', diff = true })
+  end
   for _, tool in ipairs(TOOLS) do
     table.insert(entries, { display = ('%-14s %s'):format(tool[1], tool[3]), ordinal = tool[1], key = tool[2] })
   end
@@ -61,6 +65,8 @@ function M.open()
           actions.close(prompt)
           if item.buf then
             vim.api.nvim_set_current_buf(item.buf)
+          elseif item.diff then
+            require('pc.diff_ui').back_to_diff()
           else
             vim.schedule(function()
               vim.api.nvim_feedkeys(vim.keycode(item.key), 'm', false)
