@@ -50,7 +50,12 @@ return {
 
           -- Navigation. To jump back, press <C-o> / <M-h>.
           map('gd', builtin.lsp_definitions, 'Go to Declaration')
-          map('gr', builtin.lsp_references, 'Show Usages (popup)')
+          map('gr', function()
+            if #vim.lsp.get_clients { bufnr = 0, method = 'textDocument/references' } == 0 then
+              return builtin.grep_string()
+            end
+            builtin.lsp_references()
+          end, 'Show Usages (popup)')
           map('gI', builtin.lsp_implementations, 'Go to Implementation')
           map('gD', vim.lsp.buf.declaration, 'Go to declaration (C header / forward declaration)')
           -- Go to Declaration (Cmd+B)
@@ -60,6 +65,11 @@ return {
           -- Find Usages into the Find window at the bottom (Alt+F7; F55 inside tmux).
           -- `gr` is the popup version, like Ctrl+Alt+F7 / Show Usages.
           local function find_usages()
+            -- a server of this file without usages (yaml, json…): the word in the project instead
+            -- of an error, as IDEA falls back to text search
+            if #vim.lsp.get_clients { bufnr = 0, method = 'textDocument/references' } == 0 then
+              return builtin.grep_string { prompt_title = 'Usages of "' .. vim.fn.expand '<cword>' .. '" (text)' }
+            end
             vim.lsp.buf.references(nil, {
               on_list = function(list)
                 vim.fn.setqflist({}, ' ', list)
