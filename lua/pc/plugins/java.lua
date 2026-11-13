@@ -27,13 +27,61 @@ local function jdk_runtimes(root)
   return runtimes
 end
 
+-- One jdtls per workspace: a second Neovim on the same project started another jdtls on the
+-- same workspace and it quit (exit code 13, the workspace is locked). The Neovim that has the
+-- workspace keeps a <workspace>.nvim-pid file; another one gets a workspace of its own
+-- (<workspace>-2…, kept for next time: only its first start imports the project again).
+local claimed = {}
+local function claim(workspace)
+  local lock = workspace .. '.nvim-pid'
+  local me = vim.fn.getpid()
+  local pid = tonumber((vim.fn.filereadable(lock) == 1 and vim.fn.readfile(lock)[1]) or '')
+  if pid and pid ~= me and pcall(vim.uv.kill, pid, 0) then
+    return false
+  end
+  vim.fn.mkdir(vim.fs.dirname(lock), 'p')
+  vim.fn.writefile({ tostring(me) }, lock)
+  if claimed[lock] then
+    return true
+  end
+  claimed[lock] = true
+  vim.api.nvim_create_autocmd('VimLeavePre', {
+    once = true,
+    callback = function()
+      if tonumber(vim.fn.readfile(lock)[1] or '') == me then
+        os.remove(lock)
+      end
+    end,
+  })
+  return true
+end
+
+local function own_workspace(root_dir)
+  local store = require 'pc.project_store'
+  local main = vim.fn.stdpath 'cache' .. '/jdtls/' .. root_dir:gsub('/', '_')
+  if claim(main) then
+    -- Eclipse's project files in .idea/nvim/eclipse (pc.project_store)
+    return store.jdtls_workspace(root_dir)
+  end
+  for n = 2, 9 do
+    local other = main .. '-' .. n
+    if claim(other) then
+      if not vim.g.pc_jdtls_second then
+        vim.g.pc_jdtls_second = true
+        vim.notify('Another Neovim runs the Java server of this project: this one has its own (the first time it imports the project again)', vim.log.levels.INFO)
+      end
+      return other
+    end
+  end
+  return main
+end
+
 local function start_jdtls()
   local jdtls = require 'jdtls'
   local mason = vim.fn.stdpath 'data' .. '/mason'
   local root_dir = vim.fs.root(0, { 'mvnw', 'gradlew', 'pom.xml', 'build.gradle', 'build.gradle.kts', 'settings.gradle', '.git' })
     or vim.fn.getcwd()
-  -- Eclipse's project files in .idea/nvim/eclipse (pc.project_store)
-  local workspace = require('pc.project_store').jdtls_workspace(root_dir)
+  local workspace = own_workspace(root_dir)
 
   -- Debugger + test runner extensions
   local bundles = vim.fn.glob(mason .. '/packages/java-debug-adapter/extension/server/com.microsoft.java.debug.plugin-*.jar', true, true)
