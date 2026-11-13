@@ -30,7 +30,8 @@ end
 
 function M.select_all()
   local buf = vim.api.nvim_get_current_buf()
-  local line = vim.api.nvim_get_current_line()
+  -- the input's own (only) line, not the cursor line of whatever window is current
+  local line = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] or ''
   local from = text_start(buf)
   unselect()
   if #line > from then

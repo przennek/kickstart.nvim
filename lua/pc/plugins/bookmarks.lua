@@ -19,8 +19,9 @@ local function bookmark_with_description()
   require('bookmarks')[marked and 'bookmark_toggle' or 'bookmark_ann']()
 end
 
+-- the list with delete / edit description / the whole description (pc.bookmarks_list)
 local function show_bookmarks()
-  require('telescope').extensions.bookmarks.list()
+  require('pc.bookmarks_list').open()
 end
 
 return {
