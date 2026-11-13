@@ -4,12 +4,77 @@
 --   and file:   move  [src/…/OrderService.java]  n java: j×5 w <M-d> q
 --   text typed in a file, a prompt or a terminal is not written, only how much (+12 chars),
 --   with the special keys among it (<Esc>, <C-k>, <M-1>…)
---   Ex commands (:…) and searches (/…) as entered
+--   Ex commands (:…) and searches (/…) are NOT written as entered: they carry data you typed
+--   (a path, a URL, a token in a :!curl, a search word), and the log is sent on as a whole.
+--   M.mask() keeps how you work and drops what you typed:
+--     search  /  ?      only the kind and the length:  /(+7 chars)
+--     command :         range, command name, a "!" right after it; the arguments only as length:
+--                       :%s(+14 chars)  :e (+23 chars)  :!(+31 chars)  :'<,'>q  :12  :wq
+--   (the exact rules are above M.mask)
 -- Settings → Editor → "Record my moves in the error log" turns it off.
 
 local M = {}
 
 local log = require 'pc.error_log'
+
+-- Masks what was entered on the command line before it is logged, so that what you typed as
+-- data (paths, shell commands, patterns, identifiers) never reaches the log, only how you work.
+--
+--   kind '/' or '?'  ->  kind .. '(+N chars)' (just '/' for an empty search); N counts characters.
+--   kind ':'         ->  ':' .. range .. name .. bang .. [' '] .. '(+N chars)'
+--     range  leading line specifiers, spaces dropped: digits . $ % , ; + - and marks ('a '< '>).
+--            A /pattern/ range is data, not a range: it is counted with the arguments.
+--     name   the command name: letters only when it starts lowercase (built-ins: so that
+--            `s1a1b` cannot smuggle text into it), letters and digits when it starts uppercase
+--            (user commands: Git2). It ends where the next character is not one of those, so
+--            `:s/a/b/` and `:g/x/d` have no space before their arguments. Abbreviated or
+--            misspelt names stay as typed (:Wq, :Qa!).
+--     bang   a '!' directly after the name (:q!). A bare `:!cmd` has no name: '!' is its bang.
+--     args   everything after that, written only as its length. One space is kept if the
+--            line had whitespace there (`:e (+23 chars)`, `:%s(+14 chars)`); no args, nothing.
+-- Surrounding whitespace is dropped; a line of only a range (:12, :%) is kept as it is.
+-- When the config rewrites what you typed (cmdline_enter: `:q` in a diff) the rewritten line
+-- is what is masked: `:lua (+N chars)`.
+---@param kind string ':' | '/' | '?'
+---@param line string
+---@return string
+function M.mask(kind, line)
+  line = vim.trim(line)
+  if kind ~= ':' then
+    return line == '' and kind or ('%s(+%d chars)'):format(kind, vim.fn.strchars(line))
+  end
+  local pos = 1
+  local range = ''
+  -- leading colons and blanks are noise; then range pieces, one mark ('x) at a time
+  pos = line:find('[^:%s]', pos) or #line + 1
+  while true do
+    local piece = line:match('^[%d%.%$%%,;+%-]+', pos) or line:match("^'.", pos)
+    if not piece then
+      local blanks = line:match('^%s+', pos)
+      if not blanks or pos + #blanks > #line then
+        break
+      end
+      pos = pos + #blanks
+    else
+      range = range .. piece
+      pos = pos + #piece
+    end
+  end
+  local rest = line:sub(pos)
+  local name = rest:match '^%l%a*' or rest:match '^%u%w*' or ''
+  rest = rest:sub(#name + 1)
+  local bang = ''
+  if rest:sub(1, 1) == '!' then
+    bang, rest = '!', rest:sub(2)
+  end
+  local gap = rest:match '^%s' and ' ' or ''
+  local args = vim.trim(rest)
+  local masked = ':' .. range .. name .. bang
+  if args ~= '' then
+    masked = masked .. gap .. ('(+%d chars)'):format(vim.fn.strchars(args))
+  end
+  return masked
+end
 
 local function enabled()
   local cfg = vim.g.pc_settings
@@ -49,7 +114,8 @@ local function context(mode)
   if vim.api.nvim_win_get_config(0).relative ~= '' then
     kind = kind .. ' popup'
   end
-  local where = (vim.bo[buf].buftype == '' and name ~= '') and vim.fn.fnamemodify(name, ':~:.') or (name:match '^%a+://' and name:gsub('^(%a+://).-([^/]+)$', '%1…/%2') or kind)
+  local where = (vim.bo[buf].buftype == '' and name ~= '') and vim.fn.fnamemodify(name, ':~:.')
+    or (name:match '^%a+://' and name:gsub('^(%a+://).-([^/]+)$', '%1…/%2') or kind)
   return mode .. ' ' .. kind, where
 end
 
@@ -118,7 +184,7 @@ vim.api.nvim_create_autocmd('CmdlineLeave', {
     local line = vim.fn.getcmdline()
     vim.schedule(function()
       flush()
-      log.record('move', kind .. line)
+      log.record('move', M.mask(kind, line))
     end)
   end,
 })

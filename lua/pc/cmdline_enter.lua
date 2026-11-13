@@ -14,6 +14,9 @@ local M = {}
 --- when the quit comes from ZZ, Ctrl+W q or a mapping.)
 M.bang = false
 
+--- the buffer a typed :q! throws away (see M.enter), nil otherwise; pc.autosave must not write it
+M.discard = nil
+
 local QUIT = { q = true, qa = true, wq = true, wqa = true, x = true, xa = true, Q = true, Wq = true, WQ = true }
 local TYPO = { W = true, Wq = true, WQ = true, Q = true, Qa = true, QA = true, Wa = true, WA = true, Wqa = true, WQa = true, WQA = true, X = true, Xa = true }
 
@@ -35,6 +38,22 @@ function M.enter()
     end
     if (cmd == 'q' or cmd == 'Q') and require('pc.diff_ui').active() then
       return '<C-u>lua require("pc.diff_ui").close()<CR>'
+    end
+    -- :q! on a window whose buffer is shown nowhere else: the changes go away with the window. Vim
+    -- would keep the buffer hidden and modified, and autosave (WinLeave) would then save exactly
+    -- what you threw away. A buffer still shown in another window stays as it is (saved as usual).
+    -- Limits: what the 1 s timer already wrote is on disk (and in Local History, which keeps every
+    -- saved version): only what is not written yet can be discarded.
+    local buf = vim.api.nvim_get_current_buf()
+    if bang == '!' and cmd and cmd:lower() == 'q' and vim.bo[buf].modified and vim.bo[buf].buftype == '' and #vim.fn.win_findbuf(buf) == 1 then
+      M.discard = buf
+      vim.schedule(function()
+        -- after the window is gone; a new file that was never written leaves no file either
+        if M.discard == buf and vim.api.nvim_buf_is_valid(buf) and #vim.fn.win_findbuf(buf) == 0 then
+          pcall(vim.api.nvim_buf_delete, buf, { force = true })
+        end
+        M.discard = nil
+      end)
     end
     -- :Vs, :Sp, :Wq… : a command that does not exist, written small it does
     local typo = cmd and (TYPO[cmd] or (cmd:match '^%u' and vim.fn.exists(':' .. cmd) == 0 and vim.fn.exists(':' .. cmd:lower()) > 0))

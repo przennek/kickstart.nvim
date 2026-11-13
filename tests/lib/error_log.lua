@@ -16,16 +16,29 @@ end)
 -- moves: Normal keys as typed (text typed is only counted: checked in the scenario, feedkeys
 -- does not mark Insert keys as typed)
 vim.api.nvim_feedkeys('jjw', 'tx', false)
+-- Ex commands and searches are masked when written: kind, command name and length only
+vim.api.nvim_buf_set_lines(0, 0, -1, false, { 'a sekretword here' }) -- found, so no E486 with the pattern in it
+vim.api.nvim_feedkeys('/sekretword\r', 'tx', false)
+vim.api.nvim_feedkeys(':echo "sekret123"\r', 'tx', false)
 vim.wait(2000, function()
   return false
 end)
 local text = table.concat(vim.fn.readfile(log.FILE), '\n')
-for _, want in ipairs { 'move .* n text: j×2 w', 'ERROR jdtls .* notify error', 'WARN .* notify warning', 'E117: Unknown function: visible_missing', 'callback failure', 'stack traceback' } do
+for _, want in ipairs {
+  'move .* n text: j×2 w',
+  'ERROR jdtls .* notify error',
+  'WARN .* notify warning',
+  'E117: Unknown function: visible_missing',
+  'callback failure',
+  'stack traceback',
+  'move .* /%(%+10 chars%)',
+  'move .* :echo %(%+11 chars%)',
+} do
   if not text:match(want) then
     table.insert(bad, 'missing ' .. want)
   end
 end
-for _, unwanted in ipairs { 'just information', 'silenced_missing' } do
+for _, unwanted in ipairs { 'just information', 'silenced_missing', 'sekretword', 'sekret123' } do
   if text:find(unwanted, 1, true) then
     table.insert(bad, 'logged ' .. unwanted)
   end

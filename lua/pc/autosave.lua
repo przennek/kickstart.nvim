@@ -17,6 +17,11 @@ local function changed_on_disk(buf, name)
 end
 
 local function savable(buf)
+  -- a typed :q! is throwing this buffer's changes away (pc.cmdline_enter): leaving the window
+  -- must not write them; only this buffer, only while that command runs
+  if require('pc.cmdline_enter').discard == buf then
+    return false
+  end
   local bo = vim.bo[buf]
   local name = vim.api.nvim_buf_get_name(buf)
   return vim.api.nvim_buf_is_loaded(buf)

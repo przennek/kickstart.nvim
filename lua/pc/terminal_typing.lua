@@ -1,43 +1,39 @@
--- A terminal you scrolled or copied from (Normal mode) takes typing again, like IDEA's: the
--- characters you type go to the shell (not "E21: modifiable is off" or a motion), p / P paste
--- the clipboard into it, copying (y) and the wheel down to the end go straight back to typing.
--- Scrolling and selecting keep j k g G / ? n N v V y and the mouse.
+-- Typing in a terminal that is in Normal mode (IDEA-like): what you type goes to the program
+-- running in it (the shell, Kiro's chat), not to Neovim ("E21: modifiable is off", a motion).
+--
+-- ONE rule, in two situations. How Normal mode was entered decides which keys are Vim's:
+--
+--   key                                       after Esc Esc (keyboard)   after a click / the wheel
+--   ----------------------------------------  -------------------------  -------------------------
+--   VIM keys: j k g G v V y Y / ? n N : Space   Vim (scroll, search,       program
+--             i a I A (i a I A: typing again)   copy, commands, leader)
+--   p P                                         paste the clipboard        program (the letter)
+--                                               (bracketed paste)
+--   any other printable character, BS, Del      program, back to typing    program
+--   Enter Tab Esc arrows Home End Ctrl+A B C    Vim (Enter opens a link)   program
+--     D E F G N P R U W Y Z
+--   Ctrl+H J K L (windows), mouse, wheel        Vim                        Vim
+--
+-- The program gets the keys in the order typed; typing starts again (Terminal mode) on the
+-- first one. Wheel down: only the turn that reaches the end of the output returns to typing.
+-- A mouse drag / triple click copies and returns to typing; a double click copies the word
+-- and keeps it selected. Copies lose the program's frame / margin (M.clean).
+--
+-- Two implementations, because Vim itself must read the keyboard column but cannot in the
+-- other: (1) buffer-local Normal mappings for "other printable, BS, Del": Vim's own mapping
+-- and command parsing keeps g-sequences (gg, gd), leader mappings (Space f), counts and
+-- operators (yw) working, they only act on the first key of a command. (2) after the mouse
+-- EVERY key goes to the program, so no Vim parsing may happen (global gd / gr / Space-f
+-- mappings would swallow "grep", "a f"): vim.on_key sees each key first and takes it away.
 
 local M = {}
 
--- Normal-mode keys kept for scrolling and copying (j k g G, v V y, search, : commands,
--- Space = leader, i / a back to typing, p paste, Enter opens a link); every other character
--- is typed in the shell: after a mouse-wheel scroll "echo" lost its e to a motion
-local KEEP = {
-  j = true,
-  k = true,
-  g = true,
-  G = true,
-  v = true,
-  V = true,
-  y = true,
-  Y = true,
-  ['/'] = true,
-  ['?'] = true,
-  n = true,
-  N = true,
-  [':'] = true,
-  [' '] = true,
-  i = true,
-  a = true,
-  I = true,
-  A = true,
-  p = true,
-  P = true,
-}
-local SPECIAL = { ['<'] = '<lt>', ['\\'] = '<Bslash>', ['|'] = '<Bar>' }
-local TYPE = { '<BS>', '<Del>' }
-for byte = 33, 126 do
-  local char = string.char(byte)
-  if not KEEP[char] then
-    table.insert(TYPE, SPECIAL[char] or char)
-  end
+-- the Vim keys of the table above
+local VIM = {}
+for char in ('jkgGvVyY/?nN: iaIApP'):gmatch '.' do
+  VIM[char] = true
 end
+local SPECIAL = { ['<'] = '<lt>', ['\\'] = '<Bslash>', ['|'] = '<Bar>' } -- as :map writes them
 
 local function send(buf, text)
   local chan = vim.bo[buf].channel
@@ -46,95 +42,16 @@ local function send(buf, text)
   end
 end
 
--- Left typing with the mouse (a click, the wheel: Kiro's chat, the shell's output), every key you
--- type goes back to the program, in order, Enter and Ctrl+C too: after a click "git" lost its g i
--- to Vim, Ctrl+C / Enter did nothing, ":" ran a Neovim command. Leaving typing with Esc Esc keeps
--- the Normal mode below (j k / v y…).
-local TYPING = {
-  ['<CR>'] = true,
-  ['<BS>'] = true,
-  ['<Del>'] = true,
-  ['<Tab>'] = true,
-  ['<Space>'] = true,
-  ['<lt>'] = true,
-  ['<Esc>'] = true,
-  ['<Up>'] = true,
-  ['<Down>'] = true,
-  ['<Left>'] = true,
-  ['<Right>'] = true,
-  ['<Home>'] = true,
-  ['<End>'] = true,
-}
--- the shell's Ctrl keys (Ctrl+C, Ctrl+R history, Ctrl+A / Ctrl+E…), not Ctrl+H/J/K/L (windows)
-for _, key in ipairs { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'N', 'P', 'R', 'U', 'W', 'Y', 'Z' } do
-  TYPING['<C-' .. key .. '>'] = true
-end
-local mouse_key = false
-local by_mouse = {} -- terminal buffer -> left typing with the mouse
-local queue = {} -- terminal buffer -> keys typed since, not sent yet
--- only characters and TYPING keys (one key, or several held back by a pending mapping: <Space>/)
-local function typing(name)
-  for key in name:gmatch '<[^>]+>' do
-    if not TYPING[key] then
-      return false
+-- (1) after Esc Esc: the keys that go to the program, as mappings
+local function map_typing(buf)
+  local keys = { '<BS>', '<Del>' }
+  for byte = 33, 126 do
+    local char = string.char(byte)
+    if not VIM[char] then
+      table.insert(keys, SPECIAL[char] or char)
     end
   end
-  return name ~= ''
-end
-vim.on_key(function(_, typed)
-  if not typed or typed == '' then
-    return
-  end
-  local name = vim.fn.keytrans(typed)
-  mouse_key = name:find 'Mouse' or name:find 'Scroll' or name:find 'Drag' or name:find 'Release'
-  local buf = vim.api.nvim_get_current_buf()
-  if mouse_key or not by_mouse[buf] or vim.fn.mode() ~= 'n' then
-    return
-  end
-  if typing(name) then
-    -- kept until typing has started, then sent in order (keys typed fast / pasted come before
-    -- Neovim is back in the terminal)
-    local first = queue[buf] == nil
-    queue[buf] = (queue[buf] or '') .. typed
-    if first then
-      vim.schedule(function()
-        local keys = queue[buf]
-        queue[buf] = nil
-        if vim.fn.mode() ~= 't' then
-          vim.cmd.startinsert()
-        end
-        vim.api.nvim_feedkeys(keys, 'ni', false)
-      end)
-    end
-    return ''
-  end
-end)
-local function typing_returns(buf)
-  local group = vim.api.nvim_create_augroup('pc-terminal-mouse-' .. buf, { clear = true })
-  vim.api.nvim_create_autocmd('ModeChanged', {
-    group = group,
-    buffer = buf,
-    callback = function()
-      local mode = vim.v.event.new_mode
-      if mode == 't' then
-        by_mouse[buf] = nil
-      elseif vim.v.event.old_mode == 't' and mouse_key then
-        by_mouse[buf] = true
-      end
-    end,
-  })
-  vim.api.nvim_create_autocmd('BufWipeout', {
-    group = group,
-    buffer = buf,
-    callback = function()
-      by_mouse[buf] = nil
-    end,
-  })
-end
-
-function M.attach(buf)
-  typing_returns(buf)
-  for _, key in ipairs(TYPE) do
+  for _, key in ipairs(keys) do
     vim.keymap.set('n', key, function()
       vim.cmd 'startinsert'
       send(buf, vim.keycode(key))
@@ -151,6 +68,99 @@ function M.attach(buf)
       send(buf, '\27[200~' .. text:gsub('\n$', '') .. '\27[201~')
     end, { buffer = buf, desc = 'Paste into the terminal' })
   end
+end
+
+-- (2) after a click / the wheel (the log: after a click "git" lost its g i to Vim, Ctrl+C /
+-- Enter did nothing, ":" ran a Neovim command): every key but Ctrl+H/J/K/L and the mouse
+local KEYS = { -- besides the characters, which have no <>
+  '<CR>',
+  '<BS>',
+  '<Del>',
+  '<Tab>',
+  '<Space>',
+  '<lt>',
+  '<Esc>',
+  '<Up>',
+  '<Down>',
+  '<Left>',
+  '<Right>',
+  '<Home>',
+  '<End>',
+}
+local TYPING = {}
+for _, key in ipairs(KEYS) do
+  TYPING[key] = true
+end
+for ctrl in ('ABCDEFGNPRUWYZ'):gmatch '.' do -- the shell's: Ctrl+C, Ctrl+R history, Ctrl+A / E...
+  TYPING['<C-' .. ctrl .. '>'] = true
+end
+local mouse_key = false -- the last key was the mouse
+local by_mouse = {} -- terminal buffer -> Normal mode was entered with the mouse
+local queue = {} -- terminal buffer -> keys typed since, not sent yet
+
+-- only characters and TYPING keys (one key, or several held back by a pending mapping: <Space>/)
+local function typing(name)
+  for key in name:gmatch '<[^>]+>' do
+    if not TYPING[key] then
+      return false
+    end
+  end
+  return name ~= ''
+end
+
+vim.on_key(function(_, typed)
+  if not typed or typed == '' then
+    return
+  end
+  local name = vim.fn.keytrans(typed)
+  mouse_key = name:find 'Mouse' or name:find 'Scroll' or name:find 'Drag' or name:find 'Release'
+  local buf = vim.api.nvim_get_current_buf()
+  if mouse_key or not by_mouse[buf] or vim.fn.mode() ~= 'n' or not typing(name) then
+    return
+  end
+  -- kept until typing has started, then sent in order (keys typed fast / pasted come before
+  -- Neovim is back in the terminal)
+  local first = queue[buf] == nil
+  queue[buf] = (queue[buf] or '') .. typed
+  if first then
+    vim.schedule(function()
+      local keys = queue[buf]
+      queue[buf] = nil
+      if vim.fn.mode() ~= 't' then
+        vim.cmd.startinsert()
+      end
+      vim.api.nvim_feedkeys(keys, 'ni', false)
+    end)
+  end
+  return ''
+end)
+
+-- by_mouse: set when Terminal mode is left by a mouse key, cleared when typing is back
+local function track_mouse(buf)
+  local group = vim.api.nvim_create_augroup('pc-terminal-mouse-' .. buf, { clear = true })
+  vim.api.nvim_create_autocmd('ModeChanged', {
+    group = group,
+    buffer = buf,
+    callback = function()
+      if vim.v.event.new_mode == 't' then
+        by_mouse[buf] = nil
+      elseif vim.v.event.old_mode == 't' and mouse_key then
+        by_mouse[buf] = true
+      end
+    end,
+  })
+  vim.api.nvim_create_autocmd('BufWipeout', {
+    group = group,
+    buffer = buf,
+    callback = function()
+      by_mouse[buf] = nil
+    end,
+  })
+end
+
+function M.attach(buf)
+  track_mouse(buf)
+  map_typing(buf)
   -- the wheel down to the end of the output: typing again, new output scrolls the screen
   -- only when this turn of the wheel reached the end: already there (the wheel kept turning at
   -- the last line) it stays in Normal mode, or every turn left typing and the next one came back

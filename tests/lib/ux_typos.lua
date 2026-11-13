@@ -67,5 +67,18 @@ vim.wait(50)
 vim.cmd 'new'
 vim.cmd 'quit'
 expect('! only for the command typed with it', table.concat(bangs, ' '), 'true false')
+-- :q! on one of two windows throws the unsaved text away: autosave (WinLeave) must not write it
+local qfile = dir .. '/qbang.txt'
+vim.fn.writefile({ 'old' }, qfile)
+vim.cmd 'only'
+vim.cmd.edit(qfile)
+vim.cmd 'vsplit'
+vim.cmd.edit(dir .. '/z.txt')
+vim.cmd 'wincmd w'
+vim.api.nvim_buf_set_lines(0, 0, -1, false, { 'new' })
+vim.api.nvim_feedkeys(vim.keycode ':q!<CR>', 'tx', false)
+vim.wait(50)
+expect(':q! in a split keeps the file as it was', vim.fn.readfile(qfile)[1], 'old')
+expect(':q! in a split leaves nothing modified', #vim.fn.getbufinfo { bufmodified = 1 }, 0)
 io.stdout:write('\n' .. (#bad == 0 and 'OK what you meant' or ('FAIL what you meant: ' .. table.concat(bad, '; '))) .. '\n')
 vim.cmd 'qa!'
