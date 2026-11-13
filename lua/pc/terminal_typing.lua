@@ -129,13 +129,55 @@ function M.attach(buf)
     buffer = buf,
     group = vim.api.nvim_create_augroup('pc-terminal-typing-' .. buf, { clear = true }),
     callback = function()
+      local event = vim.v.event
+      local lines = M.clean(event.regcontents)
       vim.schedule(function()
+        -- the copy without the program's margin / frame (Kiro's "  │ ") and trailing spaces
+        if event.operator == 'y' and table.concat(lines, '\n') ~= table.concat(event.regcontents, '\n') then
+          local reg = event.regname ~= '' and event.regname or vim.v.register
+          for _, r in ipairs { reg, '0' } do
+            pcall(vim.fn.setreg, r, lines, event.regtype)
+          end
+        end
         if vim.api.nvim_get_current_buf() == buf and vim.fn.mode() == 'n' then
           vim.cmd 'startinsert'
         end
       end)
     end,
   })
+end
+
+--- Lines copied from a terminal without what the program draws around them: the margin / frame
+--- every line starts with (spaces, │ ┃ ▏ |; the log: 3 x on every pasted line) and trailing spaces
+function M.clean(lines)
+  local CHAR = '[%z\1-\127\194-\244][\128-\191]*'
+  local prefix -- list of characters
+  for _, line in ipairs(lines) do
+    if line:match '%S' then
+      local p = {}
+      for ch in line:match('^[%s│┃▏▕|]*'):gmatch(CHAR) do
+        table.insert(p, ch)
+      end
+      if not prefix then
+        prefix = p
+      else
+        local n = 0
+        while n < #prefix and n < #p and prefix[n + 1] == p[n + 1] do
+          n = n + 1
+        end
+        prefix = vim.list_slice(prefix, 1, n)
+      end
+    end
+  end
+  local cut = table.concat(prefix or {})
+  local out = {}
+  for _, line in ipairs(lines) do
+    if cut ~= '' and line:sub(1, #cut) == cut then
+      line = line:sub(#cut + 1)
+    end
+    table.insert(out, (line:gsub('%s+$', '')))
+  end
+  return out
 end
 
 return M
