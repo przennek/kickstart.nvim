@@ -3,6 +3,12 @@
 --   Delete / Shift+Delete / Ctrl+D (dd, x in Normal mode)   remove the bookmark, the list stays
 --   F2 / Ctrl+E / Cmd+F11                                   edit its description
 --   right click                                             Open / Edit Description / Delete
+--   Cmd/Alt+Shift+I                                         all of them into the prompt file
+-- The list opens on the bookmark after the one you opened last (the log: Shift+F11, Up ×16, Enter,
+-- then Up ×12… from the start every time, walking through the notes of a review).
+--   M.jump(1 / -1)   next / previous bookmark of the project, across files (Space pn / pp)
+--   M.to_prompt()    every bookmark as "file:line  description" with its line of code at the
+--                    end of in.txt (pc.prompt_file), for the agent (Space pI)
 -- (the log: Delete, Shift+Delete, a right click did nothing, then each bookmark was opened and
 -- toggled off with Ctrl+F11 one by one)
 
@@ -25,6 +31,88 @@ local function entries()
     return a.filename == b.filename and a.lnum < b.lnum or a.filename < b.filename
   end)
   return list
+end
+
+local function load()
+  require('lazy').load { plugins = { 'bookmarks.nvim' } }
+end
+
+local function before(a, b)
+  return a.filename == b.filename and a.lnum < b.lnum or a.filename < b.filename
+end
+
+local last -- { filename, lnum } of the bookmark opened last
+
+-- where the list starts: the bookmark opened last, or the one after it when it is gone
+local function start_index(list)
+  if not last then
+    return 1
+  end
+  for i, item in ipairs(list) do
+    if not before(item, last) then
+      return i
+    end
+  end
+  return 1
+end
+
+local function go(item)
+  if vim.fs.normalize(vim.api.nvim_buf_get_name(0)) ~= vim.fs.normalize(item.filename) then
+    vim.cmd.edit(vim.fn.fnameescape(item.filename))
+  end
+  vim.cmd "normal! m'"
+  pcall(vim.api.nvim_win_set_cursor, 0, { item.lnum, 0 })
+  vim.cmd 'normal! zz'
+  last = { filename = item.filename, lnum = item.lnum }
+end
+
+--- The next (1) / previous (-1) bookmark of the project from the cursor, across files, around
+function M.jump(direction)
+  load()
+  local list = entries()
+  if #list == 0 then
+    return vim.notify('No bookmarks', vim.log.levels.INFO)
+  end
+  local here = { filename = vim.api.nvim_buf_get_name(0), lnum = vim.fn.line '.' }
+  local target
+  if direction > 0 then
+    for _, item in ipairs(list) do
+      if before(here, item) then
+        target = item
+        break
+      end
+    end
+    target = target or list[1]
+  else
+    for i = #list, 1, -1 do
+      if before(list[i], here) then
+        target = list[i]
+        break
+      end
+    end
+    target = target or list[#list]
+  end
+  go(target)
+end
+
+--- Every bookmark into the prompt file: where, your description, the line of code
+function M.to_prompt()
+  load()
+  local list = entries()
+  if #list == 0 then
+    return vim.notify('No bookmarks', vim.log.levels.INFO)
+  end
+  local lines = {}
+  for _, item in ipairs(list) do
+    local desc = item.desc:gsub('%s*\n%s*', ' ')
+    table.insert(lines, ('%s:%d%s'):format(vim.fn.fnamemodify(item.filename, ':~:.'), item.lnum, desc ~= '' and ('  ' .. desc) or ''))
+    if item.line ~= '' then
+      table.insert(lines, '    `' .. item.line .. '`')
+    end
+  end
+  table.insert(lines, '')
+  require('pc.prompt_file').append(lines)
+  vim.notify(('%d bookmark(s) added to in.txt'):format(#list), vim.log.levels.INFO)
 end
 
 local function finder()
@@ -169,13 +257,14 @@ local function menu(prompt)
 end
 
 function M.open()
-  require('lazy').load { plugins = { 'bookmarks.nvim' } }
+  load()
   local conf = require('telescope.config').values
   bm().prune_dead(function()
     require('telescope.pickers')
       .new({}, {
-        prompt_title = 'Bookmarks  ·  Del delete  ·  F2 edit description  ·  right click: menu',
+        prompt_title = 'Bookmarks  ·  Del delete  ·  F2 edit description  ·  Alt+Shift+I to in.txt  ·  right click: menu',
         finder = finder(),
+        default_selection_index = start_index(entries()),
         sorter = conf.generic_sorter {},
         previewer = previewer(),
         attach_mappings = function(_, map)
@@ -188,6 +277,17 @@ function M.open()
             map({ 'i', 'n' }, key, edit)
           end
           map({ 'i', 'n' }, '<RightMouse>', menu)
+          map({ 'i', 'n' }, '<M-I>', function(prompt)
+            require('telescope.actions').close(prompt)
+            M.to_prompt()
+          end)
+          -- the next time the list starts where you left it
+          require('telescope.actions').select_default:enhance {
+            pre = function()
+              local v = selected()
+              last = v and { filename = v.filename, lnum = v.lnum } or last
+            end,
+          }
           return true
         end,
       })

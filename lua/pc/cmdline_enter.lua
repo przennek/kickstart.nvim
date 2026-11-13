@@ -9,6 +9,11 @@
 
 local M = {}
 
+--- true while a command typed with ! (:q!, :qa!, :wq!) runs: pc.autosave does not save before
+--- such a quit. (It looked at the last line of the command history, which is some older command
+--- when the quit comes from ZZ, Ctrl+W q or a mapping.)
+M.bang = false
+
 local QUIT = { q = true, qa = true, wq = true, wqa = true, x = true, xa = true, Q = true, Wq = true, WQ = true }
 local TYPO = { W = true, Wq = true, WQ = true, Q = true, Qa = true, QA = true, Wa = true, WA = true, Wqa = true, WQa = true, WQA = true, X = true, Xa = true }
 
@@ -21,6 +26,13 @@ function M.enter()
       line = ranged
     end
     local cmd, bang = line:match '^%s*(%a+)(!?)%s*$'
+    if bang == '!' then
+      M.bang = true
+      -- after the command has run
+      vim.schedule(function()
+        M.bang = false
+      end)
+    end
     if (cmd == 'q' or cmd == 'Q') and require('pc.diff_ui').active() then
       return '<C-u>lua require("pc.diff_ui").close()<CR>'
     end

@@ -82,6 +82,8 @@ regression() {
   echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   out=$(headless "$WORK" "" lsp_guard.lua)
   echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
+  out=$(headless "$WORK" "" plugin_sync.lua)
+  echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   out=$(headless "$WORK" "" ux_typos.lua)
   echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   out=$(headless "$WORK/java" "" search.lua)
@@ -203,8 +205,20 @@ scenario() {
   expect "terminal: wheel up scrolls" "$(q 'mode()')" n
   lit 'echo wheeled'; k Enter; sleep 0.5
   expect "terminal: typing after the wheel" "$(screen | grep -c '^wheeled')" 1
-  for i in 1 2 3; do esc "\033[<64;20;${row}M"; done; for i in 1 2 3 4 5 6; do esc "\033[<65;20;${row}M"; done
+  for i in 1 2 3; do esc "\033[<64;20;${row}M"; done; for i in 1 2; do esc "\033[<65;20;${row}M"; done
   expect "terminal: wheel down to the end types" "$(q 'mode()')" t
+  # the wheel still turning at the end: out of typing once, not out and in with every turn
+  # (6 turns ended in typing again; the log had hundreds of t / n lines), typing goes to the shell
+  for i in 1 2 3 4 5 6; do esc "\033[<65;20;${row}M"; done
+  expect "terminal: the wheel at the end does not flip the mode" "$(q 'mode()')" n
+  lit 'echo at-the-end'; k Enter; sleep 0.5
+  expect "terminal: typing after the wheel at the end" "$(q 'mode()')/$(screen | grep -c '^at-the-end')" t/1
+  # a double click copies the word and keeps it selected, the third click copies the line
+  q "setreg('0', '')" >/dev/null; local up=$(( row - 1 ))
+  KS=0.05 esc "\033[<0;4;${up}M"; KS=0.05 esc "\033[<0;4;${up}m"; KS=0.05 esc "\033[<0;4;${up}M"; KS=0.05 esc "\033[<0;4;${up}m"; sleep 0.5
+  expect "terminal: a double click copies the word" "$(q "(getreg('0') != '' ? 'copied/' : 'empty/').mode()")" copied/v
+  sleep 0.7; for i in 1 2 3; do KS=0.03 esc "\033[<0;4;${up}M"; KS=0.03 esc "\033[<0;4;${up}m"; done; sleep 0.5
+  expect "terminal: a triple click copies the line" "$(q "getregtype('0').'/'.mode()")" V/t
   # a mouse drag copies on release, typing goes on
   q "setreg('0', '')" >/dev/null
   esc "\033[<0;2;${row}M"; sleep 0.3; esc "\033[<32;5;${row}M"; sleep 0.3; esc "\033[<32;8;${row}M"; sleep 0.3; esc "\033[<0;8;${row}m"; sleep 0.5
@@ -249,6 +263,53 @@ PY
   expect "agent: Esc Esc keeps Normal mode (Vim keys)" "$(q 'mode()')/$(cat "$WORK/chat.out")" n/abc
   lit 'i'; sleep 0.3; lit 'q'; sleep 0.5
   k i; sleep 0.3; k M-i; check agent-mouse
+  # a selection goes to the prompt file with its place, you stay in the code
+  editor; ql 'vim.cmd.edit("sel.txt")' >/dev/null; ql 'vim.api.nvim_buf_set_lines(0, 0, -1, false, { "alpha beta", "gamma", "delta" })' >/dev/null; ex w; sleep 0.5
+  k g g; k V; k j; k M-I; sleep 0.7
+  expect "prompt: a selection of lines stays in the code" "$(q 'expand("%:t")."/".mode()')" sel.txt/n
+  k g g; k w; k v; k e; k M-I; sleep 0.7
+  local prompt; prompt=$(ql 'require("pc.prompt_file").path()')
+  expect "prompt: the lines with their place" "$(tr '\n' '|' < "$prompt")" 'sel.txt:1-2|```text|alpha beta|gamma|```||sel.txt:1  `beta`|'
+  k M-I; sleep 0.7
+  expect "prompt: Alt+Shift+I opens it with them" "$(q 'expand("%:t")."/".line("$")')" in.txt/7
+  ql 'vim.api.nvim_buf_set_lines(0, 0, -1, false, {})' >/dev/null; ex w; ex 'bwipeout! sel.txt'; rm -f sel.txt; editor; check prompt-selection
+  # bookmarks across files: next / previous, the list opens where you left it, all to the prompt file
+  printf 'one\ntwo\nthree\nfour\n' > bm1.txt; printf 'uno\ndos\ntres\n' > bm2.txt
+  editor; ex 'edit bm1.txt'; sleep 0.5; k 2 G; k ' pa'; k 4 G; k ' pa'; ex 'edit bm2.txt'; sleep 0.5; k 2 G; k ' pa'; sleep 0.3
+  k g g; k ' pp'; sleep 0.5
+  expect "bookmarks: previous goes to the other file" "$(q 'expand("%:t").":".line(".")')" bm1.txt:4
+  k ' pn'; sleep 0.5; k ' pn'; sleep 0.5
+  expect "bookmarks: next goes on and around" "$(q 'expand("%:t").":".line(".")')" bm1.txt:2
+  local sel='(function() local e = require("telescope.actions.state").get_selected_entry() return e and (vim.fs.basename(e.value.filename) .. ":" .. e.value.lnum) or "none" end)()'
+  k ' sb'; sleep 1.5
+  expect "bookmarks: the list starts at the one visited last" "$(ql "$sel")" bm1.txt:2
+  k Up; k Enter; sleep 0.7; local opened; opened=$(q 'expand("%:t").":".line(".")'); k ' pa'; k ' sb'; sleep 1.5
+  expect "bookmarks: after removing it, the list starts at the next one" "$opened>$(ql "$sel")" "bm1.txt:4>bm2.txt:2"
+  k M-I; sleep 0.7
+  expect "bookmarks: all of them in the prompt file" "$(tr '\n' '|' < "$(ql 'require("pc.prompt_file").path()')")" 'bm1.txt:2|    `two`|bm2.txt:2|    `dos`||'
+  ql 'require("pc.prompt_file").append({})' >/dev/null; ql '(function() local b = vim.fn.bufadd(require("pc.prompt_file").path()) vim.api.nvim_buf_set_lines(b, 0, -1, false, {}) vim.api.nvim_buf_call(b, function() vim.cmd "silent! update" end) return 1 end)()' >/dev/null
+  ex 'edit bm1.txt'; k ' pc'; ex 'edit bm2.txt'; k ' pc'; ex 'bwipeout! bm1.txt'; ex 'bwipeout! bm2.txt'; rm -f bm1.txt bm2.txt; editor; check bookmarks-project
+  # F-keys while typing: a buffer's own (Shift+F6 of a language server) runs, one without a
+  # meaning types nothing (it was "<F18>" in the code)
+  editor; ex 'edit fk.txt'; sleep 0.5; ql '(function() vim.keymap.set("n", "<F18>", function() vim.g.fk_ran = 1 end, { buffer = 0 }) return 1 end)()' >/dev/null
+  k i; lit 'ab'; ql 'vim.api.nvim_input("<F18>")' >/dev/null; sleep 0.5
+  expect "typing: a buffer-local F-key runs" "$(q 'get(g:, "fk_ran", 0)."/".mode()."/".getline(1)')" 1/n/ab
+  k A; ql 'vim.api.nvim_input("<F62>")' >/dev/null; sleep 0.3; lit 'c'; k Escape
+  expect "typing: an F-key without a meaning types nothing" "$(q 'getline(1)')" abc
+  ex w; ex 'bwipeout! fk.txt'; rm -f fk.txt; editor; check typing-fkeys
+  # a click from a file you type in into another file ends typing; a click back goes on typing
+  printf 'left file\n' > cl1.txt; printf 'right file\n' > cl2.txt
+  editor; ex only; ex 'edit cl1.txt'; ex 'vsplit cl2.txt'; sleep 0.5; k C-h; sleep 0.3
+  local lcol=$(ql 'vim.fn.win_screenpos(0)[2] + 8') rcol=$(ql 'vim.fn.win_screenpos(vim.fn.winnr("l"))[2] + 8')
+  k A; lit 'x'; esc "\033[<0;${rcol};1M"; esc "\033[<0;${rcol};1m"; sleep 0.3
+  expect "click: into another file ends typing" "$(q 'expand("%:t")."/".mode()')" cl2.txt/n
+  esc "\033[<0;${lcol};1M"; esc "\033[<0;${lcol};1m"; sleep 0.3; lit 'y'
+  expect "click: back into the first file goes on typing" "$(q 'expand("%:t")."/".mode()')/$(q 'getline(1)' | tr -cd y)" cl1.txt/i/y
+  k Escape; k C-l; k C-h; sleep 0.3; esc "\033[<0;${lcol};1M"; esc "\033[<0;${lcol};1m"; sleep 0.3
+  expect "click: no typing after coming back by keyboard" "$(q 'mode()')" n
+  ex 'bwipeout! cl2.txt'; ex 'bwipeout! cl1.txt'; rm -f cl1.txt cl2.txt; ex only; editor; check click-typing
+  # Find Action: what you ran last leads the list
+  expect "actions: the one used last comes first" "$(ql '(function() local a = require("pc.actions") local l = a.list() local name = l[#l].name a.used(name) return tostring(a.list()[1].name == name) end)()')" true
   # your moves are in the error log, the text you typed is not (only how many characters)
   local moves=$WORK/state/nvim/pc-errors.log
   expect "telemetry: Alt+T recorded" "$(grep -c 'move .*<M-t>' "$moves" | grep -v '^0$' >/dev/null && echo yes)" yes

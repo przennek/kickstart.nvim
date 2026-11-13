@@ -117,14 +117,28 @@ function M.attach(buf)
     end, { buffer = buf, desc = 'Paste into the terminal' })
   end
   -- the wheel down to the end of the output: typing again, new output scrolls the screen
+  -- only when this turn of the wheel reached the end: already there (the wheel kept turning at
+  -- the last line) it stays in Normal mode, or every turn left typing and the next one came back
+  -- (the log: t / n hundreds of times, autosave and the diff refresh with each)
   vim.keymap.set('n', '<ScrollWheelDown>', function()
+    local before = vim.fn.line 'w$'
     vim.cmd.normal { vim.keycode '<ScrollWheelDown>', bang = true }
-    if vim.fn.line 'w$' >= vim.fn.line '$' then
+    if vim.fn.line 'w$' < vim.fn.line '$' then
+      return
+    end
+    if vim.fn.line 'w$' > before then
       vim.cmd 'startinsert'
+    else
+      -- on the last line new output keeps scrolling the window
+      vim.cmd 'normal! G'
     end
   end, { buffer = buf, desc = 'Scroll; at the end back to typing' })
   -- a mouse selection copies itself on release, as in a terminal emulator (the log: drag, then y)
   vim.keymap.set('x', '<LeftRelease>', '<LeftRelease>y', { buffer = buf, desc = 'Copy the mouse selection' })
+  -- a double click (word) copies too and stays selected, for the third click (line), which
+  -- copies and goes back to typing (the log: double / triple click, then y)
+  vim.keymap.set('x', '<2-LeftRelease>', '<2-LeftRelease>ygv', { buffer = buf, desc = 'Copy the word clicked twice' })
+  vim.keymap.set('x', '<3-LeftRelease>', '<3-LeftRelease>y', { buffer = buf, desc = 'Copy the line clicked three times' })
   vim.api.nvim_create_autocmd('TextYankPost', {
     buffer = buf,
     group = vim.api.nvim_create_augroup('pc-terminal-typing-' .. buf, { clear = true }),

@@ -32,8 +32,10 @@ return {
     { '<leader>pi', bookmark_with_description, desc = 'Bookmark: with description' },
     -- Edit Bookmark / Rename (the description of the bookmark on this line; adds one if there is none)
     { '<leader>pe', bm 'bookmark_ann', desc = 'Bookmark: [e]dit description' },
-    { '<leader>pn', bm 'bookmark_next', desc = 'Bookmark: next in file' },
-    { '<leader>pp', bm 'bookmark_prev', desc = 'Bookmark: previous in file' },
+    -- across the files of the project (the plugin's own stay inside one file)
+    { '<leader>pn', function() require('pc.bookmarks_list').jump(1) end, desc = 'Bookmark: next (project)' },
+    { '<leader>pp', function() require('pc.bookmarks_list').jump(-1) end, desc = 'Bookmark: previous (project)' },
+    { '<leader>pI', function() require('pc.bookmarks_list').to_prompt() end, desc = 'Bookmarks: all to the prompt file (in.txt)' },
     { '<leader>pc', bm 'bookmark_clean', desc = 'Bookmark: clear file' },
     { '<leader>sb', show_bookmarks, desc = 'Show Bookmarks' },
     -- F11 / Ctrl+F11 / Shift+F11 (F35 / F23 inside tmux)

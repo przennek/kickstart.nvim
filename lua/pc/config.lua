@@ -50,6 +50,10 @@ vim.opt.breakindent = true
 -- Save undo history
 vim.opt.undofile = true
 
+-- No swap files: files save themselves (pc.autosave), undo and Local History are kept, and
+-- with several Neovims open a swap file only asks questions (W325, "Edit anyway?")
+vim.opt.swapfile = false
+
 -- Case-insensitive searching (use \C to match case); like .ideavimrc, no smartcase
 vim.opt.ignorecase = true
 vim.opt.smartcase = false

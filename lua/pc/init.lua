@@ -8,7 +8,6 @@ require 'pc.notifications' -- early: plugin messages go to the Notifications win
 require 'pc.proxy' -- early: the saved proxy goes to the environment before anything is spawned
 require 'pc.config'
 require 'pc.lsp_guard' -- before any language server starts: none in Git views (diffview://)
-require 'pc.plugin_sync' -- plugins brought to lazy-lock.json by themselves
 require 'pc.remap'
 require 'pc.autocmds'
 require 'pc.run'

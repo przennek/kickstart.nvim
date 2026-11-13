@@ -116,6 +116,40 @@ local function pretty(lhs)
   return (out:gsub('␣ ', '␣'))
 end
 
+-- Actions you ran from here, most recent first: they lead the list, and win among the matches of
+-- what you type (the log: Alt+Shift+A, "diff", Up Up, Enter — the same action a dozen times a day)
+local RECENT_FILE = vim.fn.stdpath 'state' .. '/pc-actions-recent.json'
+local recent -- names, most recent first
+
+local function recent_names()
+  if not recent then
+    local ok, list = pcall(function()
+      return vim.json.decode(table.concat(vim.fn.readfile(RECENT_FILE), '\n'))
+    end)
+    recent = ok and type(list) == 'table' and list or {}
+  end
+  return recent
+end
+
+--- Remembers that the action `name` was run from Find Action / Search Everywhere
+function M.used(name)
+  local list = vim.tbl_filter(function(n)
+    return n ~= name
+  end, recent_names())
+  table.insert(list, 1, name)
+  recent = vim.list_slice(list, 1, 30)
+  pcall(vim.fn.writefile, { vim.json.encode(recent) }, RECENT_FILE)
+end
+
+--- Position of the action `name` among the recently used ones (1 = last), nil when not there
+function M.recency(name)
+  for i, n in ipairs(recent_names()) do
+    if n == name then
+      return i
+    end
+  end
+end
+
 -- Actions available in the current buffer, with their shortcuts
 local function available()
   local list = {}
@@ -156,6 +190,10 @@ local function available()
     end
   end
   table.sort(list, function(a, b)
+    local ra, rb = M.recency(a.name), M.recency(b.name)
+    if ra or rb then
+      return (ra or math.huge) < (rb or math.huge)
+    end
     return a.name:lower() < b.name:lower()
   end)
   return list
@@ -185,7 +223,24 @@ end
 M.list = available
 --- run an action from M.list() (Search Everywhere)
 function M.run(action)
+  M.used(action.name)
   execute(action.run)
+end
+
+-- the picker's sorter, with the recently used actions ahead of the other matches
+local function sorter()
+  local sorter = require('telescope.config').values.generic_sorter {}
+  local score = sorter.scoring_function
+  sorter.scoring_function = function(self, prompt, line, entry, ...)
+    local result = score(self, prompt, line, entry, ...)
+    local rank = type(entry) == 'table' and entry.value and M.recency(entry.value.name)
+    if not rank or type(result) ~= 'number' or result < 0 then
+      return result
+    end
+    -- nothing typed: the order of the list (recent first); typing: recent matches come first
+    return prompt == '' and result or result * 0.5
+  end
+  return sorter
 end
 
 function M.find_action()
@@ -210,12 +265,13 @@ function M.find_action()
           }
         end,
       },
-      sorter = require('telescope.config').values.generic_sorter {},
+      sorter = sorter(),
       attach_mappings = function(prompt_bufnr, map)
         actions_t.select_default:replace(function()
           local entry = state.get_selected_entry()
           actions_t.close(prompt_bufnr)
           if entry then
+            M.used(entry.value.name)
             execute(entry.value.run)
           end
         end)

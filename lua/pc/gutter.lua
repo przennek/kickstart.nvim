@@ -12,8 +12,42 @@ function M.on_click(handler)
   table.insert(handlers, handler)
 end
 
+-- A click from a file you are typing in into another file ends typing there (Insert mode went
+-- along: the log has a click from in.txt into the code, then keys typed into the code and u), and
+-- a click back into the first file goes on typing where you click, as it did.
+local function file_window(win)
+  return win ~= 0 and vim.api.nvim_win_get_config(win).relative == '' and vim.bo[vim.api.nvim_win_get_buf(win)].buftype == ''
+end
+local resuming -- window a click is going back to typing in
+
+vim.keymap.set('i', '<LeftMouse>', function()
+  local here, there = vim.api.nvim_get_current_win(), vim.fn.getmousepos().winid
+  if there == here or not file_window(here) or not file_window(there) then
+    return '<LeftMouse>'
+  end
+  vim.w[here].pc_typing = true
+  return '<Esc><LeftMouse>'
+end, { expr = true, desc = 'Click: into another file ends typing' })
+
+-- entered any other way (Ctrl+H, a picker), the window is not typed in any more
+vim.api.nvim_create_autocmd('WinEnter', {
+  group = vim.api.nvim_create_augroup('pc-click-typing', { clear = true }),
+  callback = function()
+    local win = vim.api.nvim_get_current_win()
+    if win ~= resuming then
+      vim.w[win].pc_typing = nil
+    end
+    resuming = nil
+  end,
+})
+
 vim.keymap.set('n', '<LeftMouse>', function()
   local mouse = vim.fn.getmousepos()
+  if mouse.winid ~= 0 and mouse.winid ~= vim.api.nvim_get_current_win() and vim.w[mouse.winid].pc_typing then
+    vim.w[mouse.winid].pc_typing = nil
+    resuming = mouse.winid
+    return '<LeftMouse>i'
+  end
   -- a window without a shown sign column (a terminal, the tree, signcolumn=auto without signs: the
   -- agent terminal opened from a Java file kept auto, and a drag from its first columns copied
   -- nothing): its first columns are text

@@ -52,5 +52,20 @@ vim.api.nvim_buf_delete(scratch, { force = true })
 expect('/items[0] as typed', on('/', 'items[0]'), '<C-u>\\Vitems[0]<CR>')
 expect('/alias as it is', on('/', 'alias'), '<CR>')
 expect('/missing as it is', on('/', 'missing'), '<CR>')
+-- the ! of a typed :q! holds for that command only: autosave saves before a later quit that was
+-- not typed (Ctrl+W q, ZZ, a mapping), it used to see the older :q! in the command history
+vim.wait(50)
+local bangs = {}
+vim.api.nvim_create_autocmd('QuitPre', {
+  callback = function()
+    table.insert(bangs, tostring(require('pc.cmdline_enter').bang))
+  end,
+})
+vim.cmd 'new'
+vim.api.nvim_feedkeys(vim.keycode ':q!<CR>', 'tx', false)
+vim.wait(50)
+vim.cmd 'new'
+vim.cmd 'quit'
+expect('! only for the command typed with it', table.concat(bangs, ' '), 'true false')
 io.stdout:write('\n' .. (#bad == 0 and 'OK what you meant' or ('FAIL what you meant: ' .. table.concat(bad, '; '))) .. '\n')
 vim.cmd 'qa!'

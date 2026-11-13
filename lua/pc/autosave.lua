@@ -63,7 +63,7 @@ vim.api.nvim_create_autocmd('QuitPre', {
   group = group,
   nested = true,
   callback = function(event)
-    if not vim.fn.histget(':', -1):match '!%s*$' then
+    if not require('pc.cmdline_enter').bang then
       M.save(event.buf)
     end
   end,
