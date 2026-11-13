@@ -15,9 +15,7 @@ end
 -- A click from a file you are typing in into another file ends typing there (Insert mode went
 -- along: the log has a click from in.txt into the code, then keys typed into the code and u), and
 -- a click back into the first file goes on typing where you click, as it did.
-local function file_window(win)
-  return win ~= 0 and vim.api.nvim_win_get_config(win).relative == '' and vim.bo[vim.api.nvim_win_get_buf(win)].buftype == ''
-end
+local file_window = require('pc.wins').is_editor
 local resuming -- window a click is going back to typing in
 
 vim.keymap.set('i', '<LeftMouse>', function()

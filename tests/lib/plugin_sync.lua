@@ -17,7 +17,16 @@ local A, B = ('a'):rep(40), ('b'):rep(40)
 plugin('same.nvim', A)
 plugin('old.nvim', B)
 local lock = dir .. '/lazy-lock.json'
-vim.fn.writefile({ vim.json.encode { ['same.nvim'] = { branch = 'main', commit = A }, ['old.nvim'] = { branch = 'main', commit = A }, ['missing.nvim'] = { branch = 'main', commit = A } } }, lock)
+vim.fn.writefile(
+  {
+    vim.json.encode {
+      ['same.nvim'] = { branch = 'main', commit = A },
+      ['old.nvim'] = { branch = 'main', commit = A },
+      ['missing.nvim'] = { branch = 'main', commit = A },
+    },
+  },
+  lock
+)
 
 local function stale()
   return sync.stale(lock, dir .. '/lazy')

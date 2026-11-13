@@ -133,7 +133,8 @@ local function update()
     local lname = both_files and 'Left' or (left.kind == 'other' and left.text or 'Previous')
     local rname = both_files and 'Right' or (right.kind == 'file' and 'Current') or (right.kind == 'revision' and 'Next') or right.text
     local ltext = (left.kind == 'other' and not both_files) and '' or (' · ' .. left.text)
-    local rtext = right.kind == 'file' and (both_files and (' · ' .. right.text) or ' · working copy') or (right.kind == 'revision' and (' · ' .. right.text) or '')
+    local rtext = right.kind == 'file' and (both_files and (' · ' .. right.text) or ' · working copy')
+      or (right.kind == 'revision' and (' · ' .. right.text) or '')
     set_label(diffs[1], ('%%#DiffDelete# ◀ %s %%*%%#Comment#%s%%*'):format(esc(lname), esc(ltext)))
     set_label(diffs[2], ('%%#DiffAdd# %s ▶ %%*%%#Comment#%s%%*'):format(esc(rname), esc(rtext)))
   end
@@ -203,6 +204,42 @@ local function source_file(buf)
   return file ~= '' and not file:match '^%a+://' and vim.uv.fs_stat(file) and file or nil
 end
 
+local function diffview_tab(tab)
+  if not package.loaded['diffview'] then
+    return false
+  end
+  for _, view in ipairs(require('diffview.lib').views) do
+    if view.tabpage == tab then
+      return true
+    end
+  end
+  return false
+end
+
+-- From the Diffview in `diff_tab` to the editor: the first tab that is not a Diffview (a new one
+-- when there is none), in an editor window of it (not the tree, a terminal, a diff side).
+-- Space vd / the Switcher go back to `diff_tab`.
+local function to_editor_tab(diff_tab)
+  M.diff_tab = diff_tab
+  local target
+  for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
+    if not target and not diffview_tab(tab) then
+      target = tab
+    end
+  end
+  if target then
+    vim.api.nvim_set_current_tabpage(target)
+  else
+    vim.cmd 'tabnew'
+  end
+  local win = require('pc.wins').editor(function(w)
+    return not vim.wo[w].diff
+  end)
+  if win then
+    vim.api.nvim_set_current_win(win)
+  end
+end
+
 -- Jump to Source (F4 in a diff, as in IDEA's diff viewer): the file you are reading, at this line,
 -- in the editor; a Diffview stays open in its tab (Space vd / the Switcher go back to it), the
 -- diff of one file (Show Diff) closes and leaves you in the file. The log: :q out of the diff,
@@ -216,25 +253,7 @@ function M.jump_to_source()
   if not diffview_open() then
     M.close()
   else
-    M.diff_tab = vim.api.nvim_get_current_tabpage()
-    local target
-    for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
-      if tab ~= M.diff_tab and not target then
-        target = tab
-      end
-    end
-    if target then
-      vim.api.nvim_set_current_tabpage(target)
-    else
-      vim.cmd 'tabnew'
-    end
-    -- an editor window of that tab (not the tree, a terminal…)
-    for _, w in ipairs(normal_wins()) do
-      if vim.bo[vim.api.nvim_win_get_buf(w)].buftype == '' and not vim.wo[w].diff then
-        vim.api.nvim_set_current_win(w)
-        break
-      end
-    end
+    to_editor_tab(vim.api.nvim_get_current_tabpage())
   end
   if vim.fs.normalize(vim.api.nvim_buf_get_name(0)) ~= vim.fs.normalize(file) then
     vim.cmd.edit(vim.fn.fnameescape(file))
@@ -260,18 +279,6 @@ end
 -- A file opened in a Diffview's tab from outside the diff (the tree, Go to File, Search
 -- Everywhere, the Switcher) goes to the editor; the Diffview keeps its file list and sides. It
 -- took the list's (or a side's) place and the diff fell apart.
-local function diffview_tab(tab)
-  if not package.loaded['diffview'] then
-    return false
-  end
-  for _, view in ipairs(require('diffview.lib').views) do
-    if view.tabpage == tab then
-      return true
-    end
-  end
-  return false
-end
-
 -- a file that is not this window's side of the diff (Diffview puts its own files in its sides)
 local function stray(win, buf, tab)
   for _, view in ipairs(require('diffview.lib').views) do
@@ -308,24 +315,7 @@ vim.api.nvim_create_autocmd('BufWinEnter', {
           pcall(vim.cmd, 'buffer #')
         end
       end)
-      M.diff_tab = tab
-      local target
-      for _, t in ipairs(vim.api.nvim_list_tabpages()) do
-        if not target and not diffview_tab(t) then
-          target = t
-        end
-      end
-      if target then
-        vim.api.nvim_set_current_tabpage(target)
-      else
-        vim.cmd 'tabnew'
-      end
-      for _, w in ipairs(normal_wins()) do
-        if vim.bo[vim.api.nvim_win_get_buf(w)].buftype == '' and not vim.wo[w].diff then
-          vim.api.nvim_set_current_win(w)
-          break
-        end
-      end
+      to_editor_tab(tab)
       vim.cmd.edit(vim.fn.fnameescape(name))
       pcall(vim.api.nvim_win_set_cursor, 0, cursor)
     end)

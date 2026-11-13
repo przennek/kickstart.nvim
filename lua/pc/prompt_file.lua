@@ -77,7 +77,11 @@ function M.agent_command(message)
     return nil
   end
   message = message
-    or ('My instructions for you in this session are in the file ' .. M.path() .. ". Nothing to do yet: when I send you that path, read the file and do what it says.")
+    or (
+      'My instructions for you in this session are in the file '
+      .. M.path()
+      .. '. Nothing to do yet: when I send you that path, read the file and do what it says.'
+    )
   return cmd .. ' ' .. vim.fn.shellescape(message)
 end
 
@@ -203,7 +207,12 @@ function M.history()
           -- 2026-11-13_14-09-33 -> 2026-11-13 14:09:33
           local day, time = name:match '^(.-)_(.+)$'
           local when = day and (day .. ' ' .. time:gsub('-', ':')) or name
-          return { value = file, display = when .. (draft > 0 and '  (not sent)' or '') .. '  ' .. first, ordinal = table.concat(vim.fn.readfile(file), ' '), path = file }
+          return {
+            value = file,
+            display = when .. (draft > 0 and '  (not sent)' or '') .. '  ' .. first,
+            ordinal = table.concat(vim.fn.readfile(file), ' '),
+            path = file,
+          }
         end,
       },
       sorter = conf.generic_sorter {},

@@ -3,9 +3,7 @@
 -- are saved first (pc.autosave); a program running in a terminal (a build, Kiro) keeps Neovim
 -- open and says so, the shell at its prompt does not.
 
-local function editor(win)
-  return vim.api.nvim_win_get_config(win).relative == '' and vim.bo[vim.api.nvim_win_get_buf(win)].buftype == ''
-end
+local editor = require('pc.wins').is_editor
 
 local function running_program()
   local nav = require 'pc.terminal_nav'

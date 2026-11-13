@@ -55,9 +55,7 @@ local function take_lock()
 end
 
 local function restore()
-  local out = vim
-    .system({ vim.v.progpath, '--headless', '+Lazy! restore', '+qa' }, { text = true, env = { [CHILD] = '1' } })
-    :wait(300000)
+  local out = vim.system({ vim.v.progpath, '--headless', '+Lazy! restore', '+qa' }, { text = true, env = { [CHILD] = '1' } }):wait(300000)
   return out.code == 0, vim.trim((out.stderr or '') .. '\n' .. (out.stdout or ''))
 end
 
@@ -90,7 +88,10 @@ function M.sync(opts)
       vim.notify(('%d plugin(s) brought to lazy-lock.json: %s'):format(#names, table.concat(names, ', ')), vim.log.levels.INFO)
     else
       local why = tostring(ran and output or ok or ''):sub(-400)
-      vim.notify(('Plugins differ from lazy-lock.json and could not be restored (%s): run :Lazy restore\n%s'):format(table.concat(left, ', '), why), vim.log.levels.WARN)
+      vim.notify(
+        ('Plugins differ from lazy-lock.json and could not be restored (%s): run :Lazy restore\n%s'):format(table.concat(left, ', '), why),
+        vim.log.levels.WARN
+      )
     end
   end)
 end

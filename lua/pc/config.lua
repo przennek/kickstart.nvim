@@ -1,9 +1,6 @@
 -- NOTE:  For more options, you can see `:help option-list`
 
--- NOTE: Must happen before plugins are loaded (otherwise wrong leader will be used)
--- See `:help mapleader`
-vim.g.mapleader = ' ' -- Set <space> as the leader key
-vim.g.maplocalleader = ' '
+-- (<leader> is set in lua/pc/init.lua, before any module maps a key)
 
 -- white spaces
 vim.opt.expandtab = true -- Convert tabs to spaces

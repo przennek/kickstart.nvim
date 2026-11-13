@@ -70,11 +70,9 @@ end
 
 -- the editor window to open files in: the last one with a file, else a new split above
 local function editor_window()
-  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-    local buf = vim.api.nvim_win_get_buf(win)
-    if vim.api.nvim_win_get_config(win).relative == '' and vim.bo[buf].buftype == '' then
-      return win
-    end
+  local win = require('pc.wins').editor()
+  if win then
+    return win
   end
   vim.cmd 'aboveleft split'
   return vim.api.nvim_get_current_win()
@@ -100,7 +98,8 @@ local function url_at(win)
   local function clean(u)
     return (u:gsub('[%.,;:!%?\'"%]]+$', ''))
   end
-  local line = vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(win), vim.api.nvim_win_get_cursor(win)[1] - 1, vim.api.nvim_win_get_cursor(win)[1], false)[1] or ''
+  local line = vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(win), vim.api.nvim_win_get_cursor(win)[1] - 1, vim.api.nvim_win_get_cursor(win)[1], false)[1]
+    or ''
   local col = vim.api.nvim_win_get_cursor(win)[2] + 1
   local init = 1
   while true do

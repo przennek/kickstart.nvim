@@ -60,13 +60,7 @@ local function replace_in_path()
             -- gdefault is on, so no g flag: every match in a line is replaced. In an editor
             -- window: the Find window (focused now) cannot show other buffers ('winfixbuf')
             local cmd = ('silent cfdo %%s/\\V\\C%s/%s/e | update'):format(vim.fn.escape(search, '/\\'), vim.fn.escape(replacement, '/\\&~'))
-            local editor = vim.api.nvim_get_current_win()
-            for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-              if vim.api.nvim_win_get_config(win).relative == '' and vim.bo[vim.api.nvim_win_get_buf(win)].buftype == '' then
-                editor = win
-                break
-              end
-            end
+            local editor = require('pc.wins').editor() or vim.api.nvim_get_current_win()
             vim.api.nvim_win_call(editor, function()
               vim.cmd(cmd)
             end)
@@ -131,23 +125,29 @@ map('x', '<M-.>', 'zf', { desc = 'Collapse selection' })
 -- IDE shortcuts work in the terminal too, as in IDEA's Terminal tool window: the key leaves
 -- the terminal for the last editor window and runs there (a picked file opens in the editor,
 -- not over the terminal). Shell word keys (Alt+B/F/D/.) stay with the shell.
-local function last_editor_window()
-  local prev = vim.fn.win_getid(vim.fn.winnr '#')
-  local function editor(win)
-    return win ~= 0 and vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_config(win).relative == '' and vim.bo[vim.api.nvim_win_get_buf(win)].buftype == ''
-  end
-  if editor(prev) then
-    return prev
-  end
-  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-    if editor(win) then
-      return win
-    end
-  end
-end
+local last_editor_window = require('pc.wins').last_editor
 local IDE_KEYS = {
-  '<A-1>', '<M-2>', '<M-3>', '<M-4>', '<M-5>', '<M-6>', '<M-7>', '<M-8>', '<M-9>', '<M-0>',
-  '<M-n>', '<M-N>', '<M-e>', '<M-E>', '<M-F12>', '<F60>', '<M-F2>', '<F50>', '<F37>', '<F39>', '<F41>',
+  '<A-1>',
+  '<M-2>',
+  '<M-3>',
+  '<M-4>',
+  '<M-5>',
+  '<M-6>',
+  '<M-7>',
+  '<M-8>',
+  '<M-9>',
+  '<M-0>',
+  '<M-n>',
+  '<M-N>',
+  '<M-e>',
+  '<M-E>',
+  '<M-F12>',
+  '<F60>',
+  '<M-F2>',
+  '<F50>',
+  '<F37>',
+  '<F39>',
+  '<F41>',
 }
 for _, lhs in ipairs(IDE_KEYS) do
   map('t', lhs, function()

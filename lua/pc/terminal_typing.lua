@@ -8,7 +8,28 @@ local M = {}
 -- Normal-mode keys kept for scrolling and copying (j k g G, v V y, search, : commands,
 -- Space = leader, i / a back to typing, p paste, Enter opens a link); every other character
 -- is typed in the shell: after a mouse-wheel scroll "echo" lost its e to a motion
-local KEEP = { j = true, k = true, g = true, G = true, v = true, V = true, y = true, Y = true, ['/'] = true, ['?'] = true, n = true, N = true, [':'] = true, [' '] = true, i = true, a = true, I = true, A = true, p = true, P = true }
+local KEEP = {
+  j = true,
+  k = true,
+  g = true,
+  G = true,
+  v = true,
+  V = true,
+  y = true,
+  Y = true,
+  ['/'] = true,
+  ['?'] = true,
+  n = true,
+  N = true,
+  [':'] = true,
+  [' '] = true,
+  i = true,
+  a = true,
+  I = true,
+  A = true,
+  p = true,
+  P = true,
+}
 local SPECIAL = { ['<'] = '<lt>', ['\\'] = '<Bslash>', ['|'] = '<Bar>' }
 local TYPE = { '<BS>', '<Del>' }
 for byte = 33, 126 do
@@ -29,7 +50,21 @@ end
 -- type goes back to the program, in order, Enter and Ctrl+C too: after a click "git" lost its g i
 -- to Vim, Ctrl+C / Enter did nothing, ":" ran a Neovim command. Leaving typing with Esc Esc keeps
 -- the Normal mode below (j k / v y…).
-local TYPING = { ['<CR>'] = true, ['<BS>'] = true, ['<Del>'] = true, ['<Tab>'] = true, ['<Space>'] = true, ['<lt>'] = true, ['<Esc>'] = true, ['<Up>'] = true, ['<Down>'] = true, ['<Left>'] = true, ['<Right>'] = true, ['<Home>'] = true, ['<End>'] = true }
+local TYPING = {
+  ['<CR>'] = true,
+  ['<BS>'] = true,
+  ['<Del>'] = true,
+  ['<Tab>'] = true,
+  ['<Space>'] = true,
+  ['<lt>'] = true,
+  ['<Esc>'] = true,
+  ['<Up>'] = true,
+  ['<Down>'] = true,
+  ['<Left>'] = true,
+  ['<Right>'] = true,
+  ['<Home>'] = true,
+  ['<End>'] = true,
+}
 -- the shell's Ctrl keys (Ctrl+C, Ctrl+R history, Ctrl+A / Ctrl+E…), not Ctrl+H/J/K/L (windows)
 for _, key in ipairs { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'N', 'P', 'R', 'U', 'W', 'Y', 'Z' } do
   TYPING['<C-' .. key .. '>'] = true

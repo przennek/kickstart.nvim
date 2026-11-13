@@ -4,9 +4,6 @@
 -- netrw
 -- vim.keymap.set('n', '<leader>pv', vim.cmd.Ex)
 
---- append to system clipboard
-vim.opt.clipboard:append 'unnamedplus'
-
 -- <Esc> clears the search highlight (and closes a diff); it is defined in split_diff.lua
 
 -- Exit terminal mode in the builtin terminal with a shortcut that is a bit easier
