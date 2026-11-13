@@ -216,6 +216,112 @@ local function diffview_tab(tab)
   return false
 end
 
+---------------------------------------------------------------------------
+-- Diffview remembers where you were
+---------------------------------------------------------------------------
+-- A Diffview of the working tree (:DiffviewOpen, with or without a revision) that is opened again
+-- for the same repository starts on the file that was selected when it was closed, with the cursor
+-- on the line you were on in the right-hand (working copy) side. A file that no longer differs
+-- is not in the list: the view starts at the first file as before. Kept per repository root in
+-- memory, for this session only. File histories and the merge tool are left alone.
+
+local last_place = {} -- repo root -> { path = repo-relative file, line = line in the right side }
+
+-- the plain diff view of the current tab, nil for anything else (cheap: no Diffview loaded, no work)
+local function plain_view()
+  if not package.loaded['diffview'] then
+    return nil
+  end
+  local view = require('diffview.lib').get_current_view()
+  if view and view:instanceof(require('diffview.scene.views.diff.diff_view').DiffView) then
+    return view
+  end
+end
+
+local function main_win(view)
+  local layout = view.cur_layout
+  local win = layout and layout:get_main_win()
+  return win and win.id
+end
+
+-- Called while you move around: the file panel and the left side never count, only the right side
+local function remember_place()
+  local view = plain_view()
+  -- while the remembered place is still being restored the cursor sits on line 1 of the first
+  -- file; recording that would overwrite what we are about to restore
+  if not view or view.pc_restoring or not view.cur_entry then
+    return
+  end
+  if vim.api.nvim_get_current_win() ~= main_win(view) then
+    return
+  end
+  last_place[view.adapter.ctx.toplevel] = { path = view.cur_entry.path, line = vim.fn.line '.' }
+end
+
+-- Once the file list is loaded and the remembered file is shown: the cursor goes to its line
+local function restore_line(view, place)
+  local win = main_win(view)
+  if not (win and vim.api.nvim_win_is_valid(win)) then
+    return
+  end
+  local buf = vim.api.nvim_win_get_buf(win)
+  local line = math.max(1, math.min(place.line, vim.api.nvim_buf_line_count(buf)))
+  pcall(vim.api.nvim_win_set_cursor, win, { line, 0 })
+  -- centre it in that window without leaving the one the user is in
+  pcall(vim.api.nvim_win_call, win, function()
+    vim.cmd 'normal! zz'
+  end)
+end
+
+local place_group = vim.api.nvim_create_augroup('pc-diffview-place', { clear = true })
+
+vim.api.nvim_create_autocmd('CursorMoved', { group = place_group, callback = remember_place })
+
+vim.api.nvim_create_autocmd('User', {
+  group = place_group,
+  pattern = 'DiffviewViewOpened',
+  callback = function()
+    local view = plain_view()
+    local place = view and last_place[view.adapter.ctx.toplevel]
+    if not place then
+      return
+    end
+    -- Diffview selects options.selected_file once the (asynchronously loaded) list is there; a
+    -- file that is not in the list is ignored by it, so the first file opens as usual. It
+    -- defaults to the file of the current buffer, which would win over where you were
+    view.options.selected_file = place.path
+    view.pc_restoring = true
+    view.emitter:on('file_open_post', function(_, entry)
+      if not view.pc_restoring or entry.layout:is_nulled() then
+        return
+      end
+      view.pc_restoring = false
+      if entry.path == place.path then
+        -- after the diff buffers are in their windows
+        vim.schedule(function()
+          restore_line(view, place)
+        end)
+      end
+    end)
+  end,
+})
+
+-- A file picked in the panel is the place too, even before the cursor enters the right side
+vim.api.nvim_create_autocmd('User', {
+  group = place_group,
+  pattern = 'DiffviewDiffBufWinEnter',
+  callback = function()
+    local view = plain_view()
+    if view and not view.pc_restoring and view.cur_entry then
+      local root = view.adapter.ctx.toplevel
+      local place = last_place[root]
+      if not place or place.path ~= view.cur_entry.path then
+        last_place[root] = { path = view.cur_entry.path, line = 1 }
+      end
+    end
+  end,
+})
+
 -- From the Diffview in `diff_tab` to the editor: the first tab that is not a Diffview (a new one
 -- when there is none), in an editor window of it (not the tree, a terminal, a diff side).
 -- Space vd / the Switcher go back to `diff_tab`.

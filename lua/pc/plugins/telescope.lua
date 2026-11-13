@@ -140,7 +140,34 @@ return {
     local builtin = require 'telescope.builtin'
     vim.keymap.set('n', '<leader>sh', builtin.help_tags, { desc = '[S]earch [H]elp' })
     vim.keymap.set('n', '<leader>sk', builtin.keymaps, { desc = '[S]earch [K]eymaps' })
-    vim.keymap.set('n', '<leader>sf', builtin.find_files, { desc = 'Go to File' })
+    -- Go to File starts with the files picked there before (pc.recent_picks); the other
+    -- find_files uses (the config directory) stay plain
+    local picks = require 'pc.recent_picks'
+    local function go_to_file()
+      local root = vim.fn.getcwd()
+      builtin.find_files {
+        attach_mappings = function(prompt_bufnr)
+          local state = require 'telescope.actions.state'
+          local recent = {}
+          for i, path in ipairs(picks.files(root)) do
+            recent[path] = i
+          end
+          picks.rank_first(state.get_current_picker(prompt_bufnr).sorter, function(entry)
+            return entry.path and recent[entry.path]
+          end)
+          require('telescope.actions').select_default:enhance {
+            pre = function()
+              local entry = state.get_selected_entry()
+              if entry and entry.path then
+                picks.file_picked(root, entry.path)
+              end
+            end,
+          }
+          return true
+        end,
+      }
+    end
+    vim.keymap.set('n', '<leader>sf', go_to_file, { desc = 'Go to File' })
     vim.keymap.set('n', '<leader>ss', builtin.builtin, { desc = '[S]earch [S]elect Telescope' })
     vim.keymap.set('n', '<leader>sw', builtin.grep_string, { desc = '[S]earch current [W]ord' })
     vim.keymap.set('n', '<leader>sg', function()
@@ -214,7 +241,28 @@ return {
             end
           end
         end
+        if prompt == '' then
+          -- nothing typed: the classes picked before come first (the server may know nothing yet)
+          local seen, first = {}, {}
+          for _, item in ipairs(picks.classes(root)) do
+            if class_kinds[item.kind] and (opts.include_all or in_project(item.filename, root)) then
+              seen[picks.class_key(item)] = true
+              table.insert(first, item)
+            end
+          end
+          for _, item in ipairs(items) do
+            if not seen[picks.class_key(item)] then
+              table.insert(first, item)
+            end
+          end
+          return first
+        end
         return items
+      end
+
+      local recent = {}
+      for i, item in ipairs(picks.classes(root)) do
+        recent[picks.class_key(item)] = i
       end
 
       require('telescope.pickers')
@@ -225,8 +273,18 @@ return {
             entry_maker = require('telescope.make_entry').gen_from_lsp_symbols { bufnr = bufnr },
           },
           previewer = require('telescope.config').values.qflist_previewer {},
-          sorter = require('telescope.config').values.generic_sorter {},
+          sorter = picks.rank_first(require('telescope.config').values.generic_sorter {}, function(entry)
+            return entry.value and entry.value.filename and recent[picks.class_key(entry.value)]
+          end),
           attach_mappings = function(prompt_bufnr, map)
+            require('telescope.actions').select_default:enhance {
+              pre = function()
+                local entry = require('telescope.actions.state').get_selected_entry()
+                if entry and entry.value and entry.value.filename then
+                  picks.class_picked(root, entry.value)
+                end
+              end,
+            }
             map({ 'i', 'n' }, '<M-n>', function()
               local text = require('telescope.actions.state').get_current_line()
               require('telescope.actions').close(prompt_bufnr)
@@ -244,8 +302,8 @@ return {
     vim.keymap.set('n', '<leader>sS', function()
       builtin.lsp_dynamic_workspace_symbols { bufnr = workspace_symbol_buf() }
     end, { desc = 'Go to Symbol' })
-    vim.keymap.set('n', '<M-N>', builtin.find_files, { desc = 'Go to File' })
-    vim.keymap.set('n', '<leader>n', builtin.find_files, { desc = 'Go to File' })
+    vim.keymap.set('n', '<M-N>', go_to_file, { desc = 'Go to File' })
+    vim.keymap.set('n', '<leader>n', go_to_file, { desc = 'Go to File' })
     -- Switcher: open files, most recently used first, then the tool windows (pc.switcher)
     vim.keymap.set('n', '<leader>q', function()
       require('pc.switcher').open()

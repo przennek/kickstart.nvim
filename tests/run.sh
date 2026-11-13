@@ -9,6 +9,7 @@
 #                              agent" editing files behind the editor, Recent Changes, Rename,
 #                              tests again, then N (default 60) random tool-window / IDE actions
 #   tests/run.sh all           both
+# Single features, each in a clean nvim: tests/steps.sh (see there).
 # Exit status: the number of failures. KEEP=1 keeps the scratch directory for a look.
 # Your nvim state (undo, Neogit, logs) and cache stay untouched: both point into the scratch
 # directory; Local History entries of the scratch files are removed at the end.
