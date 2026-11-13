@@ -190,8 +190,33 @@ for _, k in ipairs(cmd_option) do
   map(k[4] or 'n', k[1], k[2], { remap = true, desc = k[3] })
 end
 
+-- Every other F-key / Alt shortcut of Normal mode works while typing too (stops typing, then
+-- runs): Shift+F11 in Insert mode typed "<F23>" into the code (the log: clicked from in.txt into
+-- a file, still typing, Shift+F11, then u to remove it). Insert mode's own keys stay.
+vim.api.nvim_create_autocmd('VimEnter', {
+  group = vim.api.nvim_create_augroup('pc-ide-keys-typing', { clear = true }),
+  once = true,
+  callback = function()
+    vim.schedule(function()
+      for _, m in ipairs(vim.api.nvim_get_keymap 'n') do
+        local lhs = vim.fn.keytrans(vim.keycode(m.lhs))
+        local ide = lhs:match '^<[SCMA%-]*F%d+>$' or lhs:match '^<[MA]%-.>$' or lhs:match '^<[CS]%-[SCM]?%-?F%d+>$'
+        if ide and vim.fn.maparg(lhs, 'i') == '' then
+          map('i', lhs, function()
+            vim.cmd 'stopinsert'
+            vim.schedule(function()
+              vim.api.nvim_feedkeys(vim.keycode(lhs), 'm', false)
+            end)
+          end, { desc = (m.desc or 'IDE shortcut') .. ' (while typing)' })
+        end
+      end
+    end)
+  end,
+})
+
 -- Tab after an auto-inserted closing bracket / quote jumps over it (BraceOrQuoteOut);
 -- completion and snippets come first (autocomplete.lua)
+
 return {
   brace_out = function()
     local col = vim.fn.col '.'

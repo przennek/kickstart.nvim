@@ -10,13 +10,11 @@ local function bm(fn)
   end
 end
 
--- Bookmark with description (Alt+F11 / <leader>pi): on a line that already has a bookmark the
--- key removes it, like pressing the bookmark key again in IDEA, instead of editing its text
+-- Bookmark with description (Cmd/Alt+F11 / <leader>pi): adds one with a description, on a line that
+-- has one edits its description (it removed it: the log had Ctrl+F11 four times, Cmd+F11, Esc,
+-- trying to change a description); F11 / Ctrl+F11 remove
 local function bookmark_with_description()
-  local ns = vim.api.nvim_get_namespaces()['bookmarks_extmark_signs_']
-  local line = vim.fn.line '.' - 1
-  local marked = ns and #vim.api.nvim_buf_get_extmarks(0, ns, { line, 0 }, { line, -1 }, {}) > 0
-  require('bookmarks')[marked and 'bookmark_toggle' or 'bookmark_ann']()
+  require('bookmarks').bookmark_ann()
 end
 
 -- the list with delete / edit description / the whole description (pc.bookmarks_list)
