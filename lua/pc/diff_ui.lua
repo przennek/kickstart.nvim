@@ -257,6 +257,81 @@ function M.back_to_diff()
   return false
 end
 
+-- A file opened in a Diffview's tab from outside the diff (the tree, Go to File, Search
+-- Everywhere, the Switcher) goes to the editor; the Diffview keeps its file list and sides. It
+-- took the list's (or a side's) place and the diff fell apart.
+local function diffview_tab(tab)
+  if not package.loaded['diffview'] then
+    return false
+  end
+  for _, view in ipairs(require('diffview.lib').views) do
+    if view.tabpage == tab then
+      return true
+    end
+  end
+  return false
+end
+
+-- a file that is not this window's side of the diff (Diffview puts its own files in its sides)
+local function stray(win, buf, tab)
+  for _, view in ipairs(require('diffview.lib').views) do
+    if view.tabpage == tab then
+      for _, w in ipairs(view.cur_layout and view.cur_layout.windows or {}) do
+        if w.id == win then
+          return not (w.file and w.file.bufnr == buf)
+        end
+      end
+    end
+  end
+  return true
+end
+
+vim.api.nvim_create_autocmd('BufWinEnter', {
+  group = vim.api.nvim_create_augroup('pc-diffview-files', { clear = true }),
+  callback = function(event)
+    local win, tab = vim.api.nvim_get_current_win(), vim.api.nvim_get_current_tabpage()
+    local name = vim.api.nvim_buf_get_name(event.buf)
+    if vim.bo[event.buf].buftype ~= '' or name == '' or name:match '^%a+://' then
+      return
+    end
+    if vim.api.nvim_win_get_config(win).relative ~= '' or not diffview_tab(tab) or not stray(win, event.buf, tab) then
+      return
+    end
+    local cursor = vim.api.nvim_win_get_cursor(win)
+    vim.schedule(function()
+      if not vim.api.nvim_win_is_valid(win) then
+        return
+      end
+      -- the window gets back what it showed (the file list / a side)
+      vim.api.nvim_win_call(win, function()
+        if vim.fn.bufnr '#' > 0 then
+          pcall(vim.cmd, 'buffer #')
+        end
+      end)
+      M.diff_tab = tab
+      local target
+      for _, t in ipairs(vim.api.nvim_list_tabpages()) do
+        if not target and not diffview_tab(t) then
+          target = t
+        end
+      end
+      if target then
+        vim.api.nvim_set_current_tabpage(target)
+      else
+        vim.cmd 'tabnew'
+      end
+      for _, w in ipairs(normal_wins()) do
+        if vim.bo[vim.api.nvim_win_get_buf(w)].buftype == '' and not vim.wo[w].diff then
+          vim.api.nvim_set_current_win(w)
+          break
+        end
+      end
+      vim.cmd.edit(vim.fn.fnameescape(name))
+      pcall(vim.api.nvim_win_set_cursor, 0, cursor)
+    end)
+  end,
+})
+
 vim.api.nvim_create_autocmd('OptionSet', {
   group = vim.api.nvim_create_augroup('pc-diff-collapse', { clear = true }),
   pattern = 'diff',
