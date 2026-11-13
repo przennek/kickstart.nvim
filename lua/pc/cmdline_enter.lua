@@ -1,6 +1,7 @@
 -- Enter on the command / search line does what you meant:
 --   :Wq :W :Q :Qa :WQ :Vs :Sp… (Shift held a moment too long) are :wq :w :q :qa :vs :sp…
 --   :q typed while text is selected (:'<,'>q, E16) is :q
+--   :q / :qa with unsaved text in a buffer without a name asks save / discard / cancel (not E37)
 --   :q / :q! in a diff (Diffview, the split diff) closes the diff (it was an abbreviation, and :q!
 --   became "lua …close()!", E5107)
 --   / or ? text that finds nothing as a Vim pattern but is in the file as typed ($PATH, ~/.local,
@@ -24,10 +25,22 @@ function M.enter()
       return '<C-u>lua require("pc.diff_ui").close()<CR>'
     end
     -- :Vs, :Sp, :Wq… : a command that does not exist, written small it does
-    if cmd and (TYPO[cmd] or (cmd:match '^%u' and vim.fn.exists(':' .. cmd) == 0 and vim.fn.exists(':' .. cmd:lower()) > 0)) then
-      return '<C-u>' .. cmd:lower() .. bang .. '<CR>'
+    local typo = cmd and (TYPO[cmd] or (cmd:match '^%u' and vim.fn.exists(':' .. cmd) == 0 and vim.fn.exists(':' .. cmd:lower()) > 0))
+    if typo then
+      cmd = cmd:lower()
+      line = cmd .. bang
     end
-    if ranged then
+    -- :q / :qa with unsaved text in a buffer without a name (autosave cannot keep it): one
+    -- question, save / discard / cancel, instead of E37 (the log: :qa, :q, :qa, then :q!)
+    local quit = cmd and bang == '' and QUIT[cmd:lower()] and cmd:lower()
+    if quit then
+      for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.bo[buf].modified and vim.bo[buf].buftype == '' and vim.api.nvim_buf_get_name(buf) == '' then
+          return '<C-u>confirm ' .. quit .. '<CR>'
+        end
+      end
+    end
+    if ranged or typo then
       return '<C-u>' .. line .. '<CR>'
     end
   elseif (kind == '/' or kind == '?') and line ~= '' and not line:find '^\\V' then
