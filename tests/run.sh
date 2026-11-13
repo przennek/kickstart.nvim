@@ -272,9 +272,23 @@ PY
   expect "prompt: the lines with their place" "$(tr '\n' '|' < "$prompt")" 'sel.txt:1-2|```text|alpha beta|gamma|```||sel.txt:1  `beta`|'
   k M-I; sleep 0.7
   expect "prompt: Alt+Shift+I opens it with them" "$(q 'expand("%:t")."/".line("$")')" in.txt/7
-  ql 'vim.api.nvim_buf_set_lines(0, 0, -1, false, {})' >/dev/null; ex w; ex 'bwipeout! sel.txt'; rm -f sel.txt; editor; check prompt-selection
+  ql 'vim.api.nvim_buf_set_lines(0, 0, -1, false, {})' >/dev/null; ex w; ex 'bwipeout! sel.txt'; rm -f "$(q 'getcwd()')/sel.txt"; editor; check prompt-selection
+  # Alt+Shift+I: the prompt file and back to the file; from the agent terminal too; Alt+Enter in
+  # it hands it to the agent
+  editor; ex 'edit tg.txt'; sleep 0.5; k M-I; sleep 0.5
+  expect "prompt: Alt+Shift+I opens in.txt" "$(q 'expand("%:t")')" in.txt
+  k M-I; sleep 0.5
+  expect "prompt: again goes back to the file (in.txt empty)" "$(q 'expand("%:t")')" tg.txt
+  k M-i; sleep 1.5; k M-I; sleep 1
+  expect "prompt: from the agent terminal" "$(q 'expand("%:t")."/".mode()."/".&buftype')" in.txt/n/
+  k i; lit 'do this'; k M-I; sleep 0.5
+  expect "prompt: back to the file while typing, the text stays" "$(q 'expand("%:t")."/".mode()')/$(cat "$(ql 'require("pc.prompt_file").path()')")" "tg.txt/n/do this"
+  k M-I; sleep 0.5; k M-Enter; sleep 1.5
+  expect "prompt: Alt+Enter hands it to the agent" "$(q '&buftype')/$(screen | grep -c 'Read .*prompts/.*txt and do what it says')/$(wc -c < "$(ql 'require("pc.prompt_file").path()')" | tr -d ' ')" terminal/1/0
+  k C-c; lit 'exit'; k Enter; sleep 1; ex 'bwipeout! tg.txt'; rm -f "$(q 'getcwd()')/tg.txt"; editor; check prompt-toggle
   # bookmarks across files: next / previous, the list opens where you left it, all to the prompt file
-  printf 'one\ntwo\nthree\nfour\n' > bm1.txt; printf 'uno\ndos\ntres\n' > bm2.txt
+  local cwd; cwd=$(q 'getcwd()')   # the scratch project nvim runs in
+  printf 'one\ntwo\nthree\nfour\n' > "$cwd/bm1.txt"; printf 'uno\ndos\ntres\n' > "$cwd/bm2.txt"
   editor; ex 'edit bm1.txt'; sleep 0.5; k 2 G; k ' pa'; k 4 G; k ' pa'; ex 'edit bm2.txt'; sleep 0.5; k 2 G; k ' pa'; sleep 0.3
   k g g; k ' pp'; sleep 0.5
   expect "bookmarks: previous goes to the other file" "$(q 'expand("%:t").":".line(".")')" bm1.txt:4
@@ -288,7 +302,7 @@ PY
   k M-I; sleep 0.7
   expect "bookmarks: all of them in the prompt file" "$(tr '\n' '|' < "$(ql 'require("pc.prompt_file").path()')")" 'bm1.txt:2|    `two`|bm2.txt:2|    `dos`||'
   ql 'require("pc.prompt_file").append({})' >/dev/null; ql '(function() local b = vim.fn.bufadd(require("pc.prompt_file").path()) vim.api.nvim_buf_set_lines(b, 0, -1, false, {}) vim.api.nvim_buf_call(b, function() vim.cmd "silent! update" end) return 1 end)()' >/dev/null
-  ex 'edit bm1.txt'; k ' pc'; ex 'edit bm2.txt'; k ' pc'; ex 'bwipeout! bm1.txt'; ex 'bwipeout! bm2.txt'; rm -f bm1.txt bm2.txt; editor; check bookmarks-project
+  ex 'edit bm1.txt'; k ' pc'; ex 'edit bm2.txt'; k ' pc'; ex 'bwipeout! bm1.txt'; ex 'bwipeout! bm2.txt'; rm -f "$cwd/bm1.txt" "$cwd/bm2.txt"; editor; check bookmarks-project
   # F-keys while typing: a buffer's own (Shift+F6 of a language server) runs, one without a
   # meaning types nothing (it was "<F18>" in the code)
   editor; ex 'edit fk.txt'; sleep 0.5; ql '(function() vim.keymap.set("n", "<F18>", function() vim.g.fk_ran = 1 end, { buffer = 0 }) return 1 end)()' >/dev/null
@@ -296,9 +310,9 @@ PY
   expect "typing: a buffer-local F-key runs" "$(q 'get(g:, "fk_ran", 0)."/".mode()."/".getline(1)')" 1/n/ab
   k A; ql 'vim.api.nvim_input("<F62>")' >/dev/null; sleep 0.3; lit 'c'; k Escape
   expect "typing: an F-key without a meaning types nothing" "$(q 'getline(1)')" abc
-  ex w; ex 'bwipeout! fk.txt'; rm -f fk.txt; editor; check typing-fkeys
+  ex w; ex 'bwipeout! fk.txt'; rm -f "$cwd/fk.txt"; editor; check typing-fkeys
   # a click from a file you type in into another file ends typing; a click back goes on typing
-  printf 'left file\n' > cl1.txt; printf 'right file\n' > cl2.txt
+  printf 'left file\n' > "$cwd/cl1.txt"; printf 'right file\n' > "$cwd/cl2.txt"
   editor; ex only; ex 'edit cl1.txt'; ex 'vsplit cl2.txt'; sleep 0.5; k C-h; sleep 0.3
   local lcol=$(ql 'vim.fn.win_screenpos(0)[2] + 8') rcol=$(ql 'vim.fn.win_screenpos(vim.fn.winnr("l"))[2] + 8')
   k A; lit 'x'; esc "\033[<0;${rcol};1M"; esc "\033[<0;${rcol};1m"; sleep 0.3
@@ -307,7 +321,7 @@ PY
   expect "click: back into the first file goes on typing" "$(q 'expand("%:t")."/".mode()')/$(q 'getline(1)' | tr -cd y)" cl1.txt/i/y
   k Escape; k C-l; k C-h; sleep 0.3; esc "\033[<0;${lcol};1M"; esc "\033[<0;${lcol};1m"; sleep 0.3
   expect "click: no typing after coming back by keyboard" "$(q 'mode()')" n
-  ex 'bwipeout! cl2.txt'; ex 'bwipeout! cl1.txt'; rm -f cl1.txt cl2.txt; ex only; editor; check click-typing
+  ex 'bwipeout! cl2.txt'; ex 'bwipeout! cl1.txt'; rm -f "$cwd/cl1.txt" "$cwd/cl2.txt"; ex only; editor; check click-typing
   # Find Action: what you ran last leads the list
   expect "actions: the one used last comes first" "$(ql '(function() local a = require("pc.actions") local l = a.list() local name = l[#l].name a.used(name) return tostring(a.list()[1].name == name) end)()')" true
   # your moves are in the error log, the text you typed is not (only how many characters)

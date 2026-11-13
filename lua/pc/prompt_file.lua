@@ -1,11 +1,14 @@
 -- The prompt file (in.txt) of this Neovim: the agent's instructions are written here, not in a
 -- file in the project (the log: in.txt in the repo, :w, Alt+I, type "read in.txt" every time).
---   Cmd/Alt+Shift+I              open it (this session's own, in Neovim's temp directory)
+--   Cmd/Alt+Shift+I              open it (this session's own, in Neovim's temp directory), from
+--                                a file or from the agent terminal; again: back to the file you
+--                                were in (it handed the text to the agent, and with an empty
+--                                in.txt there was no way back)
 --   Cmd/Alt+Shift+I, selection   the selected code goes to the end of in.txt with where it is
 --                                (src/Order.java:12-18 and the lines; a few words: on one line),
 --                                you stay in the code (the log: v … y, Ctrl+H, a, paste, Esc,
 --                                Ctrl+L for every piece of a review)
---   Cmd/Alt+Shift+I in it        hand it to the agent: the text goes to the prompt history
+--   Cmd/Alt+Enter in it          hand it to the agent: the text goes to the prompt history
 --                                (stdpath('state')/prompts/<time>.txt), the agent terminal
 --                                opens and gets "Read <that file> and do what it says", in.txt is
 --                                empty for the next one
@@ -82,10 +85,34 @@ local function is_prompt(buf)
   return vim.fs.normalize(vim.api.nvim_buf_get_name(buf)) == vim.fs.normalize(M.path())
 end
 
---- Opens the prompt file; in it, saves it and hands it to the agent
+local came_from -- the buffer Alt+Shift+I left for in.txt
+
+--- Opens the prompt file; in it, goes back to the file you came from
 function M.key()
   if not is_prompt(0) then
+    came_from = vim.bo.buftype == '' and vim.api.nvim_get_current_buf() or nil
     vim.cmd.edit(vim.fn.fnameescape(M.path()))
+    -- handing it over belongs to this file only
+    for _, mode in ipairs { 'n', 'i' } do
+      vim.keymap.set(mode, '<M-CR>', function()
+        vim.cmd 'stopinsert'
+        M.hand_over()
+      end, { buffer = 0, desc = 'Prompt file: hand it to the agent' })
+    end
+    return
+  end
+  vim.cmd 'silent! update'
+  local back = came_from and vim.api.nvim_buf_is_valid(came_from) and came_from or vim.fn.bufnr '#'
+  if back > 0 and vim.api.nvim_buf_is_valid(back) and back ~= vim.api.nvim_get_current_buf() then
+    vim.api.nvim_set_current_buf(back)
+  else
+    vim.notify('No file to go back to', vim.log.levels.INFO)
+  end
+end
+
+--- Hands in.txt to the agent: its text into the prompt history, the agent told to read that
+function M.hand_over()
+  if not is_prompt(0) then
     return
   end
   local file = keep(vim.api.nvim_buf_get_lines(0, 0, -1, false))
@@ -214,7 +241,7 @@ vim.keymap.set('n', '<leader>sH', M.history, { desc = 'Prompt history (handed to
 vim.keymap.set({ 'n', 'i' }, '<M-I>', function()
   vim.cmd 'stopinsert'
   M.key()
-end, { desc = 'Prompt file (in.txt); in it: hand it to the agent' })
+end, { desc = 'Prompt file (in.txt); in it: back to the file' })
 vim.keymap.set('x', '<M-I>', function()
   if is_prompt(0) then
     vim.api.nvim_feedkeys(vim.keycode '<Esc>', 'nx', false)
@@ -222,5 +249,24 @@ vim.keymap.set('x', '<M-I>', function()
   end
   M.add_selection()
 end, { desc = 'Add the selection to the prompt file (in.txt)' })
+-- from the agent terminal (and any other): it hides, in.txt opens in the editor
+vim.keymap.set('t', '<M-I>', function()
+  vim.cmd 'stopinsert'
+  local term = require 'pc.fullscreen_terminal'
+  vim.schedule(function()
+    for _, name in ipairs { 'Agent', 'Database' } do
+      if term.is_open(name) then
+        term.toggle(name)
+      end
+    end
+    -- a terminal in a split: the editor window next to it
+    if vim.bo.buftype == 'terminal' then
+      vim.cmd 'wincmd p'
+    end
+    if vim.bo.buftype == '' then
+      M.key()
+    end
+  end)
+end, { desc = 'Prompt file (in.txt) from the terminal' })
 
 return M

@@ -48,6 +48,6 @@ check('sync: the lock is released', vim.uv.fs_stat(vim.fn.stdpath 'data' .. '/pl
 
 vim.fn.delete(dir, 'rf')
 vim.defer_fn(function()
-  print(#problems == 0 and 'OK plugin_sync' or ('FAIL plugin_sync: ' .. table.concat(problems, '; ')))
+  io.stdout:write('\n' .. (#problems == 0 and 'OK plugin_sync' or ('FAIL plugin_sync: ' .. table.concat(problems, '; '))) .. '\n')
   vim.cmd 'qa!'
 end, 200)
