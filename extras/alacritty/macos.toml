@@ -44,6 +44,7 @@ bindings = [
   { key = "S", mods = "Command", chars = "\u001bs" },
   { key = "T", mods = "Command", chars = "\u001bt" },
   { key = "I", mods = "Command", chars = "\u001bi" },  # agent terminal (full screen)
+  { key = "I", mods = "Command|Shift", chars = "\u001bI" },  # prompt file (in.txt) / hand it to the agent
   { key = "D", mods = "Command|Shift", chars = "\u001bD" },  # database TUI (full screen)
   { key = "U", mods = "Command", chars = "\u001bu" },
   { key = "W", mods = "Command", chars = "\u001bw" },

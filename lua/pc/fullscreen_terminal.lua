@@ -1,5 +1,6 @@
 -- Terminals over the whole editor, one key each, apart from the Alt+T one:
---   Alt+I (Cmd+I on macOS)               the agent (Kiro, Claude…): a shell you run it in
+--   Alt+I (Cmd+I on macOS)               the agent (Kiro, Claude…): a shell that starts it, told
+--                                        where this session's prompt file is (pc.prompt_file)
 --   Alt+Shift+D (Cmd+Shift+D on macOS)   the database TUI (vim.g.pc_db_tui, else the first
 --                                        installed of DB_TUIS); quitting it closes the window
 -- The key shows it, typing; again hides it and you are back where you were. What runs in it stays
@@ -97,8 +98,9 @@ local function create(name, cmd)
   }
 end
 
---- Shows / hides the full-screen terminal `name`; `cmd` (nil: your shell) runs in it
-function M.toggle(name, cmd)
+--- Shows / hides the full-screen terminal `name`; `cmd` (nil: your shell) runs in it; `startup`:
+--- typed into that shell when it is created (the agent with its first prompt)
+function M.toggle(name, cmd, startup)
   local t = terms[name]
   if t and t:is_open() then
     vim.cmd 'stopinsert'
@@ -110,9 +112,32 @@ function M.toggle(name, cmd)
     pcall(vim.api.nvim_win_close, 0, false)
   end
   vim.cmd 'stopinsert'
+  local new = t == nil
   t = t or create(name, cmd)
   terms[name] = t
   t:open()
+  if new and startup and t.job_id then
+    vim.api.nvim_chan_send(t.job_id, startup .. '\r')
+  end
+end
+
+--- Has the terminal `name` been started (open or hidden)?
+function M.started(name)
+  return terms[name] ~= nil and terms[name].job_id ~= nil
+end
+
+--- Types `text` into the terminal `name`
+function M.send(name, text)
+  local t = terms[name]
+  if t and t.job_id then
+    vim.api.nvim_chan_send(t.job_id, text)
+  end
+end
+
+--- The agent terminal; started with the agent told about the prompt file (pc.prompt_file), or
+--- with `startup` instead
+function M.toggle_agent(startup)
+  M.toggle('Agent', nil, startup or (not M.started 'Agent' and require('pc.prompt_file').agent_command()) or nil)
 end
 
 function M.is_open(name)
@@ -134,7 +159,7 @@ end
 -- also while typing and from inside (the key never reaches the program)
 local modes = { 'n', 'i', 'x', 't' }
 vim.keymap.set(modes, '<M-i>', function()
-  M.toggle 'Agent'
+  M.toggle_agent()
 end, { desc = 'Agent terminal (full screen)' })
 vim.keymap.set(modes, '<M-D>', function()
   local cmd = M.db_tui()
