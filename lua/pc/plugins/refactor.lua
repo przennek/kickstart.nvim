@@ -1,6 +1,6 @@
 -- Refactor > Extract / Inline for the languages jdtls doesn't cover (Python, C, C++, Go, TS…),
 -- on the same keys as Java (java.lua):
---   <leader>ev  Extract Variable      <leader>em, Ctrl+Alt+M (F43 via Alacritty)  Extract Method
+--   <leader>ev  Extract Variable      <leader>em, Ctrl+Alt+M (via Alacritty)  Extract Method
 --   <leader>ei  Inline Variable
 -- Select the code in visual mode first (in normal mode they take a motion, e.g. <leader>ev iw).
 local function refactor(fn)
@@ -21,8 +21,8 @@ return {
       end
       map('<leader>ev', 'extract_var', 'Extract variable')
       map('<leader>em', 'extract_func', 'Extract method')
-      -- a terminal can't tell Ctrl+Alt+M from Alt+Enter; Alacritty sends Ctrl+Shift+F7 (F43) instead
-      map('<F43>', 'extract_func', 'Extract method')
+      -- a terminal can't tell Ctrl+Alt+M from Alt+Enter; Alacritty sends Ctrl+Shift+F7 instead
+      map(require('pc.keys').CTRL_ALT_M, 'extract_func', 'Extract method')
       map('<leader>ei', 'inline_var', 'Inline')
     end
     vim.api.nvim_create_autocmd('FileType', {

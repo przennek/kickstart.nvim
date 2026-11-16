@@ -251,7 +251,10 @@ function M.abort()
   close_merge_tool()
   local code, out, err = git(root, op.abort)
   reload_buffers()
-  vim.notify(op.name .. (code == 0 and ' aborted' or ' --abort: ' .. vim.trim(err ~= '' and err or out)), code == 0 and vim.log.levels.INFO or vim.log.levels.ERROR)
+  vim.notify(
+    op.name .. (code == 0 and ' aborted' or ' --abort: ' .. vim.trim(err ~= '' and err or out)),
+    code == 0 and vim.log.levels.INFO or vim.log.levels.ERROR
+  )
 end
 
 vim.api.nvim_create_user_command('ResolveSimpleConflicts', function()

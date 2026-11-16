@@ -76,9 +76,7 @@ function M.pick()
   end)
 end
 
--- Alt+F2 arrives as F50 inside tmux
-vim.keymap.set('n', '<M-F2>', M.pick, { desc = 'Switch Project' })
-vim.keymap.set('n', '<F50>', M.pick, { desc = 'Switch Project' })
+require('pc.keys').map('n', 'M-F2', M.pick, { desc = 'Switch Project' })
 vim.keymap.set('n', '<leader>P', M.pick, { desc = 'Switch Project' })
 
 return M

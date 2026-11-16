@@ -170,24 +170,42 @@ end
 
 local PAGES = {
   { label = 'Editor', open = M.editor },
-  { label = 'Appearance → Color Scheme', open = function()
-    vim.cmd 'QuickSwitchScheme'
-  end },
-  { label = 'Appearance → HTTP Proxy', open = function()
-    require('pc.proxy').open()
-  end },
-  { label = 'Project Structure (SDK)', open = function()
-    require('pc.project_structure').open()
-  end },
-  { label = 'Build Tools → Maven', open = function()
-    require('pc.maven').settings()
-  end },
-  { label = 'Invalidate Caches…', open = function()
-    require('pc.invalidate_caches').open()
-  end },
-  { label = 'Run/Debug Configurations', open = function()
-    require('pc.run_configs').edit()
-  end },
+  {
+    label = 'Appearance → Color Scheme',
+    open = function()
+      vim.cmd 'QuickSwitchScheme'
+    end,
+  },
+  {
+    label = 'Appearance → HTTP Proxy',
+    open = function()
+      require('pc.proxy').open()
+    end,
+  },
+  {
+    label = 'Project Structure (SDK)',
+    open = function()
+      require('pc.project_structure').open()
+    end,
+  },
+  {
+    label = 'Build Tools → Maven',
+    open = function()
+      require('pc.maven').settings()
+    end,
+  },
+  {
+    label = 'Invalidate Caches…',
+    open = function()
+      require('pc.invalidate_caches').open()
+    end,
+  },
+  {
+    label = 'Run/Debug Configurations',
+    open = function()
+      require('pc.run_configs').edit()
+    end,
+  },
 }
 
 function M.open()

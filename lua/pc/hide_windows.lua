@@ -61,7 +61,21 @@ local MODULES = {
 }
 
 -- Window options a reopened tool window gets back
-local WIN_OPTS = { 'number', 'relativenumber', 'signcolumn', 'foldcolumn', 'winfixwidth', 'winfixheight', 'wrap', 'linebreak', 'list', 'cursorline', 'winbar', 'winhighlight', 'statuscolumn' }
+local WIN_OPTS = {
+  'number',
+  'relativenumber',
+  'signcolumn',
+  'foldcolumn',
+  'winfixwidth',
+  'winfixheight',
+  'wrap',
+  'linebreak',
+  'list',
+  'cursorline',
+  'winbar',
+  'winhighlight',
+  'statuscolumn',
+}
 
 -- A window that is not an editor window: special buffer, not floating, not part of a diff
 local function tool_window(win)
@@ -272,14 +286,22 @@ function M.toggle()
       vim.cmd 'wincmd p'
     end
     local state = hide()
-    if next(state.terms or {}) or next(state.trouble or {}) or next(state.modules) or next(state.others) or state.tree or state.aerial or state.qf or state.run or state.dapui then
+    if
+      next(state.terms or {})
+      or next(state.trouble or {})
+      or next(state.modules)
+      or next(state.others)
+      or state.tree
+      or state.aerial
+      or state.qf
+      or state.run
+      or state.dapui
+    then
       hidden = state
     end
   end
 end
 
--- Inside tmux Ctrl+Shift+F12 arrives as F48
-vim.keymap.set({ 'n', 't' }, '<C-S-F12>', M.toggle, { desc = 'Hide / restore all tool windows' })
-vim.keymap.set({ 'n', 't' }, '<F48>', M.toggle, { desc = 'Hide / restore all tool windows' })
+require('pc.keys').map({ 'n', 't' }, 'C-S-F12', M.toggle, { desc = 'Hide / restore all tool windows' })
 
 return M

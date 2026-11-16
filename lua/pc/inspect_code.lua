@@ -60,9 +60,7 @@ local TOOLS = {
 
 local function run(values)
   local root = project_root()
-  local target = values.scope == 'Current file' and vim.api.nvim_buf_get_name(0)
-    or values.scope == 'Current directory' and vim.fn.expand '%:p:h'
-    or root
+  local target = values.scope == 'Current file' and vim.api.nvim_buf_get_name(0) or values.scope == 'Current directory' and vim.fn.expand '%:p:h' or root
   local opts = {
     checkstyle_config = values.checkstyle_config,
     pmd_rules = project_file(root, { 'pmd.xml', 'pmd-ruleset.xml', 'config/pmd/ruleset.xml' }) or 'rulesets/java/quickstart.xml',
@@ -123,14 +121,25 @@ function M.open()
       { key = 'scope', label = 'Scope', choices = { 'Whole project', 'Current directory', 'Current file' }, default = 'Whole project' },
       { header = 'Inspections' },
       { key = 'checkstyle', label = 'Checkstyle (Java)', check = true, default = have 'checkstyle' },
-      { key = 'checkstyle_config', label = 'Checkstyle rules', choices = configs, default = configs[1], visible = function(v)
-        return v.checkstyle
-      end },
+      {
+        key = 'checkstyle_config',
+        label = 'Checkstyle rules',
+        choices = configs,
+        default = configs[1],
+        visible = function(v)
+          return v.checkstyle
+        end,
+      },
       { key = 'pmd', label = 'PMD (Java)' .. (have 'pmd' and '' or ' — not installed'), check = true, default = have 'pmd' },
       { key = 'ruff', label = 'Ruff (Python)' .. (have 'ruff' and '' or ' — not installed'), check = true, default = have 'ruff' },
-      { key = 'root', label = 'Project', readonly = true, value = function()
-        return vim.fn.fnamemodify(root, ':~')
-      end },
+      {
+        key = 'root',
+        label = 'Project',
+        readonly = true,
+        value = function()
+          return vim.fn.fnamemodify(root, ':~')
+        end,
+      },
     },
     buttons = {
       {

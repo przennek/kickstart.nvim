@@ -93,16 +93,31 @@ function M.open()
     fields = {
       { header = 'Project' },
       { key = 'sdk', label = 'SDK', choices = choices },
-      { key = 'version', label = 'SDK version', readonly = true, value = function(v)
-        local home = v.sdk ~= DEFAULT and v.sdk or vim.uv.fs_realpath(vim.env.HOME .. '/.sdkman/candidates/java/current') or vim.env.JAVA_HOME
-        return home and ('Java ' .. (M.java_version(home) or '?')) or '?'
-      end },
-      { key = 'level', label = 'Language level', readonly = true, value = function()
-        return language_level(root)
-      end },
-      { key = 'root', label = 'Project root', readonly = true, value = function()
-        return vim.fn.fnamemodify(root, ':~')
-      end },
+      {
+        key = 'version',
+        label = 'SDK version',
+        readonly = true,
+        value = function(v)
+          local home = v.sdk ~= DEFAULT and v.sdk or vim.uv.fs_realpath(vim.env.HOME .. '/.sdkman/candidates/java/current') or vim.env.JAVA_HOME
+          return home and ('Java ' .. (M.java_version(home) or '?')) or '?'
+        end,
+      },
+      {
+        key = 'level',
+        label = 'Language level',
+        readonly = true,
+        value = function()
+          return language_level(root)
+        end,
+      },
+      {
+        key = 'root',
+        label = 'Project root',
+        readonly = true,
+        value = function()
+          return vim.fn.fnamemodify(root, ':~')
+        end,
+      },
     },
     buttons = {
       {

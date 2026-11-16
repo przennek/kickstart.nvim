@@ -3,7 +3,7 @@
 --   <leader>z / :ZenMode   toggle; the same key leaves it, and so does going to
 --                          another window; Alt+1…0, Alt+T, Alt+F12 leave it and open their window
 -- Only Neovim changes: tmux and the terminal font are left alone.
-local TOOL_KEYS = { '<A-1>', '<M-2>', '<M-3>', '<M-4>', '<M-5>', '<M-6>', '<M-7>', '<M-8>', '<M-9>', '<M-0>', '<M-t>', '<M-F12>', '<F60>' }
+local TOOL_KEYS = require('pc.keys').flat { '<A-1>', '<M-2>', '<M-3>', '<M-4>', '<M-5>', '<M-6>', '<M-7>', '<M-8>', '<M-9>', '<M-0>', '<M-t>', 'M-F12' }
 local zen_buf, zen_saved = nil, {}
 
 return {

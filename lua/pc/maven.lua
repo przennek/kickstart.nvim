@@ -385,7 +385,12 @@ function M.settings()
     values = settings(p),
     fields = {
       { header = 'Build Tools → Maven' },
-      { key = 'executable', label = 'Maven executable', choices = { 'Wrapper (mvnw) if present', 'mvn', '~/.sdkman/candidates/maven/current/bin/mvn' }, default = 'Wrapper (mvnw) if present' },
+      {
+        key = 'executable',
+        label = 'Maven executable',
+        choices = { 'Wrapper (mvnw) if present', 'mvn', '~/.sdkman/candidates/maven/current/bin/mvn' },
+        default = 'Wrapper (mvnw) if present',
+      },
       { key = 'settings_file', label = 'User settings file', default = '', complete = 'file' },
       { key = 'local_repo', label = 'Local repository', default = '', complete = 'dir' },
       { key = 'jdk', label = 'JDK for Maven', choices = jdks(), default = 'Default (JAVA_HOME)' },
@@ -395,24 +400,29 @@ function M.settings()
       { key = 'offline', label = 'Work offline', check = true, default = false },
       { key = 'skip_tests', label = 'Skip tests', check = true, default = false },
       { key = 'profiles', label = 'Active profiles (a,b)', default = '' },
-      { key = 'command', label = 'Command', readonly = true, value = function(v)
-        -- the values in the form, not saved yet
-        local exe = v.executable or ''
-        local args = { exe:match '^Wrapper' and (vim.uv.fs_stat(p.root .. '/mvnw') and './mvnw' or 'mvn') or exe }
-        if (v.settings_file or '') ~= '' then
-          vim.list_extend(args, { '-s', v.settings_file })
-        end
-        if (v.local_repo or '') ~= '' then
-          table.insert(args, '-Dmaven.repo.local=' .. v.local_repo)
-        end
-        if (v.threads or '') ~= '' then
-          vim.list_extend(args, { '-T', v.threads })
-        end
-        if (v.options or '') ~= '' then
-          table.insert(args, v.options)
-        end
-        return table.concat(args, ' ') .. ' <goal>'
-      end },
+      {
+        key = 'command',
+        label = 'Command',
+        readonly = true,
+        value = function(v)
+          -- the values in the form, not saved yet
+          local exe = v.executable or ''
+          local args = { exe:match '^Wrapper' and (vim.uv.fs_stat(p.root .. '/mvnw') and './mvnw' or 'mvn') or exe }
+          if (v.settings_file or '') ~= '' then
+            vim.list_extend(args, { '-s', v.settings_file })
+          end
+          if (v.local_repo or '') ~= '' then
+            table.insert(args, '-Dmaven.repo.local=' .. v.local_repo)
+          end
+          if (v.threads or '') ~= '' then
+            vim.list_extend(args, { '-T', v.threads })
+          end
+          if (v.options or '') ~= '' then
+            table.insert(args, v.options)
+          end
+          return table.concat(args, ' ') .. ' <goal>'
+        end,
+      },
     },
     buttons = {
       {

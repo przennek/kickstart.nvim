@@ -43,8 +43,11 @@ return {
       vim.api.nvim_create_autocmd('LspAttach', {
         group = vim.api.nvim_create_augroup('kickstart-lsp-attach', { clear = true }),
         callback = function(event)
-          local map = function(keys, func, desc, mode)
-            vim.keymap.set(mode or 'n', keys, func, { buffer = event.buf, desc = 'LSP: ' .. desc })
+          -- `lhs` may be a name of pc.keys ('S-F6': both spellings)
+          local map = function(lhs, func, desc, mode)
+            for _, key in ipairs(require('pc.keys').f(lhs)) do
+              vim.keymap.set(mode or 'n', key, func, { buffer = event.buf, desc = 'LSP: ' .. desc })
+            end
           end
           local builtin = require 'telescope.builtin'
 
@@ -62,7 +65,7 @@ return {
           map('<M-b>', builtin.lsp_definitions, 'Go to Declaration')
           map('<leader>D', builtin.lsp_type_definitions, 'Go to Type Declaration')
           map('<leader>ws', builtin.lsp_dynamic_workspace_symbols, 'Go to Symbol')
-          -- Find Usages into the Find window at the bottom (Alt+F7; F55 inside tmux).
+          -- Find Usages into the Find window at the bottom (Alt+F7).
           -- `gr` is the popup version, like Ctrl+Alt+F7 / Show Usages.
           local function find_usages()
             -- a server of this file without usages (yaml, json…): the word in the project instead
@@ -78,8 +81,7 @@ return {
             })
           end
           map('<leader>f', find_usages, 'Find Usages')
-          map('<M-F7>', find_usages, 'Find Usages')
-          map('<F55>', find_usages, 'Find Usages')
+          map('M-F7', find_usages, 'Find Usages')
           -- Call Hierarchy (<leader>h in .ideavimrc): callers; <leader>H = callees
           map('<leader>h', builtin.lsp_incoming_calls, 'Call Hierarchy (callers)')
           map('<leader>H', builtin.lsp_outgoing_calls, 'Call Hierarchy (callees)')
@@ -96,10 +98,9 @@ return {
             vim.lsp.buf.signature_help { border = 'rounded' }
           end, 'Parameter Info', { 'n', 'i' })
 
-          -- Rename (also Shift+F6; F18 inside tmux)
+          -- Rename (also Shift+F6)
           map('<leader>rn', vim.lsp.buf.rename, 'Rename')
-          map('<S-F6>', vim.lsp.buf.rename, 'Rename')
-          map('<F18>', vim.lsp.buf.rename, 'Rename')
+          map('S-F6', vim.lsp.buf.rename, 'Rename')
           -- Move (F6): jdtls' Move, elsewhere the file to a new path with imports updated
           map('<F6>', function()
             require('pc.move').move()

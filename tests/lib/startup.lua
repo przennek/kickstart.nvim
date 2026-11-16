@@ -29,6 +29,8 @@ vim.defer_fn(function()
   if diags > 0 then
     table.insert(problems, diags .. ' error diagnostics')
   end
-  io.stdout:write((#problems == 0 and 'OK ' or 'FAIL ') .. vim.fn.expand '%:t' .. ' [' .. table.concat(names, ',') .. '] ' .. table.concat(problems, '; ') .. '\n')
+  io.stdout:write(
+    (#problems == 0 and 'OK ' or 'FAIL ') .. vim.fn.expand '%:t' .. ' [' .. table.concat(names, ',') .. '] ' .. table.concat(problems, '; ') .. '\n'
+  )
   vim.cmd 'qa!'
 end, tonumber(vim.env.WAIT or 10000))

@@ -75,7 +75,11 @@ local function check()
       end
       paused = running
       set_autobuild(not running)
-      vim.notify(running and 'Maven build running: jdtls auto-build paused' or 'Maven build done: jdtls auto-build on again', vim.log.levels.DEBUG, { title = 'jdtls' })
+      vim.notify(
+        running and 'Maven build running: jdtls auto-build paused' or 'Maven build done: jdtls auto-build on again',
+        vim.log.levels.DEBUG,
+        { title = 'jdtls' }
+      )
     end)
   end)
 end

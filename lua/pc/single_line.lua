@@ -53,7 +53,16 @@ vim.on_key(function(key, typed)
   end
   local k = vim.fn.keytrans(typed ~= '' and typed or key)
   -- what plugins and the UI send without a key being typed: the selection stays
-  if k == '' or k:match '^<Cmd>' or k:match '^<Ignore>' or k:match '^<Plug>' or k:match '^<SNR>' or k:match 'Focus' or k:match 'Mouse' or k:match 'ScrollWheel' then
+  if
+    k == ''
+    or k:match '^<Cmd>'
+    or k:match '^<Ignore>'
+    or k:match '^<Plug>'
+    or k:match '^<SNR>'
+    or k:match 'Focus'
+    or k:match 'Mouse'
+    or k:match 'ScrollWheel'
+  then
     return
   end
   local buf = selected

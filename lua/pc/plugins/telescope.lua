@@ -56,24 +56,24 @@ return {
     -- Like IDEA popups: pressing the key that opened a picker again closes it
     -- (Alt+F2 projects, Alt+Shift+N files, Alt+E / Alt+Shift+E recent, Alt+F12 structure,
     -- Alt+2 / Shift+F11 bookmarks, Alt+Shift+A actions, Alt+Shift+V clipboard, F10 run
-    -- configurations; F50 / F60 / F23 are how some of them arrive inside tmux).
+    -- configurations).
     -- Alt+N stays special in Go to Class: it toggles non-project classes, as in IDEA.
     local close_with_opening_key = {}
-    for _, key in ipairs {
-      '<M-F2>',
-      '<F50>',
-      '<M-N>',
-      '<M-e>',
-      '<M-E>',
-      '<M-F12>',
-      '<F60>',
-      '<M-2>',
-      '<S-F11>',
-      '<F23>',
-      '<M-A>',
-      '<M-V>',
-      '<F10>',
-    } do
+    local keys = require 'pc.keys'
+    for _, key in
+      ipairs(keys.flat {
+        'M-F2',
+        '<M-N>',
+        '<M-e>',
+        '<M-E>',
+        'M-F12',
+        '<M-2>',
+        'S-F11',
+        '<M-A>',
+        '<M-V>',
+        '<F10>',
+      })
+    do
       close_with_opening_key[key] = 'close'
     end
     -- the terminal key closes the popup and opens the terminal, as in IDEA (it was left open
@@ -85,9 +85,9 @@ return {
         vim.api.nvim_feedkeys(vim.keycode '<M-t>', 'm', false)
       end)
     end
-    -- Switcher: Ctrl+Tab / Ctrl+Shift+Tab (F37 / F38) move through the list, F4 opens
-    close_with_opening_key['<F37>'] = 'move_selection_next'
-    close_with_opening_key['<F38>'] = 'move_selection_previous'
+    -- Switcher: Ctrl+Tab / Ctrl+Shift+Tab move through the list, F4 opens
+    close_with_opening_key[keys.CTRL_TAB] = 'move_selection_next'
+    close_with_opening_key[keys.CTRL_SHIFT_TAB] = 'move_selection_previous'
     close_with_opening_key['<F4>'] = 'select_default'
 
     -- an older checkout (0.1.x, e.g. a machine not synced to lazy-lock.json) breaks every preview

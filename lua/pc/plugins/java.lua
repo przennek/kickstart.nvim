@@ -68,7 +68,10 @@ local function own_workspace(root_dir)
     if claim(other) then
       if not vim.g.pc_jdtls_second then
         vim.g.pc_jdtls_second = true
-        vim.notify('Another Neovim runs the Java server of this project: this one has its own (the first time it imports the project again)', vim.log.levels.INFO)
+        vim.notify(
+          'Another Neovim runs the Java server of this project: this one has its own (the first time it imports the project again)',
+          vim.log.levels.INFO
+        )
       end
       return other
     end
@@ -79,8 +82,7 @@ end
 local function start_jdtls()
   local jdtls = require 'jdtls'
   local mason = vim.fn.stdpath 'data' .. '/mason'
-  local root_dir = vim.fs.root(0, { 'mvnw', 'gradlew', 'pom.xml', 'build.gradle', 'build.gradle.kts', 'settings.gradle', '.git' })
-    or vim.fn.getcwd()
+  local root_dir = vim.fs.root(0, { 'mvnw', 'gradlew', 'pom.xml', 'build.gradle', 'build.gradle.kts', 'settings.gradle', '.git' }) or vim.fn.getcwd()
   local workspace = own_workspace(root_dir)
 
   -- Debugger + test runner extensions
@@ -225,9 +227,9 @@ local function start_jdtls()
       map({ 'n', 'x' }, '<leader>ev', extract(jdtls.extract_variable), 'Extract variable')
       map({ 'n', 'x' }, '<leader>ec', extract(jdtls.extract_constant), 'Extract constant')
       map('x', '<leader>em', extract(jdtls.extract_method), 'Extract method')
-      -- Ctrl+Alt+M is Extract Method in your IDEA keymap too (Alacritty sends it as F43:
+      -- Ctrl+Alt+M is Extract Method in your IDEA keymap too (Alacritty sends it as another key:
       -- a terminal can't tell Ctrl+Alt+M from Alt+Enter)
-      map('x', '<F43>', extract(jdtls.extract_method), 'Extract method')
+      map('x', require('pc.keys').CTRL_ALT_M, extract(jdtls.extract_method), 'Extract method')
       map({ 'n', 'x' }, '<leader>ei', function()
         vim.lsp.buf.code_action { context = { only = { 'refactor.inline' }, diagnostics = {} } }
       end, 'Inline')

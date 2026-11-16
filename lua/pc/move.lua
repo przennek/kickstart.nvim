@@ -85,7 +85,11 @@ function M.java_move(source, dest)
   if not target then
     return false
   end
-  local resp = client:request_sync('java/move', { moveKind = 'moveResource', sourceUris = { uri }, params = vim.NIL, destination = target, updateReferences = true }, 15000)
+  local resp = client:request_sync(
+    'java/move',
+    { moveKind = 'moveResource', sourceUris = { uri }, params = vim.NIL, destination = target, updateReferences = true },
+    15000
+  )
   local result = resp and resp.result
   if not result or result.errorMessage or not result.edit then
     vim.notify('Move: ' .. (result and result.errorMessage or (resp and resp.err and resp.err.message) or 'jdtls did not answer'), vim.log.levels.WARN)

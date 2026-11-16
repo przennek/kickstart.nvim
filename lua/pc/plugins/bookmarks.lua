@@ -26,7 +26,7 @@ return {
   'tomasky/bookmarks.nvim',
   event = 'BufReadPost',
   dependencies = { 'nvim-telescope/telescope.nvim' },
-  keys = {
+  keys = require('pc.keys').lazy {
     { '<leader>pa', bm 'bookmark_toggle', desc = 'Bookmark: toggle' },
     { '<leader>pr', bm 'bookmark_toggle', desc = 'Bookmark: toggle' },
     { '<leader>pi', bookmark_with_description, desc = 'Bookmark: with description' },
@@ -56,17 +56,14 @@ return {
     },
     { '<leader>pc', bm 'bookmark_clean', desc = 'Bookmark: clear file' },
     { '<leader>sb', show_bookmarks, desc = 'Show Bookmarks' },
-    -- F11 / Ctrl+F11 / Shift+F11 (F35 / F23 inside tmux)
+    -- F11 / Ctrl+F11 / Shift+F11
     { '<F11>', bm 'bookmark_toggle', desc = 'Bookmark: toggle' },
     -- Ctrl+F11 toggles too, as in your keymap
-    { '<C-F11>', bm 'bookmark_toggle', desc = 'Bookmark: toggle' },
-    { '<F35>', bm 'bookmark_toggle', desc = 'Bookmark: toggle' },
-    { '<S-F11>', show_bookmarks, desc = 'Show Bookmarks' },
-    { '<F23>', show_bookmarks, desc = 'Show Bookmarks' },
+    { 'C-F11', bm 'bookmark_toggle', desc = 'Bookmark: toggle' },
+    { 'S-F11', show_bookmarks, desc = 'Show Bookmarks' },
     -- macOS keymap on Alt: Cmd+F11 = bookmark with description (also what Code Remark did),
-    -- Cmd+2 = Bookmarks tool window (F59 is Alt+F11 inside tmux)
-    { '<M-F11>', bookmark_with_description, desc = 'Bookmark: with description' },
-    { '<F59>', bookmark_with_description, desc = 'Bookmark: with description' },
+    -- Cmd+2 = Bookmarks tool window
+    { 'M-F11', bookmark_with_description, desc = 'Bookmark: with description' },
     { '<M-2>', show_bookmarks, desc = 'Show Bookmarks' },
   },
   config = function()

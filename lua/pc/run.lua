@@ -764,14 +764,11 @@ M.run_context = context(RUN)
 M.debug_context = context(DEBUG)
 
 local map = vim.keymap.set
--- Inside tmux Shift+F10 arrives as F22 and Ctrl+Shift+F10 as F46
+local keys = require 'pc.keys'
 map('n', '<F10>', M.pick, { desc = 'Run / Debug Configurations' })
-map('n', '<S-F10>', M.rerun, { desc = 'Rerun last configuration' })
-map('n', '<F22>', M.rerun, { desc = 'Rerun last configuration' })
-map('n', '<C-S-F10>', M.run_context, { desc = 'Run context configuration' })
-map('n', '<F46>', M.run_context, { desc = 'Run context configuration' })
-map('n', '<C-S-F9>', M.debug_context, { desc = 'Debug context configuration' })
-map('n', '<F45>', M.debug_context, { desc = 'Debug context configuration' })
+keys.map('n', 'S-F10', M.rerun, { desc = 'Rerun last configuration' })
+keys.map('n', 'C-S-F10', M.run_context, { desc = 'Run context configuration' })
+keys.map('n', 'C-S-F9', M.debug_context, { desc = 'Debug context configuration' })
 map('n', '<leader>xx', M.pick, { desc = 'Run / Debug Configurations' })
 map('n', '<leader>xR', M.rerun, { desc = 'Rerun last configuration' })
 

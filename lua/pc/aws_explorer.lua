@@ -67,7 +67,10 @@ function LOAD.prefix(node, done)
     end
     for _, o in ipairs(data.Contents or {}) do
       if o.Key ~= node.prefix then
-        table.insert(children, { kind = 'object', label = o.Key:sub(#node.prefix + 1), detail = human(o.Size or 0), bucket = node.bucket, key = o.Key, icon = '󰈔' })
+        table.insert(
+          children,
+          { kind = 'object', label = o.Key:sub(#node.prefix + 1), detail = human(o.Size or 0), bucket = node.bucket, key = o.Key, icon = '󰈔' }
+        )
       end
     end
     done(children)
@@ -256,29 +259,49 @@ function M.toggle()
   end
   map('<CR>', with_node(activate), 'Open')
   map('o', with_node(activate), 'Open')
-  map('f', with_node(function(node)
-    activate(node, true)
-  end), 'Tail logs with a filter')
-  map('R', with_node(function(node)
-    node.children, node.error, node.open = nil, nil, false
-    expand(node)
-  end), 'Reload')
-  map('y', with_node(function(node)
-    local text = node.key and ('s3://%s/%s'):format(node.bucket, node.key) or node.prefix and ('s3://%s/%s'):format(node.bucket, node.prefix) or node.group or (node.config and node.config.FunctionArn) or node.label
-    vim.fn.setreg('+', text)
-    vim.notify('Copied ' .. text)
-  end), 'Copy name')
-  map('d', with_node(function(node)
-    if node.kind ~= 'object' then
-      return
-    end
-    local target = vim.fn.getcwd() .. '/' .. vim.fs.basename(node.key)
-    vim.system({ 'aws', 's3', 'cp', ('s3://%s/%s'):format(node.bucket, node.key), target }, {}, function(r)
-      vim.schedule(function()
-        vim.notify(r.code == 0 and ('Downloaded ' .. target) or vim.trim(r.stderr or ''), r.code == 0 and vim.log.levels.INFO or vim.log.levels.ERROR)
+  map(
+    'f',
+    with_node(function(node)
+      activate(node, true)
+    end),
+    'Tail logs with a filter'
+  )
+  map(
+    'R',
+    with_node(function(node)
+      node.children, node.error, node.open = nil, nil, false
+      expand(node)
+    end),
+    'Reload'
+  )
+  map(
+    'y',
+    with_node(function(node)
+      local text = node.key and ('s3://%s/%s'):format(node.bucket, node.key)
+        or node.prefix and ('s3://%s/%s'):format(node.bucket, node.prefix)
+        or node.group
+        or (node.config and node.config.FunctionArn)
+        or node.label
+      vim.fn.setreg('+', text)
+      vim.notify('Copied ' .. text)
+    end),
+    'Copy name'
+  )
+  map(
+    'd',
+    with_node(function(node)
+      if node.kind ~= 'object' then
+        return
+      end
+      local target = vim.fn.getcwd() .. '/' .. vim.fs.basename(node.key)
+      vim.system({ 'aws', 's3', 'cp', ('s3://%s/%s'):format(node.bucket, node.key), target }, {}, function(r)
+        vim.schedule(function()
+          vim.notify(r.code == 0 and ('Downloaded ' .. target) or vim.trim(r.stderr or ''), r.code == 0 and vim.log.levels.INFO or vim.log.levels.ERROR)
+        end)
       end)
-    end)
-  end), 'Download')
+    end),
+    'Download'
+  )
   map('q', M.toggle, 'Close')
   render()
 end

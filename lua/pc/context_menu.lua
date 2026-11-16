@@ -109,9 +109,13 @@ local function tree_items()
       table.insert(items, item)
     end
   end
-  add { 'New…', function()
-    require('pc.new_element').menu(folder)
-  end, 'Alt+Insert' }
+  add {
+    'New…',
+    function()
+      require('pc.new_element').menu(folder)
+    end,
+    'Alt+Insert',
+  }
   add '-'
   add({ 'Copy…', in_editor(function()
     require('pc.copy_class').copy(path)
@@ -123,19 +127,26 @@ local function tree_items()
   add { 'Copy Absolute Path', copy(path) }
   add { 'Copy Path from Project Root', copy(vim.fn.fnamemodify(path, ':.')) }
   add { 'Copy File Name', copy(vim.fs.basename(path)) }
-  add({ 'Compare With…', function()
-    require('pc.compare_files').mark(path)
-  end, '=' }, not dir)
+  add({
+    'Compare With…',
+    function()
+      require('pc.compare_files').mark(path)
+    end,
+    '=',
+  }, not dir)
   add '-'
   add { dir and 'Run All Tests' or 'Run', keys '<C-S-F10>', 'Ctrl+Shift+F10' }
   add { dir and 'Debug All Tests' or 'Debug', keys '<C-S-F9>', 'Ctrl+Shift+F9' }
   add '-'
-  add({ 'Open in Terminal', function()
-    vim.cmd 'wincmd p'
-    -- focus goes to the terminal, like IDEA's Open In → Terminal
-    require('toggleterm').exec('cd ' .. vim.fn.shellescape(path), nil, nil, nil, nil, nil, false)
-    vim.cmd 'startinsert'
-  end }, dir)
+  add({
+    'Open in Terminal',
+    function()
+      vim.cmd 'wincmd p'
+      -- focus goes to the terminal, like IDEA's Open In → Terminal
+      require('toggleterm').exec('cd ' .. vim.fn.shellescape(path), nil, nil, nil, nil, nil, false)
+      vim.cmd 'startinsert'
+    end,
+  }, dir)
   add({ 'Local History', in_editor(function()
     vim.cmd.edit(vim.fn.fnameescape(path))
     require('pc.local_history').show()
@@ -231,17 +242,27 @@ local function on_popup()
     fill(editor_items(visual), visual)
   else
     -- tool windows, terminals, dialogs: just the clipboard
-    fill(visual and { { 'Copy', function()
-      vim.cmd 'normal! "+y'
-    end, 'Ctrl+C' } } or { { 'Paste', function()
-      if vim.bo.buftype == 'terminal' then
-        -- typed into the shell, and back to typing
-        vim.api.nvim_chan_send(vim.bo.channel, vim.fn.getreg '+')
-        vim.cmd 'startinsert'
-      elseif vim.bo.modifiable then
-        vim.cmd 'normal! "+gP'
-      end
-    end, 'Ctrl+V' } }, visual)
+    fill(visual and { {
+      'Copy',
+      function()
+        vim.cmd 'normal! "+y'
+      end,
+      'Ctrl+C',
+    } } or {
+      {
+        'Paste',
+        function()
+          if vim.bo.buftype == 'terminal' then
+            -- typed into the shell, and back to typing
+            vim.api.nvim_chan_send(vim.bo.channel, vim.fn.getreg '+')
+            vim.cmd 'startinsert'
+          elseif vim.bo.modifiable then
+            vim.cmd 'normal! "+gP'
+          end
+        end,
+        'Ctrl+V',
+      },
+    }, visual)
   end
 end
 

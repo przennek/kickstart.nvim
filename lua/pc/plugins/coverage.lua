@@ -8,10 +8,21 @@ return {
   -- the JaCoCo report is read with neotest's XML parser
   dependencies = { 'nvim-lua/plenary.nvim', { 'nvim-neotest/neotest', dependencies = { 'nvim-neotest/nvim-nio' } } },
   cmd = { 'Coverage', 'CoverageLoad', 'CoverageShow', 'CoverageHide', 'CoverageToggle', 'CoverageSummary', 'CoverageClear' },
-  keys = {
-    { '<C-F9>', function() require('pc.coverage').run() end, desc = 'Run with Coverage' },
-    { '<F33>', function() require('pc.coverage').run() end, desc = 'Run with Coverage' },
-    { '<leader>xk', function() require('pc.coverage').run() end, desc = 'Run with Coverage' },
+  keys = require('pc.keys').lazy {
+    {
+      'C-F9',
+      function()
+        require('pc.coverage').run()
+      end,
+      desc = 'Run with Coverage',
+    },
+    {
+      '<leader>xk',
+      function()
+        require('pc.coverage').run()
+      end,
+      desc = 'Run with Coverage',
+    },
     { '<leader>xK', '<cmd>CoverageToggle<CR>', desc = 'Toggle coverage marks' },
   },
   opts = {

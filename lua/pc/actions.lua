@@ -19,11 +19,17 @@ local function clean(desc)
   return (name:gsub('^%l', string.upper))
 end
 
+-- Plumbing, not something to look for: the mappings that pass a shortcut on from another mode
+local HIDDEN = { ['IDE shortcut with a selection'] = true, ['IDE shortcut while typing'] = true }
+
 local function record(modes, lhs, opts)
   if lhs:match 'Mouse' then
     return
   end
   local name = clean(opts.desc)
+  if HIDDEN[name] then
+    return
+  end
   local action = actions[name] or { name = name, keys = {} }
   actions[name] = action
   for _, mode in ipairs(type(modes) == 'table' and modes or { modes }) do
@@ -36,11 +42,14 @@ local function record(modes, lhs, opts)
   end
 end
 
+local keys = require 'pc.keys'
+
 local set = vim.keymap.set
 ---@diagnostic disable-next-line: duplicate-set-field
 vim.keymap.set = function(modes, lhs, rhs, opts)
   set(modes, lhs, rhs, opts)
   if opts and type(opts.desc) == 'string' then
+    -- the caller's file (through keys.map it is pc.keys, which is in this config too)
     local source = (debug.getinfo(2, 'S') or {}).source or ''
     if source:find(config_dir, 1, true) or source:find('lazy/core/handler/keys.lua', 1, true) then
       record(modes, lhs, opts)
@@ -52,16 +61,8 @@ end
 -- Shortcuts as you press them (tmux / Alacritty codes translated back)
 ---------------------------------------------------------------------------
 
+-- (tmux's numbering of modified F-keys, F13+, is translated by pc.keys)
 local SPECIAL = {
-  ['<F37>'] = 'Ctrl+Tab',
-  ['<F38>'] = 'Ctrl+Shift+Tab',
-  ['<F39>'] = 'Ctrl+Shift+F',
-  ['<F40>'] = 'Ctrl+Enter',
-  ['<F41>'] = 'Ctrl+Shift+R',
-  ['<F42>'] = 'Ctrl+Shift+B',
-  ['<F43>'] = 'Ctrl+Alt+M',
-  ['<F48>'] = 'Alt+Shift+F12',
-  ['<C-S-F12>'] = 'Alt+Shift+F12',
   ['<M-M>'] = 'Ctrl+Shift+M',
   ['<M-h>'] = 'Ctrl+Shift+P',
   ['<M-l>'] = 'Ctrl+Shift+N',
@@ -69,6 +70,14 @@ local SPECIAL = {
 }
 -- characters typed with Shift, shown as the key you press
 local SHIFTED = { _ = '-', ['+'] = '=', ['{'] = '[', ['}'] = ']', ['~'] = '`', ['|'] = '\\', [':'] = ';', ['?'] = '/' }
+-- Alacritty's F37…F43 win over tmux's numbering of the same F-keys
+for lhs, label in pairs(keys.alacritty_labels) do
+  SPECIAL[lhs] = label
+end
+-- Alt+Shift+F12 is sent as Ctrl+Shift+F12 (hide_windows.lua maps that)
+for _, lhs in ipairs(keys.f 'C-S-F12') do
+  SPECIAL[lhs] = 'Alt+Shift+F12'
+end
 local NAMES = {
   CR = 'Enter',
   BS = 'Backspace',
@@ -91,8 +100,7 @@ local function pretty(lhs)
   -- F13+ are modified F-keys as they arrive inside tmux
   local f = tonumber(lhs:match '^<F(%d+)>$')
   if f and f > 12 then
-    local mods = ({ 'Shift+', 'Ctrl+', 'Ctrl+Shift+', 'Alt+', 'Alt+Shift+' })[math.floor((f - 1) / 12)]
-    return mods and (mods .. 'F' .. ((f - 1) % 12 + 1)) or lhs
+    return keys.label(lhs) or lhs
   end
   local out = lhs:gsub('<leader>', '␣ '):gsub('<([^>]+)>', function(key)
     -- "C-S-F8" -> mods "C-S", key "F8"; "M--" -> mods "M", key "-"
@@ -155,7 +163,11 @@ local function available()
   local list = {}
   for _, action in pairs(actions) do
     local keys, seen, run = {}, {}, nil
-    for _, k in pairs(action.keys) do
+    -- in a fixed order: the same shortcuts in the same order (and the same one run) every session
+    local ids = vim.tbl_keys(action.keys)
+    table.sort(ids)
+    for _, id in ipairs(ids) do
+      local k = action.keys[id]
       local m = vim.fn.maparg(k.lhs, k.mode, false, true)
       if m and m.desc and clean(m.desc) == action.name then
         local p = pretty(k.lhs)
@@ -170,7 +182,10 @@ local function available()
     end
     if run then
       table.sort(keys, function(a, b)
-        return #a < #b
+        if #a ~= #b then
+          return #a < #b
+        end
+        return a < b
       end)
       table.insert(list, { name = action.name, keys = table.concat(keys, ', '), run = run })
     end

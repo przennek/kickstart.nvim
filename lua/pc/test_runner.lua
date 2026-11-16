@@ -129,7 +129,16 @@ local function render_details()
   local lines, hls = {}, {}
   if not n or n == 'root' then
     local c = counts()
-    table.insert(lines, ('%s  %d passed, %d failed%s%s'):format(run.title, c.passed, c.failed, c.ignored > 0 and (', ' .. c.ignored .. ' skipped') or '', run.runtime and ('  ·  ' .. run.runtime .. ' ms') or ''))
+    table.insert(
+      lines,
+      ('%s  %d passed, %d failed%s%s'):format(
+        run.title,
+        c.passed,
+        c.failed,
+        c.ignored > 0 and (', ' .. c.ignored .. ' skipped') or '',
+        run.runtime and ('  ·  ' .. run.runtime .. ' ms') or ''
+      )
+    )
     table.insert(hls, { 0, 'Title' })
     table.insert(lines, '')
     vim.list_extend(lines, #run.output > 0 and run.output or { '(no output)' })
@@ -175,7 +184,8 @@ local function render()
   local c = counts()
   local root_status = run.finished and (c.failed > 0 and 'failed' or 'passed') or 'running'
   local head = ('%s %s'):format(ICON[root_status], run.title)
-  local info = run.finished and ('%d/%d passed%s'):format(c.passed, c.total, run.runtime and ('  ' .. run.runtime .. ' ms') or '') or ('%d/%s'):format(c.passed + c.failed + c.ignored, run.total or '?')
+  local info = run.finished and ('%d/%d passed%s'):format(c.passed, c.total, run.runtime and ('  ' .. run.runtime .. ' ms') or '')
+    or ('%d/%s'):format(c.passed + c.failed + c.ignored, run.total or '?')
   table.insert(lines, head .. '  ' .. info)
   table.insert(hls, { 0, 0, #ICON[root_status] + 1, HL[root_status] })
   ui.rows[1] = 'root'
@@ -328,7 +338,16 @@ local function open_window()
   vim.api.nvim_win_set_buf(ui.details, ui.dbuf)
   vim.api.nvim_win_set_width(ui.tree, math.floor(vim.o.columns * 0.4))
   for _, win in ipairs { ui.tree, ui.details } do
-    for opt, value in pairs { number = false, relativenumber = false, signcolumn = 'no', foldcolumn = '0', list = false, winfixheight = true, wrap = false, cursorline = win == ui.tree } do
+    for opt, value in pairs {
+      number = false,
+      relativenumber = false,
+      signcolumn = 'no',
+      foldcolumn = '0',
+      list = false,
+      winfixheight = true,
+      wrap = false,
+      cursorline = win == ui.tree,
+    } do
       vim.wo[win][opt] = value
     end
   end
@@ -405,7 +424,10 @@ local function mark_source()
           for _, t in ipairs(r.node.trace) do
             local lnum = t:match('%(' .. vim.pesc(vim.fs.basename(file)) .. ':(%d+)%)')
             if lnum then
-              table.insert(diags, { lnum = tonumber(lnum) - 1, col = 0, severity = vim.diagnostic.severity.ERROR, source = 'tests', message = r.node.trace[1] or 'failed' })
+              table.insert(
+                diags,
+                { lnum = tonumber(lnum) - 1, col = 0, severity = vim.diagnostic.severity.ERROR, source = 'tests', message = r.node.trace[1] or 'failed' }
+              )
               break
             end
           end
@@ -629,7 +651,10 @@ local function mk_test_results(bufnr)
             for _, t in ipairs(n.trace) do
               lnum = lnum or t:match('%(' .. vim.pesc(vim.fs.basename(file)) .. ':(%d+)%)')
             end
-            table.insert(items, { filename = file, lnum = tonumber(lnum) or method and method_line(file, method) or 1, text = n.display .. ' ' .. (n.trace[1] or '') })
+            table.insert(
+              items,
+              { filename = file, lnum = tonumber(lnum) or method and method_line(file, method) or 1, text = n.display .. ' ' .. (n.trace[1] or '') }
+            )
           end
         end
       end
@@ -639,7 +664,11 @@ local function mk_test_results(bufnr)
       mark_source()
       render()
       local c = counts()
-      vim.notify(('%s: %d passed, %d failed'):format(run.title, c.passed, c.failed), c.failed > 0 and vim.log.levels.WARN or vim.log.levels.INFO, { title = 'Tests' })
+      vim.notify(
+        ('%s: %d passed, %d failed'):format(run.title, c.passed, c.failed),
+        c.failed > 0 and vim.log.levels.WARN or vim.log.levels.INFO,
+        { title = 'Tests' }
+      )
       -- the next class / package of a rerun of failed tests or of a scope
       if run.queue and #run.queue > 0 then
         local next_item = table.remove(run.queue, 1)
@@ -868,7 +897,12 @@ function M.run_group(classes, debug, queue)
         end
       end
       local jdtls_dap = require('jdtls.dap').experimental
-      local lens = { fullName = #classes == 1 and first.fullName or (first.projectName .. ' tests'), testKind = first.testKind, testLevel = 5, projectName = first.projectName }
+      local lens = {
+        fullName = #classes == 1 and first.fullName or (first.projectName .. ' tests'),
+        testKind = first.testKind,
+        testLevel = 5,
+        projectName = first.projectName,
+      }
       local config = jdtls_dap.make_config(lens, args, debug and {} or { noDebug = true })
       if queue then
         continuing = queue
@@ -906,14 +940,22 @@ vim.keymap.set('n', '<leader>xA', function()
 end, { desc = 'Run all tests of the project' })
 vim.api.nvim_create_user_command('RunTests', function(o)
   M.run_tests(o.args ~= '' and o.args or 'project')
-end, { nargs = '?', complete = function()
-  return { 'project', 'package' }
-end, desc = 'Run tests: project (default), package or a directory' })
+end, {
+  nargs = '?',
+  complete = function()
+    return { 'project', 'package' }
+  end,
+  desc = 'Run tests: project (default), package or a directory',
+})
 vim.api.nvim_create_user_command('DebugTests', function(o)
   M.run_tests(o.args ~= '' and o.args or 'project', true)
-end, { nargs = '?', complete = function()
-  return { 'project', 'package' }
-end, desc = 'Debug tests: project (default), package or a directory' })
+end, {
+  nargs = '?',
+  complete = function()
+    return { 'project', 'package' }
+  end,
+  desc = 'Debug tests: project (default), package or a directory',
+})
 
 --- Is this dap session a test run (the runner window replaces the console)?
 function M.is_test_session(session)

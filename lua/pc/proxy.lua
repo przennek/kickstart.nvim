@@ -128,7 +128,10 @@ function M.open()
           vim.system(cmd, { text = true }, function(r)
             vim.schedule(function()
               local ok = r.code == 0 and tonumber(r.stdout) and tonumber(r.stdout) < 500
-              form:say(ok and ('Connection successful (HTTP %s)'):format(r.stdout) or ('Connection failed: ' .. vim.trim(r.stderr ~= '' and r.stderr or r.stdout)), ok and vim.log.levels.INFO or vim.log.levels.ERROR)
+              form:say(
+                ok and ('Connection successful (HTTP %s)'):format(r.stdout) or ('Connection failed: ' .. vim.trim(r.stderr ~= '' and r.stderr or r.stdout)),
+                ok and vim.log.levels.INFO or vim.log.levels.ERROR
+              )
             end)
           end)
         end,

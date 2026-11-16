@@ -277,7 +277,19 @@ function M.open_list(s)
   end)
   vim.api.nvim_win_set_buf(s.listwin, buf)
   vim.api.nvim_win_set_width(s.listwin, math.min(40, math.max(24, math.floor(vim.o.columns / 6))))
-  for opt, value in pairs { number = false, relativenumber = false, signcolumn = 'no', foldcolumn = '0', winfixwidth = true, wrap = false, list = false, cursorline = true, diff = false, scrollbind = false, cursorbind = false } do
+  for opt, value in pairs {
+    number = false,
+    relativenumber = false,
+    signcolumn = 'no',
+    foldcolumn = '0',
+    winfixwidth = true,
+    wrap = false,
+    list = false,
+    cursorline = true,
+    diff = false,
+    scrollbind = false,
+    cursorbind = false,
+  } do
     vim.wo[s.listwin][opt] = value
   end
   vim.wo[s.listwin].winbar = ('%%#Title# %d files%%* vs %s'):format(#s.files, s.ref:gsub('%%', '%%%%'))

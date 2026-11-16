@@ -86,7 +86,7 @@ local function run_java(c, debug)
   local ok = pcall(require('jdtls.dap').fetch_main_configs, nil, function(configs)
     local base
     for _, cfg in ipairs(configs) do
-      if cfg.mainClass == c.target or cfg.mainClass:match('[^.]+$') == c.target then
+      if cfg.mainClass == c.target or cfg.mainClass:match '[^.]+$' == c.target then
         base = cfg
       end
     end
@@ -196,7 +196,10 @@ function M.open(config, kind)
         key = '<C-s>',
         run = function(values, form)
           if (values.name or '') == '' or (values.target or '') == '' then
-            return form:say('Name and ' .. (values.type == 'Shell command' and 'command' or values.type == 'Python script' and 'script' or 'main class') .. ' are required', vim.log.levels.ERROR)
+            return form:say(
+              'Name and ' .. (values.type == 'Shell command' and 'command' or values.type == 'Python script' and 'script' or 'main class') .. ' are required',
+              vim.log.levels.ERROR
+            )
           end
           local list = M.list()
           for i = #list, 1, -1 do

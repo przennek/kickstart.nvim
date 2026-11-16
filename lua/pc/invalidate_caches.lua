@@ -57,9 +57,14 @@ function M.open()
       { key = 'local_history', label = 'Local History', check = true, default = false },
       { key = 'lua', label = 'Lua module cache', check = true, default = true },
       { key = 'restart', label = 'Restart language servers', check = true, default = true },
-      { key = 'where', label = 'Project', readonly = true, value = function()
-        return vim.fn.fnamemodify(root, ':~')
-      end },
+      {
+        key = 'where',
+        label = 'Project',
+        readonly = true,
+        value = function()
+          return vim.fn.fnamemodify(root, ':~')
+        end,
+      },
     },
     buttons = {
       {

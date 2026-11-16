@@ -87,6 +87,8 @@ regression() {
   echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   out=$(headless "$WORK" "" ux_typos.lua)
   echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
+  out=$(headless "$WORK" "" keys.lua)
+  echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   out=$(headless "$WORK/java" "" search.lua)
   echo "$out"; [[ $out == OK* ]] || FAILS=$((FAILS + 1))
   # on a copy: it renames and moves files of the repository

@@ -81,7 +81,7 @@ return {
     'stevearc/aerial.nvim',
     dependencies = { 'nvim-treesitter/nvim-treesitter', 'nvim-tree/nvim-web-devicons' },
     cmd = { 'AerialToggle', 'AerialNavToggle' },
-    keys = {
+    keys = require('pc.keys').lazy {
       {
         '<M-7>',
         function()
@@ -93,9 +93,8 @@ return {
         desc = 'Structure',
       },
       { '<leader>k', file_structure, desc = 'File structure' },
-      -- File Structure popup is Cmd+F12 in the macOS keymap (F60 inside tmux)
-      { '<M-F12>', file_structure, desc = 'File structure' },
-      { '<F60>', file_structure, desc = 'File structure' },
+      -- File Structure popup is Cmd+F12 in the macOS keymap
+      { 'M-F12', file_structure, desc = 'File structure' },
     },
     opts = {
       backends = { 'lsp', 'treesitter', 'markdown', 'man' },

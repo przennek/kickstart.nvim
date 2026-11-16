@@ -16,6 +16,7 @@ vim.keymap.set('t', '<Esc><Esc>', '<C-\\><C-n>', { desc = 'Exit terminal mode' }
 
 -- [[ Ported from .ideavimrc ]]
 local map = vim.keymap.set
+local keys = require 'pc.keys'
 
 -- Escape
 map('i', 'jk', '<Esc>`^', { desc = 'Escape' })
@@ -116,17 +117,15 @@ end, { expr = true, desc = 'Back' })
 map('n', '<M-l>', '<C-i>', { desc = 'Forward' })
 
 -- Problems: F2 / Shift+F2 = next / previous, Alt+F1 = error description
--- (F14 / F49 are what Shift+F2 / Alt+F1 arrive as inside tmux); Alt+6 window is in ide-ui.lua
+-- Alt+6 window is in ide-ui.lua
 local function jump_diag(count)
   return function()
     vim.diagnostic.jump { count = count, float = true }
   end
 end
 map('n', '<F2>', jump_diag(1), { desc = 'Next problem' })
-map('n', '<S-F2>', jump_diag(-1), { desc = 'Previous problem' })
-map('n', '<F14>', jump_diag(-1), { desc = 'Previous problem' })
-map('n', '<M-F1>', vim.diagnostic.open_float, { desc = 'Show error description' })
-map('n', '<F49>', vim.diagnostic.open_float, { desc = 'Show error description' })
+keys.map('n', 'S-F2', jump_diag(-1), { desc = 'Previous problem' })
+keys.map('n', 'M-F1', vim.diagnostic.open_float, { desc = 'Show error description' })
 
 -- Ctrl+T (back from a tag) says nothing when there's nowhere to go back to, instead of E73
 -- (a Ctrl+T meant for the agent terminal that lands in the editor)

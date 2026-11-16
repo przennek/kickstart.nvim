@@ -273,7 +273,7 @@ function M.open()
           end
           map('n', 'dd', delete)
           map('n', 'x', delete)
-          for _, key in ipairs { '<F2>', '<C-e>', '<M-F11>', '<F59>' } do
+          for _, key in ipairs(require('pc.keys').flat { '<F2>', '<C-e>', 'M-F11' }) do
             map({ 'i', 'n' }, key, edit)
           end
           map({ 'i', 'n' }, '<RightMouse>', menu)

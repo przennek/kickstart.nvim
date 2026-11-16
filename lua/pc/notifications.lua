@@ -190,7 +190,16 @@ function M.toggle()
   vim.cmd('botright vertical sbuffer ' .. buf)
   win = vim.api.nvim_get_current_win()
   vim.api.nvim_win_set_width(win, 60)
-  for opt, value in pairs { number = false, relativenumber = false, signcolumn = 'no', winfixwidth = true, wrap = true, linebreak = true, list = false, cursorline = true } do
+  for opt, value in pairs {
+    number = false,
+    relativenumber = false,
+    signcolumn = 'no',
+    winfixwidth = true,
+    wrap = true,
+    linebreak = true,
+    list = false,
+    cursorline = true,
+  } do
     vim.wo[win][opt] = value
   end
   vim.wo[win].winbar = '%#Title# Notifications %*%#Comment#  y copy · C clear · q close'
@@ -219,10 +228,14 @@ vim.api.nvim_create_autocmd('LspProgress', {
     end
     if next(tasks) and not spin_timer then
       spin_timer = vim.uv.new_timer()
-      spin_timer:start(0, 120, vim.schedule_wrap(function()
-        spin = spin % #SPINNER + 1
-        redrawstatus()
-      end))
+      spin_timer:start(
+        0,
+        120,
+        vim.schedule_wrap(function()
+          spin = spin % #SPINNER + 1
+          redrawstatus()
+        end)
+      )
     elseif not next(tasks) and spin_timer then
       spin_timer:stop()
       spin_timer:close()

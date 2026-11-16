@@ -53,16 +53,21 @@ function M.java_class(dir, on_done)
       { key = 'name', label = 'Name', default = '' },
       { key = 'kind', label = 'Kind', choices = { 'Class', 'Interface', 'Enum', 'Record', 'Annotation', 'Exception' }, default = 'Class' },
       { key = 'package', label = 'Package', default = '' },
-      { key = 'file', label = 'File', readonly = true, value = function(v)
-        local name = v.name or ''
-        local pkg = v.package or ''
-        local sub, simple = name:match '^(.*)%.([^.]+)$'
-        if sub then
-          pkg = pkg ~= '' and (pkg .. '.' .. sub) or sub
-          name = simple
-        end
-        return vim.fn.fnamemodify(root, ':~:.') .. '/' .. (pkg ~= '' and pkg:gsub('%.', '/') .. '/' or '') .. name .. '.java'
-      end },
+      {
+        key = 'file',
+        label = 'File',
+        readonly = true,
+        value = function(v)
+          local name = v.name or ''
+          local pkg = v.package or ''
+          local sub, simple = name:match '^(.*)%.([^.]+)$'
+          if sub then
+            pkg = pkg ~= '' and (pkg .. '.' .. sub) or sub
+            name = simple
+          end
+          return vim.fn.fnamemodify(root, ':~:.') .. '/' .. (pkg ~= '' and pkg:gsub('%.', '/') .. '/' or '') .. name .. '.java'
+        end,
+      },
     },
     buttons = {
       {
@@ -111,46 +116,61 @@ end
 function M.menu(dir, on_done)
   dir = dir or vim.fn.expand '%:p:h'
   local items = {
-    { label = 'Java Class', run = function()
-      M.java_class(dir, on_done)
-    end },
-    { label = 'Python File', run = function()
-      ask('New Python file: ', function(name)
-        local path = dir .. '/' .. name:gsub('%.py$', '') .. '.py'
-        vim.fn.mkdir(vim.fs.dirname(path), 'p')
-        if not vim.uv.fs_stat(path) then
-          vim.fn.writefile({}, path)
-          require('pc.git_track').add(path)
-        end
-        open_at(path)
-        after_create(on_done)
-      end)
-    end },
-    { label = 'Python Package', run = function()
-      ask('New Python package: ', function(name)
-        local pkg_dir = dir .. '/' .. name:gsub('%.', '/')
-        vim.fn.mkdir(pkg_dir, 'p')
-        if not vim.uv.fs_stat(pkg_dir .. '/__init__.py') then
-          vim.fn.writefile({}, pkg_dir .. '/__init__.py')
-          require('pc.git_track').add(pkg_dir .. '/__init__.py')
-        end
-        after_create(on_done)
-      end)
-    end },
-    { label = 'File', run = function()
-      ask('New file: ', function(name)
-        local path = dir .. '/' .. name
-        vim.fn.mkdir(vim.fs.dirname(path), 'p')
-        open_at(path)
-        after_create(on_done)
-      end)
-    end },
-    { label = 'Directory', run = function()
-      ask('New directory: ', function(name)
-        vim.fn.mkdir(dir .. '/' .. name, 'p')
-        after_create(on_done)
-      end)
-    end },
+    {
+      label = 'Java Class',
+      run = function()
+        M.java_class(dir, on_done)
+      end,
+    },
+    {
+      label = 'Python File',
+      run = function()
+        ask('New Python file: ', function(name)
+          local path = dir .. '/' .. name:gsub('%.py$', '') .. '.py'
+          vim.fn.mkdir(vim.fs.dirname(path), 'p')
+          if not vim.uv.fs_stat(path) then
+            vim.fn.writefile({}, path)
+            require('pc.git_track').add(path)
+          end
+          open_at(path)
+          after_create(on_done)
+        end)
+      end,
+    },
+    {
+      label = 'Python Package',
+      run = function()
+        ask('New Python package: ', function(name)
+          local pkg_dir = dir .. '/' .. name:gsub('%.', '/')
+          vim.fn.mkdir(pkg_dir, 'p')
+          if not vim.uv.fs_stat(pkg_dir .. '/__init__.py') then
+            vim.fn.writefile({}, pkg_dir .. '/__init__.py')
+            require('pc.git_track').add(pkg_dir .. '/__init__.py')
+          end
+          after_create(on_done)
+        end)
+      end,
+    },
+    {
+      label = 'File',
+      run = function()
+        ask('New file: ', function(name)
+          local path = dir .. '/' .. name
+          vim.fn.mkdir(vim.fs.dirname(path), 'p')
+          open_at(path)
+          after_create(on_done)
+        end)
+      end,
+    },
+    {
+      label = 'Directory',
+      run = function()
+        ask('New directory: ', function(name)
+          vim.fn.mkdir(dir .. '/' .. name, 'p')
+          after_create(on_done)
+        end)
+      end,
+    },
   }
   vim.ui.select(items, {
     prompt = 'New in ' .. vim.fn.fnamemodify(dir, ':~:.'),

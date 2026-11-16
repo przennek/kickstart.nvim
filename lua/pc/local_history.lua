@@ -259,7 +259,12 @@ function M.recent()
           for _, h in ipairs(diff_of(c, { result_type = 'indices' })) do
             removed, added = removed + h[2], added + h[4]
           end
-          local display = ('%s  %-12s %-8s %s'):format(os.date('%m-%d %H:%M:%S', c.version.time), ago(c.version.time), ('+%d -%d'):format(added, removed), c.path:sub(#cwd + 1))
+          local display = ('%s  %-12s %-8s %s'):format(
+            os.date('%m-%d %H:%M:%S', c.version.time),
+            ago(c.version.time),
+            ('+%d -%d'):format(added, removed),
+            c.path:sub(#cwd + 1)
+          )
           return { value = c, display = display, ordinal = display }
         end,
       },

@@ -1,9 +1,10 @@
 -- The rest of your IntelliJ keymap (macOS keymap, Cmd -> Alt) that isn't part of a feature
 -- module. Keys a terminal can't send (Ctrl+Tab, Ctrl+Shift+<letter>, Ctrl+Enter) are
--- translated by Alacritty into Ctrl+Shift+F1…F7, which arrive here as F37…F43.
+-- translated by Alacritty into Ctrl+Shift+F1…F7, which arrive here as F37…F43 (named in pc.keys).
 -- The full IDEA ↔ Neovim comparison is in ~/Projects/test/KEYMAP.md.
 
 local map = vim.keymap.set
+local keys = require 'pc.keys'
 local function tb(picker, opts)
   return function()
     require('telescope.builtin')[picker](opts)
@@ -12,26 +13,24 @@ end
 
 -- Switcher (Ctrl+Tab / Ctrl+Shift+Tab): recent files and tool windows (pc.switcher); keep pressing
 -- Ctrl+Tab to move down
-map('n', '<F37>', function()
+map('n', keys.CTRL_TAB, function()
   require('pc.switcher').open()
 end, { desc = 'Switcher' })
-map('n', '<F38>', function()
+map('n', keys.CTRL_SHIFT_TAB, function()
   require('pc.switcher').open()
 end, { desc = 'Switcher' })
 
 -- Find (Cmd+F), Find Next / Previous (F3 / Shift+F3), Find Word at Caret (Cmd+F3)
 map('n', '<M-f>', '/', { desc = 'Find' })
 map('n', '<F3>', 'n', { desc = 'Find Next' })
-map('n', '<S-F3>', 'N', { desc = 'Find Previous' })
-map('n', '<F15>', 'N', { desc = 'Find Previous' })
-map('n', '<M-F3>', '*', { desc = 'Find word at caret' })
-map('n', '<F51>', '*', { desc = 'Find word at caret' })
+keys.map('n', 'S-F3', 'N', { desc = 'Find Previous' })
+keys.map('n', 'M-F3', '*', { desc = 'Find word at caret' })
 
 -- Select All (Cmd+A); in one-line inputs (pickers, dialog fields) see lua/pc/single_line.lua
 map('n', '<M-a>', 'ggVG', { desc = 'Select All' })
 
 -- Find in Path (Ctrl+Shift+F)
-map('n', '<F39>', function()
+map('n', keys.CTRL_SHIFT_F, function()
   require('pc.find_in_path').open()
 end, { desc = 'Find in Path' })
 
@@ -75,14 +74,14 @@ local function replace_in_path()
     end)
   end)
 end
-map('n', '<F41>', replace_in_path, { desc = 'Replace in Path' })
+map('n', keys.CTRL_SHIFT_R, replace_in_path, { desc = 'Replace in Path' })
 map('n', '<leader>sR', replace_in_path, { desc = 'Replace in Path' })
 
 -- Go to Type Declaration (Ctrl+Shift+B)
-map('n', '<F42>', tb 'lsp_type_definitions', { desc = 'Go to Type Declaration' })
+map('n', keys.CTRL_SHIFT_B, tb 'lsp_type_definitions', { desc = 'Go to Type Declaration' })
 
 -- Generate (Ctrl+Enter); in the project tree it is New… (see neo-tree.lua)
-map({ 'n', 'x' }, '<F40>', function()
+map({ 'n', 'x' }, keys.CTRL_ENTER, function()
   require('pc.code_actions').show()
 end, { desc = 'Generate' })
 
@@ -100,8 +99,7 @@ local function restore_layout()
   require('pc.hide_windows').reset()
   vim.cmd 'wincmd ='
 end
-map('n', '<S-F12>', restore_layout, { desc = 'Restore default layout' })
-map('n', '<F24>', restore_layout, { desc = 'Restore default layout' })
+keys.map('n', 'S-F12', restore_layout, { desc = 'Restore default layout' })
 
 -- Next project window (Cmd+`), Git Branches (Cmd+Shift+`)
 map('n', '<M-`>', function()
@@ -126,7 +124,7 @@ map('x', '<M-.>', 'zf', { desc = 'Collapse selection' })
 -- the terminal for the last editor window and runs there (a picked file opens in the editor,
 -- not over the terminal). Shell word keys (Alt+B/F/D/.) stay with the shell.
 local last_editor_window = require('pc.wins').last_editor
-local IDE_KEYS = {
+local IDE_KEYS = keys.flat {
   '<A-1>',
   '<M-2>',
   '<M-3>',
@@ -141,13 +139,11 @@ local IDE_KEYS = {
   '<M-N>',
   '<M-e>',
   '<M-E>',
-  '<M-F12>',
-  '<F60>',
-  '<M-F2>',
-  '<F50>',
-  '<F37>',
-  '<F39>',
-  '<F41>',
+  'M-F12',
+  'M-F2',
+  keys.CTRL_TAB,
+  keys.CTRL_SHIFT_F,
+  keys.CTRL_SHIFT_R,
 }
 for _, lhs in ipairs(IDE_KEYS) do
   map('t', lhs, function()
@@ -194,7 +190,8 @@ end
 -- Insert mode typed "<F23>" into the code (the log: clicked from in.txt into a file, still typing,
 -- Shift+F11, then u to remove it). Looked up when pressed, so the F-keys a language server adds to
 -- its buffers (Shift+F6 Rename, Alt+F7 Find Usages) count; one without a meaning types nothing.
--- F13…F63 are the modified F-keys as tmux delivers them. Insert mode's own F-keys stay.
+-- F13…F63 are the modified F-keys as tmux delivers them (see pc.keys); this loop is
+-- deliberately numeric, it covers every F-key. Insert mode's own F-keys stay.
 local function f_key_while_typing(lhs)
   if vim.fn.maparg(lhs, 'i') ~= '' then
     return

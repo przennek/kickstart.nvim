@@ -115,14 +115,24 @@ function M.copy(path)
     values = values,
     focus = 'name',
     fields = {
-      { key = 'from', label = 'Copy', readonly = true, value = function()
-        return relative(path)
-      end },
+      {
+        key = 'from',
+        label = 'Copy',
+        readonly = true,
+        value = function()
+          return relative(path)
+        end,
+      },
       { key = 'name', label = java and 'New name' or 'New name (no extension)' },
       java and { key = 'package', label = 'To package' } or { key = 'directory', label = 'To directory' },
-      { key = 'to', label = 'Creates', readonly = true, value = function(v)
-        return relative(target(v))
-      end },
+      {
+        key = 'to',
+        label = 'Creates',
+        readonly = true,
+        value = function(v)
+          return relative(target(v))
+        end,
+      },
     },
     buttons = {
       {

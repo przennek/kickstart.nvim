@@ -30,8 +30,7 @@ return {
           table.insert(linters, 'checkstyle')
         end
         if vim.fn.executable 'pmd' == 1 then
-          require('lint.linters.pmd').rulesets = project_file { 'pmd.xml', 'pmd-ruleset.xml', 'config/pmd/ruleset.xml' }
-            or 'rulesets/java/quickstart.xml'
+          require('lint.linters.pmd').rulesets = project_file { 'pmd.xml', 'pmd-ruleset.xml', 'config/pmd/ruleset.xml' } or 'rulesets/java/quickstart.xml'
           table.insert(linters, 'pmd')
         end
         return linters

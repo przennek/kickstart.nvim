@@ -29,10 +29,10 @@ fm.set ''
 -- Go to File's command lists .gitignore and nothing from .git
 local cmd = require('telescope.config').pickers.find_files.find_command
 local files = vim.system(cmd, { text = true }):wait().stdout
-if not files:find('\n%.gitignore\n') and not files:find('^%.gitignore\n') then
+if not files:find '\n%.gitignore\n' and not files:find '^%.gitignore\n' then
   table.insert(bad, 'Go to File: no .gitignore')
 end
-if files:find('%.git/') then
+if files:find '%.git/' then
   table.insert(bad, 'Go to File: lists .git/')
 end
 io.stdout:write((#bad == 0 and 'OK search' or ('FAIL search: ' .. table.concat(bad, '; '))) .. '\n')

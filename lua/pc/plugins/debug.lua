@@ -124,9 +124,8 @@ return {
       end
     end
 
-    -- IntelliJ IDEA (Default for XWin) debugger keys. Inside tmux modified F-keys arrive
-    -- as F13+ (Shift +12, Ctrl +24, Ctrl+Shift +36, Alt +48), so both forms are mapped.
-    return {
+    -- IntelliJ IDEA (Default for XWin) debugger keys; 'S-F9' stands for both spellings (pc.keys)
+    return require('pc.keys').lazy {
       -- F5 is Copy in IDEA (lua/pc/copy_class.lua); while debugging it still continues
       {
         '<F5>',
@@ -139,29 +138,20 @@ return {
         end,
         desc = 'Copy Class / Debug: Continue',
       },
-      { '<S-F9>', dap 'continue', desc = 'Debug: Start/Continue' },
-      { '<F21>', dap 'continue', desc = 'Debug: Start/Continue' },
+      { 'S-F9', dap 'continue', desc = 'Debug: Start/Continue' },
       { '<F9>', dap 'continue', desc = 'Debug: Resume' },
       { '<F8>', dap 'step_over', desc = 'Debug: Step Over' },
       { '<F7>', diff_change('next', dap 'step_into'), desc = 'Next change (diff) / Step Into' },
-      { '<S-F7>', diff_change 'prev', desc = 'Previous change (diff)' },
-      { '<F19>', diff_change 'prev', desc = 'Previous change (diff)' },
-      { '<S-F8>', dap 'step_out', desc = 'Debug: Step Out' },
-      { '<F20>', dap 'step_out', desc = 'Debug: Step Out' },
-      { '<M-F9>', dap 'run_to_cursor', desc = 'Debug: Run to Cursor' },
-      { '<F57>', dap 'run_to_cursor', desc = 'Debug: Run to Cursor' },
-      { '<C-F8>', dap 'toggle_breakpoint', desc = 'Debug: Toggle Breakpoint' },
-      { '<F32>', dap 'toggle_breakpoint', desc = 'Debug: Toggle Breakpoint' },
-      { '<C-S-F8>', conditional_breakpoint, desc = 'Debug: Conditional Breakpoint' },
-      { '<F44>', conditional_breakpoint, desc = 'Debug: Conditional Breakpoint' },
-      -- Toggle Line Breakpoint is Cmd+F8 in the macOS keymap -> Alt+F8 (F56 inside tmux).
+      { 'S-F7', diff_change 'prev', desc = 'Previous change (diff)' },
+      { 'S-F8', dap 'step_out', desc = 'Debug: Step Out' },
+      { 'M-F9', dap 'run_to_cursor', desc = 'Debug: Run to Cursor' },
+      { 'C-F8', dap 'toggle_breakpoint', desc = 'Debug: Toggle Breakpoint' },
+      { 'C-S-F8', conditional_breakpoint, desc = 'Debug: Conditional Breakpoint' },
+      -- Toggle Line Breakpoint is Cmd+F8 in the macOS keymap -> Alt+F8.
       -- Evaluate Expression (Option+F8 there) is <leader>xe.
-      { '<M-F8>', dap 'toggle_breakpoint', desc = 'Debug: Toggle Breakpoint' },
-      { '<F56>', dap 'toggle_breakpoint', desc = 'Debug: Toggle Breakpoint' },
-      { '<C-F2>', dap 'terminate', desc = 'Debug: Stop' },
-      { '<F26>', dap 'terminate', desc = 'Debug: Stop' },
-      { '<C-F5>', dap 'restart', desc = 'Debug: Rerun' },
-      { '<F29>', dap 'restart', desc = 'Debug: Rerun' },
+      { 'M-F8', dap 'toggle_breakpoint', desc = 'Debug: Toggle Breakpoint' },
+      { 'C-F2', dap 'terminate', desc = 'Debug: Stop' },
+      { 'C-F5', dap 'restart', desc = 'Debug: Rerun' },
       -- Debug tool window (Alt+5)
       {
         '<M-5>',

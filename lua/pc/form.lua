@@ -108,7 +108,12 @@ end
 
 --- A message line under the buttons (Test Connection result, validation errors)
 function Form:say(text, level)
-  self.message = text and { text = text:gsub('\n', ' '), hl = level == vim.log.levels.ERROR and 'DiagnosticError' or level == vim.log.levels.WARN and 'DiagnosticWarn' or 'DiagnosticOk' } or nil
+  self.message = text
+      and {
+        text = text:gsub('\n', ' '),
+        hl = level == vim.log.levels.ERROR and 'DiagnosticError' or level == vim.log.levels.WARN and 'DiagnosticWarn' or 'DiagnosticOk',
+      }
+    or nil
   self:render()
 end
 

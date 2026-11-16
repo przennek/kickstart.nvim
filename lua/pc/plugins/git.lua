@@ -152,7 +152,10 @@ local function revert_commit()
   if r.code == 0 then
     vim.notify(('Reverted %s: %s'):format(hash:sub(1, 10), subject))
   else
-    vim.notify('Revert stopped:\n' .. vim.trim(r.stderr ~= '' and r.stderr or r.stdout) .. '\n(conflicts: <leader>vm, then <leader>vx / <leader>vX)', vim.log.levels.WARN)
+    vim.notify(
+      'Revert stopped:\n' .. vim.trim(r.stderr ~= '' and r.stderr or r.stdout) .. '\n(conflicts: <leader>vm, then <leader>vx / <leader>vX)',
+      vim.log.levels.WARN
+    )
   end
   vim.cmd 'silent! checktime'
 end
@@ -264,9 +267,21 @@ return {
       { '<leader>vv', '<cmd>Neogit<CR>', desc = 'VCS: Status / commit window' },
       { '<leader>vc', '<cmd>Neogit commit<CR>', desc = 'VCS: [C]ommit' },
       { '<leader>vC', commit_and_push, desc = 'VCS: [C]ommit and Push' },
-      { '<leader>vA', function() commit_action 'amend' end, desc = 'VCS: [A]mend last commit' },
+      {
+        '<leader>vA',
+        function()
+          commit_action 'amend'
+        end,
+        desc = 'VCS: [A]mend last commit',
+      },
       -- Update Project: merge pull with autostash (Neogit's pull popup: p in the Alt+0 window)
-      { '<leader>vp', function() require('pc.vcs_operations').update_project() end, desc = 'VCS: Update Project (pull)' },
+      {
+        '<leader>vp',
+        function()
+          require('pc.vcs_operations').update_project()
+        end,
+        desc = 'VCS: Update Project (pull)',
+      },
       { '<leader>vP', '<cmd>Neogit push<CR>', desc = 'VCS: [P]ush' },
       { '<leader>vB', '<cmd>Telescope git_branches<CR>', desc = 'VCS: [B]ranches' },
       { '<leader>vf', '<cmd>Telescope git_status<CR>', desc = 'VCS: Changed [f]iles' },
@@ -329,15 +344,39 @@ return {
         end,
         desc = 'VCS: [D]iff working tree',
       },
-      { '<leader>vm', function() require('pc.merge').open() end, desc = 'VCS: Resolve conflicts ([m]erge tool)' },
-      { '<leader>vx', function() require('pc.merge').continue() end, desc = 'VCS: Continue merge / rebase' },
-      { '<leader>vX', function() require('pc.merge').abort() end, desc = 'VCS: Abort merge / rebase' },
+      {
+        '<leader>vm',
+        function()
+          require('pc.merge').open()
+        end,
+        desc = 'VCS: Resolve conflicts ([m]erge tool)',
+      },
+      {
+        '<leader>vx',
+        function()
+          require('pc.merge').continue()
+        end,
+        desc = 'VCS: Continue merge / rebase',
+      },
+      {
+        '<leader>vX',
+        function()
+          require('pc.merge').abort()
+        end,
+        desc = 'VCS: Abort merge / rebase',
+      },
       { '<leader>vw', compare_with_branch(true), desc = 'VCS: Compare file [w]ith branch' },
       { '<leader>vW', compare_with_branch(false), desc = 'VCS: Compare project [W]ith branch' },
       { '<leader>vo', compare_with_revision, desc = 'VCS: Compare file with revision ([o]lder version)' },
       { '<leader>d', branches_popup, desc = 'Git Branches' },
       -- Show Diff (Cmd+D): the current file against HEAD
-      { '<M-d>', function() require('pc.split_diff').toggle_file_diff() end, desc = 'VCS: Show diff of this file (toggle)' },
+      {
+        '<M-d>',
+        function()
+          require('pc.split_diff').toggle_file_diff()
+        end,
+        desc = 'VCS: Show diff of this file (toggle)',
+      },
     },
     opts = function()
       -- q closes a diff / history tab, like Esc on an IDEA dialog
