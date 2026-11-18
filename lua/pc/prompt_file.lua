@@ -272,7 +272,10 @@ vim.keymap.set('t', '<M-I>', function()
     if vim.bo.buftype == 'terminal' then
       vim.cmd 'wincmd p'
     end
-    if vim.bo.buftype == '' then
+    -- from the terminal it always means in.txt: when the editor under it already shows in.txt
+    -- (in.txt, Alt+I, Alt+Shift+I) it stays there; toggling sent you back to the file and the
+    -- next Alt+Shift+I opened in.txt again, one step behind from then on
+    if vim.bo.buftype == '' and not is_prompt(0) then
       M.key()
     end
   end)
