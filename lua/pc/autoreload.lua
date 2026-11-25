@@ -6,6 +6,9 @@
 -- Directories of open files are watched (editors and agents often save through a new file and
 -- a rename, which a watcher on the file itself would miss); returning from the terminal,
 -- entering a window and focus coming back check as well.
+-- A file deleted on disk (an agent, git, a script) is closed like IDEA closes its tab, the
+-- windows stay; with your unsaved edits it stays open with a warning (:w writes it back).
+-- Neovim's own "E211: File … no longer available" no longer shows.
 
 local M = {}
 
@@ -30,7 +33,7 @@ local function check(buf)
   local name = vim.api.nvim_buf_get_name(buf)
   local stat = vim.uv.fs_stat(name)
   if not stat then
-    return
+    return M.gone(buf)
   end
   local changed = mtime(name) ~= vim.b[buf].pc_mtime
   if vim.bo[buf].modified then
@@ -50,6 +53,44 @@ local function check(buf)
   vim.api.nvim_buf_call(buf, function()
     vim.cmd 'silent! checktime'
   end)
+end
+
+local gone_pending = {} -- buf -> true while a deleted file is being looked at again
+
+--- The file of `buf` is gone from disk: looked at again a moment later (a tool saving through
+--- delete + write), then the buffer is closed in place, or kept with a warning when modified
+function M.gone(buf)
+  if gone_pending[buf] or not vim.b[buf].pc_mtime or vim.b[buf].pc_new_file then
+    return
+  end
+  gone_pending[buf] = true
+  vim.defer_fn(function()
+    gone_pending[buf] = nil
+    if not file_buf(buf) or not vim.api.nvim_buf_is_loaded(buf) then
+      return
+    end
+    local name = vim.api.nvim_buf_get_name(buf)
+    if vim.uv.fs_stat(name) then
+      return check(buf)
+    end
+    local short = vim.fn.fnamemodify(name, ':t')
+    if vim.bo[buf].modified then
+      if not warned[buf] then
+        warned[buf] = true
+        vim.notify(short .. ' was deleted on disk: your text is still here, :w writes it back', vim.log.levels.WARN)
+      end
+      return
+    end
+    local ok = pcall(function()
+      require('mini.bufremove').delete(buf, true)
+    end)
+    if not ok and vim.fn.bufwinid(buf) == -1 then
+      pcall(vim.api.nvim_buf_delete, buf, { force = true })
+    end
+    if not vim.api.nvim_buf_is_valid(buf) or not vim.api.nvim_buf_is_loaded(buf) or not vim.bo[buf].buflisted then
+      vim.notify(short .. ' was deleted on disk and closed', vim.log.levels.INFO)
+    end
+  end, 400)
 end
 
 local function schedule_check(buf)
@@ -160,5 +201,21 @@ for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     watch(buf)
   end
 end
+
+-- Neovim's own check (focus, entering the buffer, :checktime) of a file deleted on disk said
+-- "E211: File … no longer available"; that case is handled above, the others as before
+vim.api.nvim_create_autocmd('FileChangedShell', {
+  group = group,
+  callback = function(event)
+    if vim.v.fcs_reason == 'deleted' then
+      vim.v.fcs_choice = ''
+      vim.schedule(function()
+        M.gone(event.buf)
+      end)
+    else
+      vim.v.fcs_choice = 'ask'
+    end
+  end,
+})
 
 return M
