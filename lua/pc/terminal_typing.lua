@@ -13,6 +13,7 @@
 --   Enter Tab Esc arrows Home End Ctrl+A B C    Vim (Enter opens a link)   program
 --     D E F G N P R U W Y Z
 --   Ctrl+H J K L (windows), mouse, wheel        Vim                        Vim
+--   Alt/Ctrl+Left / Right, Alt+BS (typing)      a word, as in the editor   the same (M.EDIT)
 --
 -- The program gets the keys in the order typed; typing starts again (Terminal mode) on the
 -- first one. Wheel down: only the turn that reaches the end of the output returns to typing.
@@ -94,6 +95,20 @@ end
 for ctrl in ('ABCDEFGNPRUWYZ'):gmatch '.' do -- the shell's: Ctrl+C, Ctrl+R history, Ctrl+A / E...
   TYPING['<C-' .. ctrl .. '>'] = true
 end
+-- editing the prompt like the editor (Alt/Cmd/Option+Left / Right a word, Alt+Backspace a word
+-- back): the terminal sent Alt+arrows as codes the shell / the agent's prompt ignore, and the log
+-- had Left ×81, Right ×86, Backspace ×84 to fix one word of a long prompt. These are the codes
+-- every prompt understands (zsh, bash, kiro-cli, claude: Esc b / Esc f, Ctrl+W).
+M.EDIT = {
+  ['<M-Left>'] = '\27b',
+  ['<M-Right>'] = '\27f',
+  ['<C-Left>'] = '\27b',
+  ['<C-Right>'] = '\27f',
+  ['<M-BS>'] = '\23',
+}
+for key in pairs(M.EDIT) do
+  TYPING[key] = true
+end
 local mouse_key = false -- the last key was the mouse
 local by_mouse = {} -- terminal buffer -> Normal mode was entered with the mouse
 local queue = {} -- terminal buffer -> keys typed since, not sent yet
@@ -121,7 +136,7 @@ vim.on_key(function(_, typed)
   -- kept until typing has started, then sent in order (keys typed fast / pasted come before
   -- Neovim is back in the terminal)
   local first = queue[buf] == nil
-  queue[buf] = (queue[buf] or '') .. typed
+  queue[buf] = (queue[buf] or '') .. (M.EDIT[name] or typed)
   if first then
     vim.schedule(function()
       local keys = queue[buf]
@@ -161,6 +176,11 @@ end
 function M.attach(buf)
   track_mouse(buf)
   map_typing(buf)
+  for key, code in pairs(M.EDIT) do
+    vim.keymap.set('t', key, function()
+      send(buf, code)
+    end, { buffer = buf, desc = 'Edit the prompt like the editor' })
+  end
   -- the wheel down to the end of the output: typing again, new output scrolls the screen
   -- only when this turn of the wheel reached the end: already there (the wheel kept turning at
   -- the last line) it stays in Normal mode, or every turn left typing and the next one came back
