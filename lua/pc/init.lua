@@ -16,6 +16,7 @@ require 'pc.projects'
 require 'pc.splits'
 require 'pc.split_diff'
 require 'pc.diff_ui'
+require 'pc.diff_hide' -- Alt+Shift+F12 / Space vd in a diff: put it away, the same key brings it back
 require 'pc.cmdline_enter'
 require 'pc.aws'
 require 'pc.aws_explorer'

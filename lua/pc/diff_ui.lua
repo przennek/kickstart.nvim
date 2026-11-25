@@ -359,6 +359,8 @@ function M.jump_to_source()
   if not diffview_open() then
     M.close()
   else
+    -- Alt+Shift+F12 / Space vd come back to this window of the diff (pc.diff_hide)
+    require('pc.diff_hide').mark_hidden(vim.api.nvim_get_current_tabpage(), vim.api.nvim_get_current_win())
     to_editor_tab(vim.api.nvim_get_current_tabpage())
   end
   if vim.fs.normalize(vim.api.nvim_buf_get_name(0)) ~= vim.fs.normalize(file) then

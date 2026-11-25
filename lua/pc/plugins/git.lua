@@ -334,10 +334,14 @@ return {
       { '<leader>vl', '<cmd>DiffviewFileHistory<CR>', desc = 'VCS: [L]og' },
       { '<leader>vh', '<cmd>DiffviewFileHistory %<CR>', desc = 'VCS: File [h]istory' },
       { '<leader>vh', ":'<,'>DiffviewFileHistory<CR>", mode = 'v', desc = 'VCS: Selection history' },
-      -- back to the open one (after F4 to the file), not a second Diffview
+      -- in a diff: hide it; outside: the hidden one back (pc.diff_hide), else back to the open
+      -- one (after F4 to the file), not a second Diffview
       {
         '<leader>vd',
         function()
+          if require('pc.diff_hide').toggle() then
+            return
+          end
           if not require('pc.diff_ui').back_to_diff() then
             vim.cmd 'DiffviewOpen'
           end

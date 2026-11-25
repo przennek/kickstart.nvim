@@ -271,9 +271,19 @@ local function in_diffview()
   return package.loaded['diffview'] and require('diffview.lib').get_current_view() ~= nil
 end
 
+local hidden_at = 0 -- when the tool windows were hidden (the diff too: the later comes back first)
+
 function M.toggle()
+  -- in a diff: the diff is put away, the same key brings it back (pc.diff_hide)
+  local diff = require 'pc.diff_hide'
+  if diff.in_diff() then
+    return diff.hide()
+  end
   if in_diffview() then
     return vim.notify('Hide All Windows: not in a diff / log tab (q closes it)', vim.log.levels.INFO)
+  end
+  if not any_tool_window() and diff.hidden() and (not hidden or diff.seq > hidden_at) then
+    return diff.restore()
   end
   -- like IDEA: visible tool windows are hidden first; with none visible the hidden ones return
   if not any_tool_window() and hidden then
@@ -298,6 +308,7 @@ function M.toggle()
       or state.dapui
     then
       hidden = state
+      hidden_at = vim.uv.hrtime()
     end
   end
 end

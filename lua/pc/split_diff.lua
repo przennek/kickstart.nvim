@@ -340,6 +340,44 @@ function M.close()
   return true
 end
 
+--- What the diff of this tab shows (branch, files, file, line), for M.restore; nil without one
+function M.snapshot()
+  local s = M.current()
+  if not s then
+    return nil
+  end
+  local cursor = vim.api.nvim_win_is_valid(s.win) and vim.api.nvim_win_get_cursor(s.win) or { 1, 0 }
+  return { ref = s.ref, root = s.root, files = vim.deepcopy(s.files), status = vim.deepcopy(s.status or {}), single = s.single, idx = s.idx, cursor = cursor }
+end
+
+--- The diff of a snapshot again, in the current window (its list on the left as before)
+function M.restore(snap)
+  M.close()
+  local s = {
+    ref = snap.ref,
+    root = snap.root,
+    files = snap.files,
+    idx = snap.idx,
+    win = vim.api.nvim_get_current_win(),
+    prev_buf = vim.api.nvim_get_current_buf(),
+    prev_cursor = vim.api.nvim_win_get_cursor(0),
+    status = snap.status,
+    single = snap.single,
+  }
+  sessions[vim.api.nvim_get_current_tabpage()] = s
+  s.state = state_of(s)
+  if not s.single then
+    M.open_list(s)
+  end
+  show(s, math.min(snap.idx, #s.files))
+  if vim.api.nvim_win_is_valid(s.win) then
+    local buf = vim.api.nvim_win_get_buf(s.win)
+    pcall(vim.api.nvim_win_set_cursor, s.win, { math.min(snap.cursor[1], vim.api.nvim_buf_line_count(buf)), snap.cursor[2] })
+    vim.api.nvim_set_current_win(s.win)
+    vim.cmd 'normal! zz'
+  end
+end
+
 -- Show Diff (Cmd+D): this file against HEAD; again closes it
 function M.toggle_file_diff()
   if M.current() then
