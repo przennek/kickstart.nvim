@@ -14,6 +14,7 @@ require 'pc.run'
 require 'pc.hide_windows'
 require 'pc.projects'
 require 'pc.splits'
+require 'pc.span' -- Alacritty over two monitors: split lines that cross the middle sit on the seam
 require 'pc.split_diff'
 require 'pc.diff_ui'
 require 'pc.diff_hide' -- Alt+Shift+F12 / Space vd in a diff: put it away, the same key brings it back
