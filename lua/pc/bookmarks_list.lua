@@ -1,6 +1,7 @@
 -- Show Bookmarks (Shift+F11 / Cmd+2), like IDEA's Bookmarks: the list, with the whole description
 -- above the code in the preview (a long one was cut off in the list), and in the list
 --   Delete / Shift+Delete / Ctrl+D (dd, x in Normal mode)   remove the bookmark, the list stays
+--                                     (a Mac keyboard has no Delete: Ctrl+D, or fn+Backspace)
 --   F2 / Ctrl+E / Cmd+F11                                   edit its description
 --   right click                                             Open / Edit Description / Delete
 --   Cmd/Alt+Shift+I                                         all of them into the prompt file
@@ -190,9 +191,21 @@ local function selected()
   return entry and entry.value
 end
 
+-- the list again with what is left: in place while it is open; after the right-click menu (its
+-- own picker replaced the list, the log: "attempt to index local 'picker'") opened anew
 local function refresh(prompt)
-  local picker = require('telescope.actions.state').get_current_picker(prompt)
-  picker:refresh(finder(), { reset_prompt = false })
+  local ok, picker = pcall(require('telescope.actions.state').get_current_picker, prompt)
+  if ok and picker then
+    picker:refresh(finder(), { reset_prompt = false })
+  else
+    vim.schedule(M.open)
+  end
+end
+
+local function remove(v)
+  local actions = bm()
+  actions.bookmark_del(v.filename, v.lnum)
+  actions.saveBookmarks()
 end
 
 local function delete(prompt)
@@ -200,22 +213,14 @@ local function delete(prompt)
   if not v then
     return
   end
-  local actions = bm()
-  actions.bookmark_del(v.filename, v.lnum)
-  actions.saveBookmarks()
+  remove(v)
   refresh(prompt)
 end
 
--- the plugin edits the description of the bookmark under the cursor: its own Edit, run on that
--- line of the file (loaded if needed) in a hidden window; the box for the text opens after that
--- window is gone (inside it, the box was not focused and typing went into the file), then the
--- list again
-local function edit(prompt)
-  local v = selected()
-  if not v then
-    return
-  end
-  require('telescope.actions').close(prompt)
+-- the plugin edits the description of the bookmark: its own Edit, run on that line of the file
+-- (loaded if needed) in a hidden window; the box for the text opens after that window is gone
+-- (inside it, the box was not focused and typing went into the file), then the list again
+local function edit_value(v)
   local buf = vim.fn.bufadd(v.filename)
   vim.fn.bufload(buf)
   local input, asked = vim.ui.input, nil
@@ -243,15 +248,30 @@ local function edit(prompt)
   end)
 end
 
-local function menu(prompt)
-  local items = { 'Open', 'Edit Description', 'Delete' }
-  vim.ui.select(items, { prompt = 'Bookmark' }, function(choice)
+local function edit(prompt)
+  local v = selected()
+  if not v then
+    return
+  end
+  require('telescope.actions').close(prompt)
+  edit_value(v)
+end
+
+-- the menu is a picker of its own that replaces the list: the bookmark is taken before it opens,
+-- the choice works on that one
+local function menu()
+  local v = selected()
+  if not v then
+    return
+  end
+  vim.ui.select({ 'Open', 'Edit Description', 'Delete' }, { prompt = 'Bookmark' }, function(choice)
     if choice == 'Open' then
-      require('telescope.actions').select_default(prompt)
+      go(v)
     elseif choice == 'Edit Description' then
-      edit(prompt)
+      edit_value(v)
     elseif choice == 'Delete' then
-      delete(prompt)
+      remove(v)
+      vim.schedule(M.open)
     end
   end)
 end
@@ -262,7 +282,7 @@ function M.open()
   bm().prune_dead(function()
     require('telescope.pickers')
       .new({}, {
-        prompt_title = 'Bookmarks  ·  Del delete  ·  F2 edit description  ·  Alt+Shift+I to in.txt  ·  right click: menu',
+        prompt_title = 'Bookmarks  ·  Del / Ctrl+D delete  ·  F2 edit description  ·  Alt+Shift+I to in.txt  ·  right click: menu',
         finder = finder(),
         default_selection_index = start_index(entries()),
         sorter = conf.generic_sorter {},
