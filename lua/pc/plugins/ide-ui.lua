@@ -171,6 +171,10 @@ return {
       direction = 'horizontal',
       -- always back in the shell prompt, also after leaving it with an IDE shortcut
       persist_mode = false,
+      -- toggleterm ran G on every chunk of output: scrolled up to read the agent's answer, the
+      -- view jumped back while it was writing (the user, 2026-11-25). Neovim itself follows the
+      -- output when the cursor is at the end (the wheel down to the end, typing)
+      auto_scroll = false,
       -- toggleterm's own start_in_insert switches the mode a moment later in whatever window
       -- has the focus by then: a terminal reopened by Hide All left the editor typing (and
       -- Alt+T there = Esc + t, waiting for a character). Typing mode only in the terminal itself:

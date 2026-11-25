@@ -57,6 +57,8 @@ local function create(name, cmd)
     direction = 'float',
     -- not one of the Alt+T terminals (:ToggleTerm, the tool window)
     hidden = true,
+    -- scrolled up, the view stays while the program writes (see pc.plugins.ide-ui)
+    auto_scroll = false,
     float_opts = {
       border = 'none',
       row = 0,
