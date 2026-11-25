@@ -36,6 +36,7 @@ return {
     if #enabled == 0 then
       return vim.notify('sonarlint-language-server is not installed yet (:Mason)', vim.log.levels.WARN)
     end
+    require('pc.lsp_guard').sonarlint_foreign_files()
     require('sonarlint').setup {
       server = { cmd = cmd },
       filetypes = enabled,

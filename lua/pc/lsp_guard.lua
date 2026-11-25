@@ -41,6 +41,40 @@ local function inside(a, b)
   return a == b or vim.fs.relpath(a, b) ~= nil or vim.fs.relpath(b, a) ~= nil
 end
 
+-- A Java file jdtls does not have in its project (another project in a subfolder, a file
+-- opened from outside): sonarlint asks jdtls whether it is a test and for its classpath, jdtls
+-- answers "Given URI does not belong to an existing Java source file", and sonarlint.nvim turned
+-- that into an error on screen (an assert, then "Error executing java.project.getClasspaths";
+-- the log 2026-11-24). Such a file is analysed without a classpath, quietly.
+local FOREIGN = 'does not belong to an existing Java source file'
+
+local function foreign(err)
+  if type(err) ~= 'table' then
+    return false
+  end
+  local text = tostring(err.message or '') .. ' ' .. tostring(type(err.data) == 'table' and err.data.message or '')
+  return text:find(FOREIGN, 1, true) ~= nil
+end
+
+function M.sonarlint_foreign_files()
+  local util = require 'sonarlint.jdtlsutil'
+  if util.pc_foreign then
+    return
+  end
+  util.pc_foreign = true
+  local execute = util.execute_command
+  util.execute_command = function(cmd, ...)
+    local err, result = execute(cmd, ...)
+    if foreign(err) then
+      if type(cmd) == 'table' and cmd.command == 'java.project.isTestFile' then
+        return nil, false
+      end
+      return nil, nil
+    end
+    return err, result
+  end
+end
+
 function M.sonarlint()
   local utils = require 'sonarlint.utils'
   local java = require 'sonarlint.java'
